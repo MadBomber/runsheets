@@ -14,17 +14,29 @@ cheap once the pieces existed.
 
 ## Milestone 2: the full block set
 
-- **`background` blocks**: Start and Stop buttons for long-running
-  processes such as a tunnel, output streamed, a "running processes" panel,
-  everything stopped when the run ends. The executor already writes every
-  execution to a log file the page tails, so this is mostly lifecycle.
-- **Redaction**: occurrences of secret input values are replaced in captured
-  output before it is written. String replacement only; encoded forms are
-  out of scope and the docs will say so.
-- **Output size**: a cap or a tail-with-marker for very large outputs in
-  the page. The file keeps everything.
-- **`capture`**: a flag that stores a block's stdout as a named input for
-  later blocks, the one escape hatch from "nothing carries over".
+Done.
+
+- **`background` blocks**: Start and Stop buttons, no timeout, output
+  streamed, a **Running** panel in the sidebar on every page, everything
+  still running stopped when the run ends and recorded as `stopped`.
+- **`terminal` blocks**: an **I ran this** button records the operator's
+  confirmation, with an optional note, as an `ack` event.
+- **Destructive confirmation moved server-side**: the first execute request
+  gets a four-character code back (HTTP 428); the block runs only when the
+  code is typed back. The record notes that the execution was confirmed.
+- **`expect` panels**: an expect block is linked to the executable block
+  above it and shown beside that block's real output with a matches/differs
+  hint.
+- **Redaction**: secret input values are replaced in captured output before
+  it reaches the `.out` file, even when a secret is split across two writes.
+  String replacement only; encoded forms are not caught and
+  [Inputs and Secrets](runbooks/inputs.md) says so.
+- **Output size**: the page shows the last 256 KB with a marker when there
+  is more. The file keeps everything.
+
+Deferred from the original list: **`capture`**, a flag that stores a block's
+stdout as a named input for later blocks. It needs a syntax for the name
+and a real runbook to prove it; see the plan's open questions.
 
 ## Milestone 3: verification and history
 

@@ -45,7 +45,7 @@ It worked when the last line prints `0`.
 | destroys or changes something irreversible | `destructive` |
 | needs a TTY, a browser, or a prompt answered | `terminal` |
 | is an example of output, a config file to copy, or SQL for another client | no flag |
-| is a tunnel or watcher that must stay up across steps | `background` (not executable yet; use `terminal` for now) |
+| is a tunnel or watcher that must stay up across steps | `background` |
 
 If you are unsure whether something is destructive, it is. The confirmation
 costs the operator three seconds; a missed confirmation costs a lot more.

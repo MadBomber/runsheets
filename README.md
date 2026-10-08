@@ -8,8 +8,9 @@ operator's acknowledgements of the manual steps.
 
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
-Status: early. Milestone 1 of the [plan](PLAN.md) works end to end; the
-block convention may still change.
+Status: early. Milestones 1 and 2 of the [plan](PLAN.md) work end to end:
+every block kind in the convention below is live. The convention may still
+change once it has met a few real runbooks.
 
 ## Install
 
@@ -118,11 +119,11 @@ flags. A block with no flag is display only, whatever its language.
 | --- | --- |
 | ```` ```bash ```` | Display only. |
 | ```` ```bash run ```` | Run button. Executed with the run's inputs in the environment; stdout, stderr and exit status recorded. |
-| ```` ```bash destructive ```` | Run button behind a typed confirmation. Implies `run`. |
+| ```` ```bash destructive ```` | Run button behind a typed confirmation code issued by the server. Implies `run`. |
 | ```` ```ruby run ```` | Same, executed with `ruby` (or the runbook's `interpreters.ruby`). |
-| ```` ```bash terminal ```` | No Run button. "Run this in your own terminal." For anything interactive. |
-| ```` ```text expect ```` | Not executed. Shown as the expected output. |
-| ```` ```bash background ```` | Reserved for long-running processes with Start and Stop buttons. Not executable yet. |
+| ```` ```bash background ```` | Start and Stop buttons. No timeout; output streams into the page; listed in the sidebar's Running panel; stopped when the run ends. |
+| ```` ```bash terminal ```` | No Run button. "Run this in your own terminal, then confirm." An **I ran this** button records the confirmation, with an optional note. |
+| ```` ```text expect ```` | Not executed. Shown beside the output of the executable block above it, with a matches/differs hint. |
 
 An unknown flag, or `run` on a language that cannot execute, renders with a
 visible warning instead of being ignored. `runsheet --check` lists them.
@@ -151,8 +152,11 @@ docs in a repository. The landing page lists previous runs.
 - Every state-changing request needs a per-process token that only a page
   served by this process knows, and the `Host` header must be a loopback
   name. Together these stop a page on another origin from driving the tool.
-- Destructive blocks ask for a typed confirmation and show the blast radius.
-- Secret inputs reach the child process but never the run record.
+- Destructive blocks show the blast radius and need a confirmation code the
+  server issues per block, checked server-side.
+- Secret inputs reach the child process but never the run record. Captured
+  output is redacted before it is written; plain string replacement, so an
+  encoded secret is not caught.
 - The tool writes nothing inside the runbook directory.
 
 ## Development

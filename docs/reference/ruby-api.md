@@ -73,8 +73,13 @@ block.id           # "010-confirm-nothing-to-preserve-1"
 block.lang         # "bash"
 block.flags        # ["run"]
 block.kind         # :display, :run, :destructive, :terminal, :expect, :background
-block.executable?  # true for :run and :destructive in a language with an interpreter
+block.executable?  # true for :run, :destructive and :background in a language with an interpreter
 block.destructive?
+block.background?
+block.terminal?
+block.acknowledgeable?  # true for :terminal
+block.expect?
+block.expect_for   # for an :expect block, the id of the executable block above it, or nil
 block.code         # the fence contents, dedented
 block.line         # line number of the opening fence
 block.warnings
@@ -138,10 +143,22 @@ session.run                     # the RunRecord, or nil
 session.resolve_inputs(given)   # what the inputs would be, without starting a run
 session.execution(id)           # a live Execution by id
 session.executions
+session.running_executions      # Executions whose process is still alive
+session.stop(execution_id)      # TERM then KILL its process group; state becomes :stopped
+session.challenge_for(block_id) # the confirmation code a destructive block currently expects
+session.execute(block_id, confirm: code)   # run a destructive block
+session.acknowledge(block_id, note: "...")  # record that a terminal block was run by hand
+session.ack(block_id)           # the latest acknowledgement Hash, or nil
+session.secret_inputs_set       # names of secret inputs that have a value
 session.step_status(slug)       # "done", "skipped" or nil
 session.history                 # previous RunRecords, newest first
 session.token                   # the session token the web layer requires
 ```
+
+Executing a destructive block without the right `confirm` raises
+`Runsheets::Session::ConfirmationRequired`, a `RunError` whose `challenge`
+is the code to pass back. `finish_run` stops anything still running before
+it closes the record.
 
 ## Executions
 
@@ -150,11 +167,13 @@ execution.id
 execution.block_id
 execution.step_slug
 execution.command        # ["bash"]
-execution.state          # :pending, :running, :finished, :timed_out, :failed
+execution.background?    # true for a background block (no timeout)
+execution.state          # :pending, :running, :finished, :timed_out, :stopped, :failed
 execution.running?
-execution.finished?      # true for finished, timed_out and failed
+execution.finished?      # true for finished, timed_out, stopped and failed
 execution.success?       # finished with exit status 0
-execution.failure?
+execution.failure?       # finished non-zero, timed_out or failed; never stopped
+execution.stopped?
 execution.timed_out?
 execution.pid
 execution.exit_status
@@ -190,6 +209,22 @@ end
 
 `run` is `start` followed by `wait`. `start` raises nothing; a spawn
 failure leaves the execution in state `:failed` with `error` set.
+`executor.stop(execution)` asks the reaper to end the process group.
+
+`start` takes a `redactor:` that every chunk of output passes through
+before it is written:
+
+```ruby
+redactor = Runsheets::Redactor.new("DB_PASSWORD" => "hunter2")
+redactor.redact("password=hunter2")   # => "password=[redacted DB_PASSWORD]"
+Runsheets::Executor.new.run(execution, code: "echo $DB_PASSWORD\n", env: { "DB_PASSWORD" => "hunter2" }, redactor:)
+execution.output                       # => "[redacted DB_PASSWORD]\n"
+```
+
+`Redactor.for(inputs, runbook)` builds the one a session uses: every
+`secret` input that has a value. `feed(chunk)` and `flush` are the
+streaming form, which holds back a tail that could be the start of a
+secret until the next chunk settles it.
 
 ## Reading run records
 
@@ -208,6 +243,7 @@ run.inputs          # non-secret inputs
 run.events          # Array of Hash with symbol keys
 run.executions      # Array of Hash with symbol keys
 run.step_status     # { "010-..." => "done" }
+run.acks            # { "020-...-3" => { at:, step:, note: } } terminal confirmations
 run.steps_done
 run.failed_executions
 run.summary         # { id:, started_at:, finished_at:, status:, duration:, executions:, failures:, steps_done: }

@@ -182,6 +182,27 @@ module Runsheets
       .rs-output { margin: 0; padding: 12px 16px; max-height: 420px; overflow: auto; font: 12.5px/1.5 var(--mono); color: #c9d1d9; white-space: pre-wrap; word-break: break-word; border: 0 !important; border-radius: 0 !important; }
       .rs-output:empty::before { content: "(no output)"; color: var(--muted); font-style: italic; }
       .rs-exit { padding: 6px 16px; border-top: 1px solid var(--border); font: 11.5px var(--mono); color: var(--muted); }
+      .rs-block.rs-stopped { border-color: rgba(255,180,84,.5); }
+      .rs-block.rs-acked { border-color: rgba(61,220,151,.5); }
+      .rs-status.stopped { color: var(--warn); } .rs-status.acked { color: var(--ok); }
+      .rs-stop { background: rgba(255,180,84,.14); border-color: rgba(255,180,84,.6); }
+      .rs-ack { background: rgba(61,220,151,.14); border-color: rgba(61,220,151,.5); }
+      .rs-panes { display: grid; grid-template-columns: 1fr; }
+      .rs-panes.has-expected { grid-template-columns: 1fr 1fr; }
+      .rs-expected { border-left: 1px solid var(--border); min-width: 0; }
+      .rs-expected .rs-pane-title { padding: 4px 16px 0; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); }
+      .rs-expected pre { margin: 0; padding: 8px 16px 12px; max-height: 420px; overflow: auto; font: 12.5px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-word; border: 0 !important; border-radius: 0 !important; }
+      .rs-expected.match { border-left-color: rgba(61,220,151,.5); } .rs-expected.match .rs-pane-title { color: var(--ok); }
+      .rs-expected.mismatch { border-left-color: rgba(255,180,84,.5); } .rs-expected.mismatch .rs-pane-title { color: var(--warn); }
+      .rs-sidebar .running h2 { color: var(--ok); }
+      .rs-sidebar .running li { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+      .rs-sidebar .running li a { display: inline; padding: 0; }
+      .rs-sidebar .running li code { font: 600 11.5px var(--mono); }
+      .rs-sidebar .running li .meta { grid-column: 1; color: var(--muted); font: 11px var(--mono); }
+      .rs-sidebar .running li button { grid-column: 2; grid-row: 1 / span 2; }
+      .rs-sidebar .running li.ended { opacity: .55; }
+      .meta code.secret { color: var(--warn); }
+      @media (max-width: 700px) { .rs-panes.has-expected { grid-template-columns: 1fr; } .rs-expected { border-left: 0; border-top: 1px solid var(--border); } }
 
       @media (max-width: 900px) {
         .rs-header { grid-template-columns: auto 1fr; height: auto; padding: 8px 12px; row-gap: 6px; }
@@ -232,51 +253,146 @@ module Runsheets
         }
 
         // Executable blocks.
-        const prior = (() => { try { return JSON.parse(document.getElementById('rs-prior')?.textContent || '{}'); } catch (e) { return {}; } })();
+        const prior = (() => {
+          try { const p = JSON.parse(document.getElementById('rs-prior')?.textContent || '{}'); return { executions: p.executions || {}, acks: p.acks || {} }; }
+          catch (e) { return { executions: {}, acks: {} }; }
+        })();
+        const headers = { 'X-Runsheets-Token': token, 'Accept': 'application/json' };
+        const post = async (path, fields) => {
+          const body = fields ? new URLSearchParams(fields) : null;
+          const res  = await fetch(path, { method: 'POST', headers, body });
+          const data = await res.json();
+          return { res, data };
+        };
+        const TRUNCATED = '[… earlier output omitted; the .out file in the run directory is complete]\n';
+        const norm = s => (s || '').replace(/[ \t]+$/gm, '').replace(/\s+$/, '');
+
+        // Fill the "expected" pane from the expect block that follows this one
+        // and say whether the actual output matches it. A hint, not a verdict.
+        const compare = (block, id, actual) => {
+          const pane   = block.querySelector('[data-role="expected"]');
+          const panes  = block.querySelector('.rs-panes');
+          const source = document.querySelector('.rs-expect[data-expect-for="' + CSS.escape(id) + '"] pre');
+          if (!pane || !source) return null;
+          const expected = source.innerText;
+          pane.querySelector('pre').textContent = expected;
+          pane.hidden = false; panes.classList.add('has-expected');
+          const match = norm(actual) === norm(expected);
+          pane.classList.toggle('match', match); pane.classList.toggle('mismatch', !match);
+          return match ? 'matches expected' : 'differs from expected';
+        };
 
         const show = (block, data) => {
-          const status = block.querySelector('[data-role="status"]');
-          const result = block.querySelector('.rs-result');
-          const output = block.querySelector('[data-role="output"]');
-          const exit   = block.querySelector('[data-role="exit"]');
-          const button = block.querySelector('[data-action="execute"]');
+          const status  = block.querySelector('[data-role="status"]');
+          const result  = block.querySelector('.rs-result');
+          const output  = block.querySelector('[data-role="output"]');
+          const exit    = block.querySelector('[data-role="exit"]');
+          const button  = block.querySelector('[data-action="execute"]');
+          const stop    = block.querySelector('[data-action="stop"]');
+          const id      = block.dataset.block;
           result.hidden = false;
-          output.textContent = data.output || '';
+          output.textContent = (data.output_truncated ? TRUNCATED : '') + (data.output || '');
           output.scrollTop = output.scrollHeight;
-          block.classList.remove('rs-ok', 'rs-failed');
+          block.classList.remove('rs-ok', 'rs-failed', 'rs-stopped');
           status.className = 'rs-status';
           if (data.state === 'running') {
             const elapsed = data.started_at ? (Date.now() - Date.parse(data.started_at)) / 1000 : null;
             status.classList.add('running'); status.textContent = 'running ' + (elapsed != null ? fmt(elapsed) : '');
             exit.textContent = 'pid ' + data.pid + ' · ' + data.command.join(' ');
             if (button) button.disabled = true;
+            if (stop) { stop.hidden = false; stop.disabled = false; stop.dataset.execution = data.id; }
             return true;
           }
           const ok = data.state === 'finished' && data.exit_status === 0;
-          block.classList.add(ok ? 'rs-ok' : 'rs-failed');
-          status.classList.add(ok ? 'ok' : 'failed');
-          status.textContent = data.state === 'timed_out' ? 'timed out' : data.state === 'failed' ? 'failed to start' : (ok ? 'ok' : 'exit ' + data.exit_status);
+          const stopped = data.state === 'stopped';
+          block.classList.add(ok ? 'rs-ok' : stopped ? 'rs-stopped' : 'rs-failed');
+          status.classList.add(ok ? 'ok' : stopped ? 'stopped' : 'failed');
+          status.textContent = data.state === 'timed_out' ? 'timed out' : data.state === 'failed' ? 'failed to start' : stopped ? 'stopped' : (ok ? 'ok' : 'exit ' + data.exit_status);
+          const verdict = data.state === 'failed' ? null : compare(block, id, data.output);
           exit.textContent = [
-            data.state === 'failed' ? data.error : 'exit ' + data.exit_status,
+            data.state === 'failed' ? data.error : (stopped ? 'stopped' : 'exit ' + data.exit_status),
             data.duration != null ? fmt(data.duration) : null,
             data.finished_at ? 'finished ' + new Date(data.finished_at).toLocaleTimeString() : null,
-            data.log ? 'log ' + data.log : null
+            data.log ? 'log ' + data.log : null,
+            verdict
           ].filter(Boolean).join(' · ');
           if (button) button.disabled = false;
+          if (stop) stop.hidden = true;
           return false;
+        };
+
+        const showAck = (block, ack) => {
+          const status = block.querySelector('[data-role="status"]');
+          const result = block.querySelector('.rs-result');
+          const exit   = block.querySelector('[data-role="exit"]');
+          const button = block.querySelector('[data-action="acknowledge"]');
+          block.classList.add('rs-acked');
+          status.className = 'rs-status acked'; status.textContent = 'confirmed';
+          result.hidden = false;
+          exit.textContent = ['confirmed ' + new Date(ack.at).toLocaleTimeString(), ack.note ? 'note: ' + ack.note : null].filter(Boolean).join(' · ');
+          if (button) button.textContent = 'Confirm again';
+        };
+
+        const fail = (block, label, err) => {
+          const status = block.querySelector('[data-role="status"]');
+          status.className = 'rs-status failed'; status.textContent = label;
+          block.querySelector('.rs-result').hidden = false;
+          block.querySelector('[data-role="exit"]').textContent = String(err.message || err);
+          block.querySelectorAll('[data-action="execute"], [data-action="acknowledge"]').forEach(b => b.disabled = false);
         };
 
         const poll = async (block, id) => {
           try {
-            const res  = await fetch('/executions/' + encodeURIComponent(id), { headers: { 'X-Runsheets-Token': token } });
+            const res  = await fetch('/executions/' + encodeURIComponent(id), { headers });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || res.statusText);
             if (show(block, data)) setTimeout(() => poll(block, id), 500);
           } catch (err) {
-            const status = block.querySelector('[data-role="status"]');
-            status.className = 'rs-status failed'; status.textContent = 'poll failed';
-            block.querySelector('[data-role="exit"]').textContent = String(err);
-            const button = block.querySelector('[data-action="execute"]'); if (button) button.disabled = false;
+            fail(block, 'poll failed', err);
+          }
+        };
+
+        // Run the block; a destructive one needs the server's confirmation code typed back.
+        const execute = async (block, id, button) => {
+          button.disabled = true;
+          const status = block.querySelector('[data-role="status"]');
+          status.className = 'rs-status running'; status.textContent = 'starting';
+          try {
+            let { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute');
+            if (res.status === 428 && data.challenge) {
+              const typed = prompt('This block is destructive. Type the code ' + data.challenge + ' to run it.');
+              if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; button.disabled = false; return; }
+              ({ res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { confirm: typed.trim() }));
+            }
+            if (!res.ok) throw new Error(data.error || res.statusText);
+            if (show(block, data)) poll(block, data.id);
+          } catch (err) {
+            fail(block, 'not run', err);
+          }
+        };
+
+        const stopExecution = async (executionId, button) => {
+          button.disabled = true;
+          try {
+            const { res, data } = await post('/executions/' + encodeURIComponent(executionId) + '/stop');
+            if (!res.ok) throw new Error(data.error || res.statusText);
+            button.textContent = 'Stopping…';
+          } catch (err) {
+            button.disabled = false; button.textContent = String(err.message || err);
+          }
+        };
+
+        const acknowledge = async (block, id, button) => {
+          const note = prompt('Confirm that you ran this in your terminal. Add a note if you like, or leave it blank.', '');
+          if (note === null) return;
+          button.disabled = true;
+          try {
+            const { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/acknowledge', { note });
+            if (!res.ok) throw new Error(data.error || res.statusText);
+            showAck(block, data);
+            button.disabled = false;
+          } catch (err) {
+            fail(block, 'not confirmed', err);
           }
         };
 
@@ -287,29 +403,40 @@ module Runsheets
             try { await navigator.clipboard.writeText(code ? code.innerText : ''); e.target.textContent = 'Copied'; setTimeout(() => e.target.textContent = 'Copy', 1200); }
             catch (err) { e.target.textContent = 'Copy failed'; }
           });
-          const button = block.querySelector('[data-action="execute"]');
-          if (button) button.addEventListener('click', async () => {
-            if (block.dataset.kind === 'destructive') {
-              const word = Math.random().toString(36).slice(2, 6);
-              const typed = prompt('This block is destructive. Type ' + word + ' to run it.');
-              if (typed !== word) return;
-            }
-            button.disabled = true;
-            const status = block.querySelector('[data-role="status"]');
-            status.className = 'rs-status running'; status.textContent = 'starting';
+          const run = block.querySelector('[data-action="execute"]');
+          if (run) run.addEventListener('click', () => execute(block, id, run));
+          const stop = block.querySelector('[data-action="stop"]');
+          if (stop) stop.addEventListener('click', () => stopExecution(stop.dataset.execution, stop));
+          const ack = block.querySelector('[data-action="acknowledge"]');
+          if (ack) ack.addEventListener('click', () => acknowledge(block, id, ack));
+          const last = prior.executions[id];
+          if (last) { if (show(block, last)) poll(block, last.id); }
+          if (prior.acks[id]) showAck(block, prior.acks[id]);
+        });
+
+        // Running-processes panel in the sidebar.
+        document.querySelectorAll('#rs-running li[data-execution]').forEach(li => {
+          const executionId = li.dataset.execution;
+          const stop   = li.querySelector('[data-action="stop"]');
+          const status = li.querySelector('[data-role="running-status"]');
+          stop?.addEventListener('click', () => stopExecution(executionId, stop));
+          const tick = async () => {
             try {
-              const res  = await fetch('/blocks/' + encodeURIComponent(id) + '/execute', { method: 'POST', headers: { 'X-Runsheets-Token': token, 'Accept': 'application/json' } });
+              const res  = await fetch('/executions/' + encodeURIComponent(executionId), { headers });
               const data = await res.json();
               if (!res.ok) throw new Error(data.error || res.statusText);
-              if (show(block, data)) poll(block, data.id);
-            } catch (err) {
-              status.className = 'rs-status failed'; status.textContent = 'not run';
-              const result = block.querySelector('.rs-result'); result.hidden = false;
-              block.querySelector('[data-role="exit"]').textContent = String(err.message || err);
-              button.disabled = false;
-            }
-          });
-          if (prior[id]) { if (show(block, prior[id])) poll(block, prior[id].id); }
+              if (data.state === 'running') {
+                const elapsed = data.started_at ? (Date.now() - Date.parse(data.started_at)) / 1000 : null;
+                status.textContent = (data.background ? 'background' : 'running') + (elapsed != null ? ' · ' + fmt(elapsed) : '') + ' · pid ' + data.pid;
+                setTimeout(tick, 1000);
+              } else {
+                li.classList.add('ended');
+                status.textContent = data.state === 'stopped' ? 'stopped' : data.state === 'finished' ? 'exit ' + data.exit_status : data.state.replace('_', ' ');
+                if (stop) stop.remove();
+              }
+            } catch (err) { status.textContent = String(err.message || err); }
+          };
+          tick();
         });
 
         // Keyboard shortcuts.

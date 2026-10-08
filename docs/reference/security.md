@@ -50,10 +50,10 @@ Sinatra's rack-protection middleware is left enabled as well, including its
 
 ### Opt-in execution
 
-Only fenced blocks whose info string carries `run` or `destructive`
-execute, and only in languages with an interpreter. Unknown flags and
-unrunnable languages are surfaced as warnings so a typo cannot quietly turn
-a block inert, or quietly make one runnable.
+Only fenced blocks whose info string carries `run`, `destructive` or
+`background` execute, and only in languages with an interpreter. Unknown
+flags and unrunnable languages are surfaced as warnings so a typo cannot
+quietly turn a block inert, or quietly make one runnable.
 
 ### Active run required
 
@@ -64,9 +64,14 @@ afterwards.
 ### Destructive confirmation
 
 Destructive blocks sit under a banner with the runbook's blast radius and
-escalation contact, and Run asks for a typed random word. The confirmation
-is client-side and is a guard against a reflexive click, not against a
-hostile operator, who could run the command in a terminal anyway.
+escalation contact. The server refuses to run one until the request carries
+a four-character code it issued for that block (HTTP 428 carries the code;
+the page prompts for it). The code is random rather than the runbook slug
+so it cannot become muscle memory, it is checked server-side so a script
+driving the API cannot skip it, and it is retired once used. It is a guard
+against a reflexive click, not against a hostile operator, who could run
+the command in a terminal anyway. The record marks the execution as
+confirmed.
 
 ### Blank inputs refused
 
@@ -76,15 +81,18 @@ before anything spawns. See [Inputs and Secrets](../runbooks/inputs.md).
 ### Secrets stay out of the record
 
 Inputs marked `secret` reach the child process and nothing else: not
-`run.json`, not `run.md`, not the active-run panel. Redaction of secrets
-that a block itself prints is not implemented yet; see
-[Roadmap](../roadmap.md).
+`run.json`, not `run.md`, not the active-run panel (which shows only that
+the secret is set). Output is redacted on its way from the child to the
+`.out` file, so a block that prints a secret records `[redacted NAME]`
+instead. This is exact string replacement and does not catch encoded or
+transformed forms; see [Inputs and Secrets](../runbooks/inputs.md#redaction).
 
-### Process groups and timeouts
+### Process groups, timeouts and stops
 
-Every execution is its own process group. Timeouts kill the group, so a
-block cannot leave a child behind. The group is created at spawn, so
-nothing runsheets kills can reach the operator's shell or the server.
+Every execution is its own process group. Timeouts, operator stops and the
+end of the run kill the group, so a block cannot leave a child behind. The
+group is created at spawn, so nothing runsheets kills can reach the
+operator's shell or the server.
 
 ### File serving
 

@@ -79,7 +79,9 @@ that appears under `~/.local/share/runsheets/runs/hello/`.
 
 ## Status
 
-Early. Milestone 1 of the [roadmap](roadmap.md) works end to end: rendering,
-executing `bash` and `ruby` blocks, destructive confirmation, manual
-acknowledgements, and the run record. The block convention may still change
-once it has met a few real runbooks.
+Early. Milestones 1 and 2 of the [roadmap](roadmap.md) work end to end:
+rendering, executing `bash` and `ruby` blocks, background processes with
+Start and Stop, destructive confirmation, terminal and manual
+acknowledgements, expected-output panels, secret redaction, and the run
+record. The block convention may still change once it has met a few real
+runbooks.

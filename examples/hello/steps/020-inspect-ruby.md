@@ -20,7 +20,8 @@ SELECT count(*) FROM runs WHERE status = 'completed';
 ```
 
 Some things cannot be run from a page at all, because they are interactive.
-Do them in your own terminal:
+Do them in your own terminal, then click **I ran this** so the run record
+shows you did, with a note if you want one:
 
 ```bash terminal
 read -r -p "Press Enter when you have looked at the output above: "

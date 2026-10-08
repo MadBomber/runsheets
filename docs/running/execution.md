@@ -42,19 +42,29 @@ therefore mean the same thing on every operator's machine.
 
 ## Output
 
-Standard output and standard error are both redirected to the execution's
-`.out` file, interleaved in the order the process wrote them. The page polls
-the tail of that file every half second while the process runs, so a
-command that prints progress is seen printing it. Up to 256 KB of the tail
-is shown in the page; the file holds everything.
+Standard output and standard error both go to one pipe, interleaved in the
+order the process wrote them. A thread in the `runsheet` process reads the
+pipe, passes each chunk through the run's redactor (see
+[Inputs and Secrets](../runbooks/inputs.md#redaction)), and appends it to
+the execution's `.out` file, flushing after every chunk. The page polls the
+tail of that file every half second while the process runs, so a command
+that prints progress is seen printing it. Up to 256 KB of the tail is shown
+in the page, with a marker when there is more; the file holds everything.
 
 Output is decoded as UTF-8 with invalid bytes replaced, both for the page
 and for the transcript.
 
+When the process exits, runsheets waits up to one second for the reader to
+drain the pipe before marking the execution finished. A grandchild the
+block left behind (`nohup something &`) keeps the pipe open; its later
+output still lands in the file, but the execution is reported finished
+without waiting for it.
+
 ## Timeouts
 
 Each step's `timeout` (default 600 seconds) bounds every execution of its
-blocks. When it expires:
+`run` and `destructive` blocks. `background` blocks have no timeout. When
+it expires:
 
 1. `SIGTERM` is sent to the process **group**, not just the interpreter, so
    a `sleep` or an `aws` command started by bash receives it too.
@@ -69,6 +79,18 @@ The process group is created with `pgroup: true` at spawn, so the killing
 cannot reach anything the operator's shell started. Stopping the `runsheet`
 server itself does not kill running blocks; finish the run first.
 
+## Stopping
+
+A running execution can be stopped by the operator: the Stop button on a
+`background` block, the Stop button in the sidebar's **Running** panel, or
+`POST /executions/:id/stop`. The same TERM, wait, KILL sequence runs and
+the execution is recorded with state `stopped`. Stopping is not a failure:
+the block's border turns amber, not red, and the step is not marked failed.
+
+Finishing or abandoning the run stops everything still running first and
+waits up to three seconds for the process groups to go away before the
+record is closed.
+
 ## States and verdicts
 
 <div class="diagram" markdown>
@@ -80,12 +102,15 @@ server itself does not kill running blocks; finish the run first.
 | `pending` | Created, not yet spawned. Visible only for an instant. | `null` |
 | `running` | The process is alive. | `null` |
 | `finished` | The process exited on its own. | its exit code, or `128 + signal` if a signal from elsewhere ended it |
-| `timed_out` | runsheets killed it. | `128 + signal` |
+| `timed_out` | runsheets killed it when the step's timeout expired. | `128 + signal` |
+| `stopped` | The operator stopped it, or the run ended while it was running. | `128 + signal` |
 | `failed` | It could not be spawned (interpreter not found, permission denied). `error` holds the message. | `null` |
 
 An execution is a **success** only when its state is `finished` and its
-exit status is `0`. The page colours the block, and the sidebar marks the
-step, on that definition.
+exit status is `0`. It is a **failure** when it is `finished` with any
+other status, `timed_out`, or `failed`. A `stopped` execution is neither.
+The page colours the block, and the sidebar marks the step, on those
+definitions.
 
 ## Concurrency
 

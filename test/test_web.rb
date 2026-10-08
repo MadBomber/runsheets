@@ -125,6 +125,87 @@ class TestWeb < Minitest::Test
     assert_includes last_response.body, "completed"
   end
 
+  def test_destructive_block_needs_the_servers_confirmation_code
+    post "/run", { "_token" => "tok" }
+    with_token
+    post "/blocks/040-exercise-failure-1/execute"
+    assert_equal 428, last_response.status
+    body = JSON.parse(last_response.body)
+    assert_match(/\A[0-9a-f]{4}\z/, body["challenge"])
+    assert_equal "040-exercise-failure-1", body["block_id"]
+
+    post "/blocks/040-exercise-failure-1/execute", { "confirm" => "nope" }
+    assert_equal 428, last_response.status
+    assert_equal body["challenge"], JSON.parse(last_response.body)["challenge"], "the same code until it is used"
+
+    post "/blocks/040-exercise-failure-1/execute", { "confirm" => body["challenge"] }
+    assert_equal 202, last_response.status
+    id = JSON.parse(last_response.body)["id"]
+    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+    assert_equal 3, JSON.parse(last_response.body)["exit_status"]
+  end
+
+  def test_background_start_stop_and_running_panel
+    post "/run", { "_token" => "tok" }
+    get "/steps/035-keep-a-clock-running"
+    assert_includes last_response.body, ">Start</button>"
+    assert_includes last_response.body, 'data-action="stop"'
+    refute_includes last_response.body, 'id="rs-running"'
+
+    with_token
+    post "/blocks/035-keep-a-clock-running-1/execute"
+    assert_equal 202, last_response.status
+    data = JSON.parse(last_response.body)
+    assert data["background"]
+    id = data["id"]
+
+    get "/"
+    assert_includes last_response.body, 'id="rs-running"'
+    assert_includes last_response.body, "data-execution=\"#{id}\""
+
+    post "/executions/#{id}/stop"
+    assert_equal 202, last_response.status
+    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+    assert_equal "stopped", JSON.parse(last_response.body)["state"]
+
+    get "/"
+    refute_includes last_response.body, 'id="rs-running"'
+    post "/executions/nope/stop"
+    assert_equal 409, last_response.status
+  end
+
+  def test_acknowledge_terminal_block
+    post "/run", { "_token" => "tok" }
+    get "/steps/020-inspect-ruby"
+    assert_includes last_response.body, 'data-action="acknowledge"'
+
+    with_token
+    post "/blocks/020-inspect-ruby-3/acknowledge", { "note" => "done" }
+    assert_equal 201, last_response.status
+    ack = JSON.parse(last_response.body)
+    assert_equal "done", ack["note"]
+    assert_equal "020-inspect-ruby-3", ack["block_id"]
+
+    get "/steps/020-inspect-ruby"
+    assert_includes last_response.body, '"acks":{"020-inspect-ruby-3"'
+
+    post "/blocks/020-inspect-ruby-1/acknowledge"
+    assert_equal 409, last_response.status
+  end
+
+  def test_expect_block_is_linked_to_the_block_above_it
+    get "/steps/010-say-hello"
+    assert_includes last_response.body, 'data-expect-for="010-say-hello-1"'
+    assert_includes last_response.body, 'data-role="expected"'
+  end
+
+  def test_active_run_panel_shows_secrets_as_set_without_values
+    post "/run", { "_token" => "tok", "inputs" => { "SECRET_WORD" => "swordfish" } }
+    get "/"
+    assert_includes last_response.body, "SECRET_WORD=•••"
+    refute_includes last_response.body, "swordfish"
+  end
+
   def test_unknown_execution_is_404_json
     with_token
     get "/executions/nope"

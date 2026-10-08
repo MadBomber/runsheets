@@ -81,14 +81,32 @@ A `secret: true` input:
 
 - is rendered as a password field,
 - is passed to the child process like any other input,
-- is never written to `run.json` or `run.md`, and is not shown in the
-  active-run panel.
+- is never written to `run.json` or `run.md`; the active-run panel shows
+  only that it is set,
+- is redacted from captured output before the output is written.
 
-!!! warning "Output is not redacted yet"
-    If a block prints a secret, the output file will contain it. Redaction
-    of captured output is on the [roadmap](../roadmap.md) for milestone 2.
-    Until then, treat the run directory with the same care as the terminal
-    scrollback it replaces, and write blocks that do not echo secrets.
+### Redaction
+
+Every execution's stdout and stderr pass through a redactor on their way
+to the `.out` file. Each occurrence of each secret value is replaced with
+`[redacted NAME]`, longest secret first, so a block that prints
+`password=hunter2` is recorded as `password=[redacted DB_PASSWORD]`. Output
+arrives in chunks and a secret can straddle two of them, so the redactor
+holds back a tail that could be the start of a secret until the next chunk
+settles it. Nothing unredacted ever reaches the disk, the page, or the
+transcript.
+
+!!! warning "String replacement only"
+    The redactor matches the value exactly as it was given. A secret that a
+    command prints base64-encoded, URL-encoded, hex-dumped, wrapped across
+    lines or inside a JWT is not caught. Treat the run directory with the
+    same care as the terminal scrollback it replaces, and write blocks that
+    do not echo secrets at all.
+
+A secret whose value is blank is not redacted (there is nothing to match).
+A very short secret would redact every occurrence of those characters in
+the output, which is a nuisance rather than a leak; prefer secrets of
+reasonable length.
 
 Credentials are never stored by runsheets. A runbook that needs one either
 asks through a secret input or hands the step to the operator's own terminal

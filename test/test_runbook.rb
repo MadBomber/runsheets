@@ -9,8 +9,8 @@ class TestRunbook < Minitest::Test
     rb = example_runbook
     assert_equal "hello", rb.slug
     assert_equal "Hello, runsheets", rb.title
-    assert_equal %w[010-say-hello 020-inspect-ruby 030-take-a-breath 040-exercise-failure], rb.steps.map(&:slug)
-    assert_equal [1, 2, 3, 4], rb.steps.map(&:position)
+    assert_equal %w[010-say-hello 020-inspect-ruby 030-take-a-breath 035-keep-a-clock-running 040-exercise-failure], rb.steps.map(&:slug)
+    assert_equal [1, 2, 3, 4, 5], rb.steps.map(&:position)
     assert_equal %w[verify rollback], rb.extras.keys
     assert_equal %w[example safe], rb.tags
     assert_equal Date.new(2026, 10, 7), rb.last_verified

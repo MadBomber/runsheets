@@ -72,6 +72,7 @@ module Runsheets
       blocks = fences.each_with_index.map do |fence, i|
         Block.new(id: "#{id_prefix}-#{i + 1}", index: i, info: fence.info, code: fence.code, line: fence.line)
       end
+      link_expectations(blocks)
 
       doc       = Kramdown::Document.new(rewritten, **KRAMDOWN_OPTIONS)
       options   = Kramdown::Options.merge(doc.options.merge(doc.root.options[:options] || {}))
@@ -83,37 +84,61 @@ module Runsheets
 
     def self.h(value) = CGI.escapeHTML(value.to_s)
 
+    # An expect block illustrates the nearest executable block above it.
+    def self.link_expectations(blocks)
+      last = nil
+      blocks.each do |block|
+        if block.executable?
+          last = block
+        elsif block.expect? && last
+          block.expect_for = last.id
+        end
+      end
+      blocks
+    end
+
     # The <div class="rs-block"> wrapper around a highlighted code block.
     def self.wrap_block(block, code_html, indent = 0)
       pad     = " " * indent
       classes = ["rs-block", "rs-#{block.kind}"]
       classes << "rs-executable" if block.executable?
       classes << "rs-warned" if block.warnings.any?
+      attrs = %(id="block-#{h block.id}" data-block="#{h block.id}" data-kind="#{block.kind}" data-lang="#{h block.lang}")
+      attrs += %( data-expect-for="#{h block.expect_for}") if block.expect_for
 
       <<~HTML
-        #{pad}<div class="#{classes.join(' ')}" id="block-#{h block.id}" data-block="#{h block.id}" data-kind="#{block.kind}" data-lang="#{h block.lang}">
+        #{pad}<div class="#{classes.join(' ')}" #{attrs}>
         #{pad}<div class="rs-toolbar">#{toolbar(block)}</div>
         #{code_html.chomp}
-        #{pad}<div class="rs-result" hidden><pre class="rs-output" data-role="output"></pre><div class="rs-exit" data-role="exit"></div></div>
+        #{pad}<div class="rs-result" hidden><div class="rs-panes"><pre class="rs-output" data-role="output"></pre><div class="rs-expected" data-role="expected" hidden><div class="rs-pane-title">expected</div><pre></pre></div></div><div class="rs-exit" data-role="exit"></div></div>
         #{pad}</div>
       HTML
     end
 
     NOTES = {
-      terminal:   "run this in your own terminal",
+      terminal:   "run this in your own terminal, then confirm",
       expect:     "expected output",
-      background: "background processes are not executable yet"
+      background: "runs until stopped or the run ends"
     }.freeze
 
     def self.toolbar(block)
       parts = ["<span class=\"rs-badge rs-#{block.kind}\">#{h block.label}</span>"]
       block.warnings.each { parts << "<span class=\"rs-warning\" title=\"authoring warning\">#{h it}</span>" }
-      parts << "<span class=\"rs-note\">#{h NOTES[block.kind]}</span>" if NOTES.key?(block.kind)
+      if block.expect_for
+        parts << "<span class=\"rs-note\">expected output of <a href=\"#block-#{h block.expect_for}\">#{h block.expect_for}</a></span>"
+      elsif NOTES.key?(block.kind)
+        parts << "<span class=\"rs-note\">#{h NOTES[block.kind]}</span>"
+      end
       parts << '<span class="rs-spacer"></span>'
       parts << '<button type="button" class="rs-btn rs-copy" data-action="copy" title="Copy to clipboard">Copy</button>'
-      if block.executable?
+      if block.background?
+        parts << '<button type="button" class="rs-btn rs-run" data-action="execute">Start</button>'
+        parts << '<button type="button" class="rs-btn rs-stop" data-action="stop" hidden>Stop</button>'
+      elsif block.executable?
         label = block.destructive? ? "Run (destructive)" : "Run"
         parts << "<button type=\"button\" class=\"rs-btn rs-run#{' rs-danger' if block.destructive?}\" data-action=\"execute\">#{label}</button>"
+      elsif block.acknowledgeable?
+        parts << '<button type="button" class="rs-btn rs-ack" data-action="acknowledge">I ran this</button>'
       end
       parts << '<span class="rs-status" data-role="status"></span>'
       parts.join

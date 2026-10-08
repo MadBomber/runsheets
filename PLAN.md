@@ -3,7 +3,7 @@
 Plan and discussion log for `runsheets`, an open-source tool that turns a directory of
 markdown files into an executable, recorded runbook served in the browser.
 
-Status: milestone 1 built and passing (see the 2026-10-07 log). Milestones 2 to 4 open.
+Status: milestones 1 and 2 built and passing (see the 2026-10-07 and 2026-10-08 log). Milestones 3 and 4 open.
 Started: 2026-10-07.
 Repo: `~/sandbox/git_repos/madbomber/runsheets`. Origin copy of this plan: `~/scripts/runbook_plan.md`.
 
@@ -55,6 +55,9 @@ The rendering is the vehicle. The run record is the point.
 | Output | Every execution writes to a log file; the page polls | One spawn path for `run` and the future `background`; a ten-minute `--wait` shows its output as it arrives instead of looking hung. |
 | Interpreters | `interpreters:` in runbook.md front matter maps a language to a command | xyzzy's Ruby snippets need `bin/rails runner -`; the same mechanism will route `sql` through `psql` when needed. |
 | Browser security | Per-process token in a meta tag, required on every non-GET request, plus loopback-only Host authorization | A page on another origin can neither read the token nor send the custom header without a preflight the app never answers; the Host check defeats DNS rebinding. |
+| Destructive confirmation | Server issues a random four-character code per block (HTTP 428), runs the block only when it comes back, retires it once used | The review's point: a typed slug becomes muscle memory. Checking server-side means a script driving the API cannot skip it either. The record notes the execution was confirmed. |
+| Redaction | Child output goes through a pipe and a reader thread that replaces secret values before writing the `.out` file, holding back a tail that could be a partial secret | Letting the child write the file directly made redaction impossible. Plain string replacement; encoded secrets are documented as out of scope. |
+| Stopped is not failed | Operator stops and run-end stops record state `stopped`, distinct from `timed_out` | A background tunnel stopped on purpose must not mark the step failed. |
 | Lineage | Builds on `~/scripts/tdv.rb` | Sinatra + kramdown GFM + rouge, directory index, breadcrumbs, search, sidebar outline. Reuse the layout and rendering; add execution and recording. |
 | Scripting language | Ruby, standard library plus the few gems tdv.rb already uses | Matches the author's tooling. |
 
@@ -260,9 +263,10 @@ recording and rendering are tested without spawning processes.
 1. **Render and run.** Done 2026-10-07. Load a runbook directory, render landing and step pages with
    tdv.rb's layout, execute `bash run` blocks, show output and exit status, write the
    run record. One real runbook converted as the fixture.
-2. **The full block set.** `manual` steps with acknowledgement, `terminal`,
-   `destructive` with typed confirmation, `background` with start, stop and streaming,
-   `expect` panels. Inputs form with secrets and redaction.
+2. **The full block set.** Done 2026-10-08. `manual` steps with acknowledgement, `terminal`
+   with recorded confirmation, `destructive` with server-checked typed confirmation,
+   `background` with start, stop and streaming, `expect` panels beside the real output.
+   Inputs form with secrets and redaction of captured output.
 3. **Verification and history.** `verify` steps and `verify.md` runnable standalone,
    `last_verified` write-back, run history on the landing page, rollback sidebar.
 4. **Packaging.** Gem with a `bin/` entry point, README with the document structure and
@@ -280,8 +284,11 @@ recording and rendering are tested without spawning processes.
 - **SQL blocks.** Routing `sql run` through a configured client (`psql` with a
   connection string from inputs) would cover a common case. Deferred until a runbook
   actually needs it.
-- **Output size.** Cap captured output per block and truncate with a marker, or stream
-  everything to disk and show the tail? Likely the latter.
+- **Output size.** Settled: everything streams to disk; the page shows the last 256 KB
+  with a marker, the transcript the last 64 KB.
+- **`capture`.** A flag that stores a block's stdout as a named input for later blocks.
+  Needs a syntax for the name (`capture=NAME`? a second word?) and a runbook that needs
+  it. Left out of milestone 2 on purpose.
 - **Whether xyzzy adopts it.** xyzzy's XYZZY-180 currently describes a `bin/rails runbook`
   CLI. If `runsheets` works, that ticket shrinks to restructuring `docs/runbooks/` into the
   directory shape and adding a launcher. Not decided; the ticket is left as written
@@ -386,3 +393,38 @@ interpreters, browser security). Still open from the review: redaction of secret
 in captured output (milestone 2), typed-token confirmation for destructive blocks
 is done client-side only, `last_verified` write-back (milestone 3), single-file
 runbooks.
+
+### 2026-10-08
+
+**Milestone 2 built.** The full block set is live; 108 minitest tests.
+
+- `background` blocks execute with no timeout. `Executor#stop` asks the reaper thread
+  to TERM then KILL the process group, and the execution ends in a new state
+  `stopped`, which `RunRecord.failure?` does not count as a failure. The sidebar has
+  a Running panel on every page with Stop buttons; `Session#finish_run` stops
+  everything still running and waits up to three seconds before closing the record.
+- Output capture moved from a file handle handed to the child to a pipe pumped by a
+  thread in the server. That is what makes redaction possible: `Redactor` replaces
+  each secret value with `[redacted NAME]`, longest first, and `feed`/`flush` hold
+  back a tail that could be the start of a secret so a value split across two
+  writes is still caught. The reaper waits up to a second for the pump to drain
+  after the child exits, so a grandchild that keeps the pipe open does not stall the
+  page.
+- Destructive confirmation moved server-side. `Session#execute(id, confirm:)` raises
+  `ConfirmationRequired` with a per-block random code; the web layer turns that into
+  HTTP 428 and the page prompts for the code. The `execute` event records
+  `confirmed: true`.
+- `terminal` blocks get an "I ran this" button. `Session#acknowledge` writes an `ack`
+  event and `run.json` gains an `acks` map; the transcript shows the confirmation
+  inline with executions and step marks.
+- `expect` blocks are linked by `Renderer.link_expectations` to the nearest executable
+  block above them (`Block#expect_for`). The page shows the expected text beside the
+  real output and says whether they match, trailing whitespace ignored. The expect
+  block stays where the author put it.
+- Smaller: `output_truncated` in execution JSON with a marker in the page; manual
+  steps get acknowledgement wording; the active run panel shows secrets as `NAME=•••`;
+  `examples/hello` gains step 035 (a background clock) and a redaction check in
+  `verify.md`.
+
+Left out on purpose: `capture` (see open questions). Open for milestone 3: `verify`
+standalone, `last_verified` write-back, richer history, the vocabulary split.

@@ -26,12 +26,30 @@ class TestBlock < Minitest::Test
     assert_empty block("bash run destructive").warnings
   end
 
-  def test_background_terminal_expect_are_not_executable_yet
-    %w[background terminal expect].each do |flag|
+  def test_background_is_executable
+    b = block("bash background")
+    assert_equal :background, b.kind
+    assert b.executable?
+    assert b.background?
+    refute b.destructive?
+  end
+
+  def test_terminal_and_expect_are_not_executable
+    %w[terminal expect].each do |flag|
       b = block("bash #{flag}")
       assert_equal flag.to_sym, b.kind
       refute b.executable?
     end
+    assert block("bash terminal").acknowledgeable?
+    refute block("bash run").acknowledgeable?
+    assert block("text expect").expect?
+  end
+
+  def test_expect_for_is_settable_and_serialised
+    b = block("text expect")
+    assert_nil b.expect_for
+    b.expect_for = "s-1"
+    assert_equal "s-1", b.to_h[:expect_for]
   end
 
   def test_unknown_flag_warns

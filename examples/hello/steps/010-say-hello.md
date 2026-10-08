@@ -13,7 +13,9 @@ echo "Hello, $NAME!"
 echo "Running block $RUNSHEETS_BLOCK of step $RUNSHEETS_STEP in run $RUNSHEETS_RUN_ID"
 ```
 
-You should see something like:
+You should see something like this. The page shows the expected output
+beside the real one and says whether they match. It is a hint, not a
+verdict: the run id differs every time, so this one always says "differs":
 
 ```text expect
 Hello, world!

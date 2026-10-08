@@ -79,7 +79,9 @@ module Runsheets
       end
 
       def execution_json(execution)
-        execution.to_h.merge(output: execution.output(tail: OUTPUT_TAIL), output_size: execution.output_size, success: execution.success?)
+        size = execution.output_size
+        execution.to_h.merge(output: execution.output(tail: OUTPUT_TAIL), output_size: size,
+                             output_truncated: size > OUTPUT_TAIL, success: execution.success?)
       end
 
       def after_step_href(step)
@@ -93,6 +95,13 @@ module Runsheets
       next if request.get? || request.head?
 
       fail_with("missing or invalid session token", 403) unless token_ok?
+    end
+
+    # A destructive block without its typed confirmation: tell the page the
+    # code to ask for. 428 Precondition Required.
+    error Session::ConfirmationRequired do
+      e = env["sinatra.error"]
+      json({ error: e.message, challenge: e.challenge, block_id: e.block_id }, status: 428)
     end
 
     error RunError do
@@ -161,13 +170,23 @@ module Runsheets
     # -- execution ------------------------------------------------------
 
     post "/blocks/:id/execute" do
-      execution = rs.execute(params["id"])
+      execution = rs.execute(params["id"], confirm: params["confirm"])
       json execution_json(execution), status: 202
+    end
+
+    post "/blocks/:id/acknowledge" do
+      ack = rs.acknowledge(params["id"], note: params["note"])
+      json ack.merge(block_id: params["id"]), status: 201
     end
 
     get "/executions/:id" do
       execution = rs.execution(params["id"]) or fail_with("no execution #{params['id']}", 404)
       json execution_json(execution)
+    end
+
+    post "/executions/:id/stop" do
+      execution = rs.stop(params["id"])
+      json execution_json(execution), status: 202
     end
   end
 end

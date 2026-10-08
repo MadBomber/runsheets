@@ -75,6 +75,61 @@ class TestRunRecord < Minitest::Test
     end
   end
 
+  def test_acknowledgements_and_confirmations_are_recorded
+    with_runs_dir do |root|
+      rb    = example_runbook
+      run   = RunRecord.start(root, rb)
+      step  = rb.step("020-inspect-ruby")
+      term  = step.blocks.find(&:terminal?)
+      run.acknowledge(term, step:, note: "pressed enter")
+      assert_equal "pressed enter", run.acks[term.id][:note]
+
+      dstep = rb.step("040-exercise-failure")
+      block = dstep.blocks.first
+      cmd, log = run.paths_for(block)
+      ex = Runsheets::Execution.new(id: "d1", block_id: block.id, step_slug: dstep.slug, command: %w[bash], cmd_path: cmd, log_path: log)
+      run.record_execution(ex, step: dstep, confirmed: true)
+      Runsheets::Executor.new.run(ex, code: "true\n")
+      run.finish!
+
+      data = JSON.parse(File.read(File.join(run.dir, "run.json")))
+      assert_equal %w[ack execute], data["events"].map { it["type"] }
+      assert_equal true, data["events"].last["confirmed"]
+      assert_equal "pressed enter", data["acks"][term.id]["note"]
+
+      md = File.read(File.join(run.dir, "run.md"))
+      assert_includes md, "`#{term.id}` (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter"
+      assert_includes md, "— ok in"
+      assert_includes md, "[confirmed]"
+
+      reloaded = RunRecord.load(run.dir)
+      assert_equal "pressed enter", reloaded.acks[term.id][:note]
+    end
+  end
+
+  def test_stopped_executions_are_not_failures
+    with_runs_dir do |root|
+      rb   = example_runbook
+      run  = RunRecord.start(root, rb)
+      step = rb.step("035-keep-a-clock-running")
+      block = step.blocks.first
+      assert block.background?
+      cmd, log = run.paths_for(block)
+      ex = Runsheets::Execution.new(id: "bg", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log, background: true)
+      run.record_execution(ex, step:)
+      executor = Runsheets::Executor.new
+      executor.start(ex, code: "sleep 30\n")
+      executor.stop(ex)
+      ex.wait(10)
+      run.finish!
+      assert_empty run.failed_executions
+      assert_includes File.read(File.join(run.dir, "run.md")), "— stopped in"
+      assert_includes File.read(File.join(run.dir, "run.md")), "[background]"
+      assert RunRecord.failure?({ state: "finished", exit_status: 1 })
+      refute RunRecord.failure?({ state: "stopped", exit_status: 143 })
+    end
+  end
+
   def test_finish_rejects_unknown_status
     with_runs_dir { |root| assert_raises(ArgumentError) { RunRecord.start(root, example_runbook).finish!(status: "weird") } }
   end

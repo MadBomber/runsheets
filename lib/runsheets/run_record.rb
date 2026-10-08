@@ -10,7 +10,7 @@ module Runsheets
   #     run.md          human-readable transcript
   #     blocks/
   #       <block-id>.<n>.cmd   the exact code that ran
-  #       <block-id>.<n>.out   its stdout + stderr
+  #       <block-id>.<n>.out   its stdout + stderr, secrets redacted
   #
   # Runs live outside the runbook so captured output never lands next to the
   # docs in a repository.
@@ -20,7 +20,7 @@ module Runsheets
     TRANSCRIPT_TAIL = 64 * 1024
 
     attr_reader :dir, :runbook_slug, :runbook_title, :started_at, :finished_at, :status,
-                :inputs, :events, :executions, :step_status
+                :inputs, :events, :executions, :step_status, :acks
 
     # Create the run directory and write the initial record. Secret inputs are
     # never stored.
@@ -41,7 +41,8 @@ module Runsheets
         status: data["status"], inputs: data["inputs"] || {},
         events: (data["events"] || []).map { it.transform_keys(&:to_sym) },
         executions: (data["executions"] || []).map { it.transform_keys(&:to_sym) },
-        step_status: data["steps"] || {}
+        step_status: data["steps"] || {},
+        acks: (data["acks"] || {}).transform_values { it.transform_keys(&:to_sym) }
       )
     end
 
@@ -62,8 +63,18 @@ module Runsheets
       "#{dir}-#{n}"
     end
 
+    # Whether an execution hash (as stored in the record) counts as a
+    # failure. A background process the operator stopped is not one.
+    def self.failure?(hash)
+      case hash[:state]
+      when "timed_out", "failed" then true
+      when "finished"            then hash[:exit_status] != 0
+      else false
+      end
+    end
+
     def initialize(dir:, runbook_slug:, runbook_title:, started_at:, inputs: {}, status: "running",
-                   finished_at: nil, events: [], executions: [], step_status: {})
+                   finished_at: nil, events: [], executions: [], step_status: {}, acks: {})
       @dir           = dir
       @runbook_slug  = runbook_slug
       @runbook_title = runbook_title
@@ -74,6 +85,7 @@ module Runsheets
       @events        = events
       @executions    = executions
       @step_status   = step_status
+      @acks          = acks
       @live          = {}
     end
 
@@ -89,8 +101,12 @@ module Runsheets
       ["#{base}.cmd", "#{base}.out"]
     end
 
-    def record_execution(execution, step:, at: Time.now)
-      events << { type: "execute", at: at.iso8601(3), step: step.slug, block: execution.block_id, execution: execution.id }
+    # +confirmed+ records that the operator typed the destructive
+    # confirmation before this execution.
+    def record_execution(execution, step:, confirmed: false, at: Time.now)
+      event = { type: "execute", at: at.iso8601(3), step: step.slug, block: execution.block_id, execution: execution.id }
+      event[:confirmed] = true if confirmed
+      events << event
       @live[execution.id] = execution
       executions << execution.to_h.merge(step: step.slug)
       self
@@ -102,6 +118,14 @@ module Runsheets
       self
     end
 
+    # The operator confirms they ran a terminal block themselves.
+    def acknowledge(block, step:, note: nil, at: Time.now)
+      ack = { at: at.iso8601(3), step: step.slug, note: }.compact
+      events << { type: "ack", block: block.id, **ack }
+      acks[block.id] = ack
+      self
+    end
+
     def finish!(status: "completed", at: Time.now)
       raise ArgumentError, "unknown status #{status}" unless STATUSES.include?(status)
 
@@ -110,7 +134,7 @@ module Runsheets
       write!
     end
 
-    def failed_executions = executions.select { it[:state] == "timed_out" || it[:state] == "failed" || (it[:state] == "finished" && it[:exit_status] != 0) }
+    def failed_executions = executions.select { RunRecord.failure?(it) }
     def steps_done        = step_status.count { |_, s| s == "done" }
 
     def execution(id) = @live[id] || executions.find { it[:id] == id }
@@ -135,7 +159,7 @@ module Runsheets
       {
         runbook: runbook_slug, title: runbook_title, id:, status:,
         started_at: started_at.iso8601(3), finished_at: finished_at&.iso8601(3),
-        duration: duration.round(3), inputs:, steps: step_status, events:, executions:
+        duration: duration.round(3), inputs:, steps: step_status, acks:, events:, executions:
       }
     end
 
@@ -161,6 +185,7 @@ module Runsheets
         case event[:type]
         when "execute" then lines.concat(execution_transcript(event))
         when "step"    then lines << "- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{" — #{event[:note]}" if event[:note]}" << ""
+        when "ack"     then lines << "- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{" — #{event[:note]}" if event[:note]}" << ""
         end
       end
       "#{lines.join("\n")}\n"
@@ -173,10 +198,16 @@ module Runsheets
       verdict = case hash[:state]
                 when "finished"  then hash[:exit_status] == 0 ? "ok" : "exit #{hash[:exit_status]}"
                 when "timed_out" then "timed out"
+                when "stopped"   then "stopped"
                 when "failed"    then "failed to start: #{hash[:error]}"
                 else hash[:state].to_s
                 end
-      lines = ["### #{event[:at]} `#{event[:block]}` (#{event[:step]}) — #{verdict}#{" in #{hash[:duration]}s" if hash[:duration]}", ""]
+      tags = []
+      tags << "background" if hash[:background]
+      tags << "confirmed" if event[:confirmed]
+      title = "### #{event[:at]} `#{event[:block]}` (#{event[:step]}) — #{verdict}#{" in #{hash[:duration]}s" if hash[:duration]}"
+      title += " [#{tags.join(', ')}]" if tags.any?
+      lines = [title, ""]
       lines << "```#{command_lang(hash)}" << read_block_file(hash[:cmd]).chomp << "```" << ""
       output = read_block_file(hash[:log], tail: TRANSCRIPT_TAIL)
       lines << "Output:" << "" << "```text" << output.chomp << "```" << "" unless output.empty?

@@ -101,8 +101,16 @@ Click **Run** again if you like. Both executions are recorded, with separate
 `.cmd` and `.out` files.
 
 The second block on that page is marked `expect`. It shows what the output
-should look like and is never executed. The third has no flag at all: it is
-the same command, display only.
+should look like and is never executed. Once the first block has run, the
+expected text appears in a pane beside the real output and the footer says
+whether they match. Here they never do, because the run id in the expected
+text is made up; that is the point of the example. The third block has no
+flag at all: it is the same command, display only.
+
+Step 2, *Inspect the Ruby that will run things*, ends with a `terminal`
+block, for things that need a real terminal. Run it in your own shell, then
+click **I ran this**. The confirmation, with a note if you add one, goes
+into the record the same way a step mark does.
 
 ### 4. Mark the step done
 
@@ -115,18 +123,28 @@ instead.
 The sidebar marks each step: `✓` done, `↷` skipped, `•` ran with no
 failures, `✗` a block failed, `·` untouched.
 
-### 5. See a failure and a timeout
+### 5. Keep something running
 
-Step 4, *Exercise a failure*, is marked destructive in its front matter even
+Step 4, *Keep a clock running*, has a `background` block with **Start** and
+**Stop** buttons instead of Run. Start it: a timestamp appears every second,
+the block has no timeout, and the sidebar grows a **Running** panel that
+follows you to every page with its own Stop button. Stop it from either
+place, or leave it; finishing the run stops it for you. Either way it is
+recorded as `stopped`, which is not a failure.
+
+### 6. See a failure and a timeout
+
+Step 5, *Exercise a failure*, is marked destructive in its front matter even
 though it is harmless, so you can see the confirmation flow. Clicking **Run
-(destructive)** asks you to type a short random word first.
+(destructive)** asks the server to run the block; the server answers with a
+four-character code instead, and the block runs only once you type it back.
 
 The first block exits 3 on purpose. The second sleeps longer than the step's
 five second timeout; runsheets sends `TERM` to the whole process group,
 waits two seconds, sends `KILL`, and records the execution as `timed_out`.
 Nothing is left running.
 
-### 6. Finish the run
+### 7. Finish the run
 
 Back on the landing page, the **Active run** panel shows how many executions
 ran and how many steps are done. **Finish run** marks the record

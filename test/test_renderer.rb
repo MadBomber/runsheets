@@ -51,6 +51,25 @@ class TestRenderer < Minitest::Test
     assert_includes html, "rs-danger"
   end
 
+  def test_expect_blocks_link_to_the_nearest_executable_block_above
+    md = "```text expect\norphan\n```\n```bash run\none\n```\nprose\n```text expect\n1\n```\n```bash\nshown\n```\n```text expect\nalso 1\n```\n```ruby run\ntwo\n```\n```text expect\n2\n```\n"
+    result = Renderer.render(md, id_prefix: "s")
+    assert_equal [nil, nil, "s-2", nil, "s-2", nil, "s-6"], result.blocks.map(&:expect_for)
+    assert_includes result.html, 'data-expect-for="s-2"'
+    assert_includes result.html, 'expected output of <a href="#block-s-2">s-2</a>'
+    assert_includes result.html, 'data-role="expected"'
+  end
+
+  def test_background_and_terminal_toolbars
+    html = Renderer.render("```bash background\nx\n```\n", id_prefix: "s").html
+    assert_includes html, ">Start</button>"
+    assert_includes html, 'data-action="stop"'
+    refute_includes html, "not executable"
+    html = Renderer.render("```bash terminal\nx\n```\n", id_prefix: "s").html
+    assert_includes html, 'data-action="acknowledge"'
+    refute_includes html, 'data-action="execute"'
+  end
+
   def test_html_in_code_is_escaped
     html = Renderer.render("```bash run\necho '<b>'\n```\n", id_prefix: "s").html
     refute_includes html, "<b>"

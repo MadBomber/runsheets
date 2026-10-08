@@ -43,7 +43,7 @@ class TestCLI < Minitest::Test
     out = StringIO.new
     err = StringIO.new
     assert_equal 0, CLI.run(["--check", RunsheetsTest::EXAMPLE_DIR], out:, err:)
-    assert_includes out.string, "4 steps, 0 warnings"
+    assert_includes out.string, "5 steps, 0 warnings"
     assert_empty err.string
   end
 

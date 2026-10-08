@@ -19,14 +19,33 @@ aws sts get-caller-identity
 | --- | --- | --- |
 | ```` ```bash ```` | display | Rendered with syntax highlighting and a Copy button. No Run button. |
 | ```` ```bash run ```` | <span class="kind run">run</span> | Run button. Executed with the run's inputs in the environment; stdout, stderr, exit status and timing recorded. |
-| ```` ```bash destructive ```` | <span class="kind destructive">destructive</span> | Run button behind a typed confirmation. Implies `run`. The step shows the blast-radius banner. |
+| ```` ```bash destructive ```` | <span class="kind destructive">destructive</span> | Run button behind a typed confirmation code that the server issues per block. Implies `run`. The step shows the blast-radius banner. |
 | ```` ```ruby run ```` | <span class="kind run">run</span> | Same as `bash run`, executed with `ruby` or the runbook's `interpreters.ruby`. |
-| ```` ```bash terminal ```` | <span class="kind terminal">terminal</span> | No Run button. Labelled "run this in your own terminal". For anything interactive: `read -s`, an SSO login that opens a browser, an interactive `psql` session. |
-| ```` ```text expect ```` | <span class="kind expect">expect</span> | Never executed. Labelled "expected output". A visual hint for the operator; it does not gate pass or fail. |
-| ```` ```bash background ```` | <span class="kind background">background</span> | Reserved for long-running processes such as a tunnel, with Start and Stop buttons. Recognised but not executable yet. |
+| ```` ```bash background ```` | <span class="kind background">background</span> | Start and Stop buttons for long-running processes such as a tunnel or a log tail. No timeout. Output streams into the page; the process is listed in the sidebar's **Running** panel on every page; anything still running is stopped when the run ends and recorded as `stopped`, not as a failure. |
+| ```` ```bash terminal ```` | <span class="kind terminal">terminal</span> | No Run button. Labelled "run this in your own terminal, then confirm". For anything interactive: `read -s`, an SSO login that opens a browser, an interactive `psql` session. An **I ran this** button records the operator's confirmation, with an optional note. |
+| ```` ```text expect ```` | <span class="kind expect">expect</span> | Never executed. Linked to the nearest executable block above it and shown beside that block's real output with a "matches expected" or "differs from expected" hint. A hint for the operator; it does not gate pass or fail. |
 
 Flags are additive where it makes sense: `bash run destructive` and
 `bash destructive` are the same thing.
+
+### Expect blocks
+
+An `expect` block illustrates the executable block nearest above it in the
+same document, whatever prose sits between them. Its toolbar says which
+block it belongs to and links to it. When that block has run, the page
+shows the expected text in a pane beside the actual output and compares
+them with trailing whitespace ignored. An expect block with no executable
+block above it is just displayed.
+
+### Background blocks
+
+A background block is for something that must stay up while later steps
+run. It has no timeout, so the step's `timeout` does not apply to it. Stop
+it from its own Stop button, from the Running panel on any page, or by
+finishing the run. The process group gets `TERM`, then `KILL` two seconds
+later if needed, and the execution is recorded with state `stopped`. A
+background process that exits on its own is recorded like a `run` block:
+`finished` with its exit status, which counts as a failure if non-zero.
 
 ## Which languages execute
 

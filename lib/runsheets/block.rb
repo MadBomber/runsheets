@@ -5,10 +5,10 @@ module Runsheets
   #
   #   ```bash              display only
   #   ```bash run          Run button
-  #   ```bash destructive  Run button behind a confirmation (implies run)
-  #   ```bash background   start/stop (not executable yet)
-  #   ```bash terminal     operator runs it in their own terminal
-  #   ```text expect       expected output, never executed
+  #   ```bash destructive  Run button behind a typed confirmation (implies run)
+  #   ```bash background   Start and Stop buttons; output streams until stopped
+  #   ```bash terminal     operator runs it in their own terminal and confirms
+  #   ```text expect       expected output of the preceding executable block
   class Block
     KINDS = %i[display run background destructive terminal expect].freeze
 
@@ -20,9 +20,8 @@ module Runsheets
       "expect"      => :expect
     }.freeze
 
-    # Kinds the tool executes today. :background joins once streaming
-    # processes land.
-    EXECUTABLE_KINDS = %i[run destructive].freeze
+    # Kinds the tool spawns a process for.
+    EXECUTABLE_KINDS = %i[run destructive background].freeze
 
     # Languages that can execute and the command that runs a file of them.
     # A runbook can add or override entries in its front matter.
@@ -34,6 +33,10 @@ module Runsheets
     }.freeze
 
     attr_reader :id, :index, :lang, :flags, :code, :line, :kind, :warnings
+
+    # For an :expect block, the id of the executable block it illustrates
+    # (the nearest one above it). Set by Renderer once every block is known.
+    attr_accessor :expect_for
 
     def initialize(id:, index:, info:, code:, line: nil)
       @id    = id
@@ -61,7 +64,7 @@ module Runsheets
       extra = kinds - [:run, kind]
       warnings << "conflicting flags: #{kinds.join(', ')}; using #{kind}" if extra.any?
 
-      if %i[run destructive background].include?(kind) && !INTERPRETERS.key?(lang)
+      if EXECUTABLE_KINDS.include?(kind) && !INTERPRETERS.key?(lang)
         warnings << (lang.empty? ? "a block without a language cannot execute" : "#{lang} blocks cannot execute; displayed only")
       end
 
@@ -70,14 +73,20 @@ module Runsheets
 
     def executable?  = EXECUTABLE_KINDS.include?(kind) && INTERPRETERS.key?(lang)
     def destructive? = kind == :destructive
+    def background?  = kind == :background
+    def terminal?    = kind == :terminal
+    def expect?      = kind == :expect
     def display?     = kind == :display
     def label        = flags.empty? ? lang : "#{lang} #{flags.join(' ')}"
+
+    # Terminal blocks are not executed; the operator confirms they ran them.
+    def acknowledgeable? = terminal?
 
     # Names of $VARIABLES the code refers to.
     def referenced_variables = code.scan(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/).flatten.uniq
 
     def to_h
-      { id:, index:, lang:, flags:, kind:, line:, executable: executable?, warnings:, code: }
+      { id:, index:, lang:, flags:, kind:, line:, executable: executable?, expect_for:, warnings:, code: }
     end
   end
 end

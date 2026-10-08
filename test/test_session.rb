@@ -44,7 +44,9 @@ class TestSession < Minitest::Test
       s.mark_step("010-say-hello", status: "done", note: "  ")
       assert_equal "done", s.step_status("010-say-hello")
 
-      failed = s.execute("040-exercise-failure-1").wait
+      error = assert_raises(Runsheets::Session::ConfirmationRequired) { s.execute("040-exercise-failure-1") }
+      assert_raises(Runsheets::Session::ConfirmationRequired) { s.execute("040-exercise-failure-1", confirm: "wrong") }
+      failed = s.execute("040-exercise-failure-1", confirm: error.challenge).wait
       assert_equal 3, failed.exit_status
       assert_equal "failed", Runsheets::Pages.step_mark(s, s.runbook.step("040-exercise-failure"))
 
@@ -84,6 +86,80 @@ class TestSession < Minitest::Test
       assert ex.success?
       assert_equal({ "NAME" => "world" }, s.run.inputs)
       refute_includes File.read(File.join(s.run.dir, "run.json")), "swordfish"
+    end
+  end
+
+  def test_destructive_confirmation_is_a_per_block_challenge
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run
+      a = s.challenge_for("040-exercise-failure-1")
+      assert_match(/\A[0-9a-f]{4}\z/, a)
+      assert_equal a, s.challenge_for("040-exercise-failure-1")
+      ex = s.execute("040-exercise-failure-1", confirm: " #{a} ").wait
+      assert_equal 3, ex.exit_status
+      refute_equal a, s.challenge_for("040-exercise-failure-1"), "a used challenge is retired"
+      assert_equal true, s.run.events.find { it[:type] == "execute" }[:confirmed]
+    end
+  end
+
+  def test_background_block_runs_without_timeout_until_stopped
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run
+      ex = s.execute("035-keep-a-clock-running-1")
+      assert ex.background?
+      assert_nil ex.timeout
+      assert_equal [ex], s.running_executions
+      wait_for { ex.output.include?("still here") }
+      s.stop(ex.id)
+      ex.wait(10)
+      assert ex.stopped?
+      assert_empty s.running_executions
+      assert_equal "ran", Runsheets::Pages.step_mark(s, s.runbook.step("035-keep-a-clock-running"))
+      assert_raises(Runsheets::RunError) { s.stop("nope") }
+    end
+  end
+
+  def test_finishing_the_run_stops_whatever_is_still_running
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run
+      bg = s.execute("035-keep-a-clock-running-1")
+      wait_for { bg.output.include?("still here") }
+      s.finish_run(status: "abandoned")
+      assert bg.stopped?
+      refute s.active?
+      data = JSON.parse(File.read(File.join(s.run.dir, "run.json")))
+      assert_equal "stopped", data["executions"].first["state"]
+    end
+  end
+
+  def test_acknowledge_records_terminal_blocks_only
+    with_runs_dir do |root|
+      s = session(root)
+      assert_raises(Runsheets::RunError) { s.acknowledge("020-inspect-ruby-3") }
+      s.start_run
+      ack = s.acknowledge("020-inspect-ruby-3", note: "  pressed enter ")
+      assert_equal "pressed enter", ack[:note]
+      assert_equal "pressed enter", s.ack("020-inspect-ruby-3")[:note]
+      assert_equal "ran", Runsheets::Pages.step_mark(s, s.runbook.step("020-inspect-ruby"))
+      assert_raises(Runsheets::RunError) { s.acknowledge("020-inspect-ruby-1") }
+      assert_raises(Runsheets::RunError) { s.acknowledge("nope") }
+      assert_includes File.read(File.join(s.run.dir, "run.md")), "confirmed run in the operator's terminal — pressed enter"
+    end
+  end
+
+  def test_secrets_are_redacted_from_captured_output
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run(inputs: { "SECRET_WORD" => "swordfish" })
+      ex = s.execute("verify-2").wait
+      assert ex.success?
+      assert_includes ex.output, "the secret is [redacted SECRET_WORD]"
+      refute_includes File.binread(ex.log_path), "swordfish"
+      refute_includes File.read(File.join(s.run.dir, "run.md")), "swordfish"
+      assert_equal %w[SECRET_WORD], s.secret_inputs_set
     end
   end
 

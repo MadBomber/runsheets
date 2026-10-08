@@ -9,7 +9,7 @@ outside the runbook:
   run.md            human-readable transcript of the same
   blocks/
     010-say-hello-1.1.cmd         the exact code that ran
-    010-say-hello-1.1.out         its stdout + stderr, interleaved
+    010-say-hello-1.1.out         its stdout + stderr, interleaved, secrets redacted
     010-say-hello-1.2.cmd         the same block, run a second time
     010-say-hello-1.2.out
 ```
@@ -70,17 +70,24 @@ Hello, smoke!
 
 ...
 
+### 2026-10-07T17:33:52.002-05:00 `035-keep-a-clock-running-1` (035-keep-a-clock-running) — stopped in 4.1s [background]
+
+...
+
+- 2026-10-07T17:33:55.120-05:00 `020-inspect-ruby-3` (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter
+
 - 2026-10-07T17:33:58.448-05:00 step **010-say-hello** marked done — smoke ok
 ```
 
-Events appear in the order they happened, executions and step marks
-interleaved, so jumping around is visible rather than hidden. Output longer
-than 64 KB is trimmed to its tail in the transcript with a marker; the
-`.out` file is complete.
+Events appear in the order they happened: executions, terminal
+confirmations and step marks interleaved, so jumping around is visible
+rather than hidden. Output longer than 64 KB is trimmed to its tail in the
+transcript with a marker; the `.out` file is complete.
 
 The verdict after the block id is one of `ok`, `exit N`, `timed out`,
-`failed to start: <error>`, or the raw state if the run was abandoned while
-the block was still running.
+`stopped`, `failed to start: <error>`, or the raw state if the run was
+abandoned while the block was still running. Tags in brackets after it
+mark a `background` execution and a destructive one that was `confirmed`.
 
 ## `run.json`
 
@@ -95,9 +102,16 @@ the block was still running.
   "duration": 9.656,
   "inputs": { "NAME": "smoke" },
   "steps": { "010-say-hello": "done" },
+  "acks": {
+    "020-inspect-ruby-3": { "at": "2026-10-07T17:33:55.120-05:00", "step": "020-inspect-ruby", "note": "pressed enter" }
+  },
   "events": [
     { "type": "execute", "at": "2026-10-07T17:33:48.863-05:00",
       "step": "010-say-hello", "block": "010-say-hello-1", "execution": "1b6a8f0c2d3e" },
+    { "type": "execute", "at": "2026-10-07T17:33:50.134-05:00",
+      "step": "040-exercise-failure", "block": "040-exercise-failure-1", "execution": "9c1d2e3f4a5b", "confirmed": true },
+    { "type": "ack", "block": "020-inspect-ruby-3", "at": "2026-10-07T17:33:55.120-05:00",
+      "step": "020-inspect-ruby", "note": "pressed enter" },
     { "type": "step", "at": "2026-10-07T17:33:58.448-05:00",
       "step": "010-say-hello", "status": "done", "note": "smoke ok" }
   ],
@@ -107,6 +121,7 @@ the block was still running.
       "block_id": "010-say-hello-1",
       "step": "010-say-hello",
       "command": ["bash"],
+      "background": false,
       "state": "finished",
       "pid": 83412,
       "started_at": "2026-10-07T17:33:48.871-05:00",
@@ -134,15 +149,19 @@ the block was still running.
 | `duration` | Seconds, to the millisecond. For a running run, time elapsed so far at the last write. |
 | `inputs` | The non-secret inputs the run was started with. Secrets are never written. |
 | `steps` | Step slug to the operator's last mark, `done` or `skipped`. Steps never marked are absent. |
+| `acks` | Terminal block id to the operator's latest confirmation: `at`, `step`, and `note` when one was given. |
 | `events` | Everything that happened, in order. |
 | `executions` | One entry per execution, in start order. |
 
 ### Events
 
-Two types:
+Three types:
 
 - `execute`: `at`, `step`, `block`, and the `execution` id to look up in
-  `executions`.
+  `executions`. `confirmed: true` when the block was destructive and the
+  operator typed the confirmation code.
+- `ack`: `at`, `step`, `block`, and `note` when one was given. The operator
+  confirmed they ran a `terminal` block themselves.
 - `step`: `at`, `step`, `status` (`done` or `skipped`), and `note` when one
   was given.
 
@@ -153,7 +172,8 @@ Two types:
 | `id` | Twelve hex characters, unique within the process. |
 | `block_id`, `step` | Which block ran, and the step it belongs to. |
 | `command` | The interpreter command, before the `.cmd` path is appended. |
-| `state` | `pending`, `running`, `finished`, `timed_out`, `failed`. See [Execution Model](execution.md). |
+| `background` | `true` for a `background` block. |
+| `state` | `pending`, `running`, `finished`, `timed_out`, `stopped`, `failed`. See [Execution Model](execution.md). |
 | `pid` | The child's process id, which is also its process group id. |
 | `started_at`, `finished_at`, `duration` | As for the run. |
 | `exit_status` | The exit code, or `128 + signal`, or `null`. |
@@ -164,9 +184,10 @@ Two types:
 ## When the record is written
 
 - At run start, with no events.
-- After every execution starts, every step mark, and the first time a
-  finished execution is observed by the page's polling.
-- At finish.
+- After every execution starts, every step mark, every terminal
+  confirmation, and the first time a finished execution is observed by the
+  page's polling.
+- At finish, after anything still running has been stopped.
 
 So a `run.json` read while a run is active is at most one poll interval
 behind. If the `runsheet` process is killed mid-run, the record stays with

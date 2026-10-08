@@ -34,6 +34,7 @@ module Runsheets
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <meta name="rs-token" content="#{h session.token}">
+          <meta name="rs-runbook" content="#{h runbook.slug}">
           <title>#{h title} · #{h runbook.title}</title>
           <style>#{Assets.stylesheet}</style>
         </head>
@@ -133,6 +134,7 @@ module Runsheets
 
       <<~HTML
         <aside class="rs-sidebar">
+          #{running_panel(session)}
           <section>
             <h2>Steps</h2>
             <ol class="steps">#{items.join}</ol>
@@ -141,6 +143,31 @@ module Runsheets
           #{rollback}
           <section class="outline"><h2>On this page</h2><ol id="outline"></ol></section>
         </aside>
+      HTML
+    end
+
+    # Processes still running in the active run, each with a Stop button.
+    # The page's JavaScript keeps the entries current.
+    def self.running_panel(session)
+      running = session.running_executions
+      return "" if running.empty?
+
+      items = running.map do |ex|
+        step = session.runbook.step(ex.step_slug)
+        href = step ? "#{step_href(step)}#block-#{Rack::Utils.escape_path(ex.block_id)}" : "#"
+        <<~LI
+          <li data-execution="#{h ex.id}">
+            <a href="#{h href}" title="#{h ex.step_slug}"><code>#{h ex.block_id}</code></a>
+            <span class="meta" data-role="running-status">#{ex.background? ? 'background' : 'running'} · pid #{ex.pid}</span>
+            <button type="button" class="rs-btn rs-stop" data-action="stop" data-execution="#{h ex.id}">Stop</button>
+          </li>
+        LI
+      end
+      <<~HTML
+        <section class="running" id="rs-running">
+          <h2>Running</h2>
+          <ul>#{items.join}</ul>
+        </section>
       HTML
     end
 
@@ -153,10 +180,10 @@ module Runsheets
       return "pending" unless run
 
       executions = run.refresh!.executions.select { it[:step] == step.slug }
-      return "pending" if executions.empty?
+      acked      = run.acks.values.any? { it[:step] == step.slug }
+      return "pending" if executions.empty? && !acked
 
-      failures = executions.select { it[:state] == "timed_out" || it[:state] == "failed" || (it[:state] == "finished" && it[:exit_status] != 0) }
-      failures.any? ? "failed" : "ran"
+      executions.any? { RunRecord.failure?(it) } ? "failed" : "ran"
     end
 
     # ------------------------------------------------------------------
@@ -212,7 +239,7 @@ module Runsheets
           <section class="panel">
             <h2>Active run</h2>
             <p><strong>#{h run.id}</strong> started #{h run.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{run.executions.size} execution#{'s' unless run.executions.size == 1} · #{run.steps_done} of #{runbook.steps.size} steps done · <a href="/run">view record</a></p>
-            #{run.inputs.empty? ? '' : "<p class=\"meta\">Inputs: #{run.inputs.map { |k, v| "<code>#{h k}=#{h v}</code>" }.join(' ')}</p>"}
+            #{inputs_line(run.inputs, session.secret_inputs_set)}
             <div class="btn-row">
               #{runbook.steps.first ? "<a class=\"btn primary\" href=\"#{h step_href(runbook.steps.first)}\">Go to first step</a>" : ''}
               <form method="post" action="/run/finish"><input type="hidden" name="_token" value="#{h session.token}"><input type="hidden" name="status" value="completed"><button class="btn ok" type="submit">Finish run</button></form>
@@ -242,6 +269,15 @@ module Runsheets
           </section>
         HTML
       end
+    end
+
+    # The active run's inputs: values for plain inputs, "set" for secrets.
+    def self.inputs_line(inputs, secrets_set)
+      parts = inputs.map { |k, v| "<code>#{h k}=#{h v}</code>" }
+      parts += secrets_set.map { "<code class=\"secret\" title=\"secret, not recorded\">#{h it}=•••</code>" }
+      return "" if parts.empty?
+
+      "<p class=\"meta\">Inputs: #{parts.join(' ')}</p>"
     end
 
     def self.steps_list(session)
@@ -292,10 +328,11 @@ module Runsheets
       badges << '<span class="badge destructive">destructive</span>' if step.destructive?
       badges << "<span class=\"badge\">timeout #{step.timeout}s</span>" if step.executable_blocks.any?
 
+      confirm = " Running a destructive block asks you to type a confirmation code first."
       banner = if step.destructive? && runbook.blast_radius
-                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>Blast radius</strong><br>#{h runbook.blast_radius}#{runbook.escalation ? "<br><strong>Escalation</strong><br>#{h runbook.escalation}" : ''}</div></div>"
+                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>Blast radius</strong><br>#{h runbook.blast_radius}#{runbook.escalation ? "<br><strong>Escalation</strong><br>#{h runbook.escalation}" : ''}<br>#{confirm}</div></div>"
                elsif step.destructive?
-                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>This step is destructive.</strong> Read it fully before running anything.</div></div>"
+                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>This step is destructive.</strong> Read it fully before running anything.#{confirm}</div></div>"
                else
                  ""
                end
@@ -319,15 +356,19 @@ module Runsheets
     def self.mark_panel(session, step)
       return "" unless session.active? && step.position
 
-      status = session.step_status(step.slug)
+      status  = session.step_status(step.slug)
+      heading = step.manual? ? "Acknowledge this step" : "Step status"
+      done    = step.manual? ? "I have done this, continue" : "Mark done and continue"
+      hint    = step.manual? ? "A manual step is complete when you say so. The acknowledgement and your note go into the run record." : ""
       <<~HTML
         <section class="panel">
-          <h2>Step status#{status ? ": #{h status}" : ''}</h2>
+          <h2>#{heading}#{status ? ": #{h status}" : ''}</h2>
+          #{hint.empty? ? '' : "<p class=\"meta\">#{hint}</p>"}
           <form method="post" action="#{h step_href(step)}/mark">
             <input type="hidden" name="_token" value="#{h session.token}">
             <div class="field"><label for="note">Note (optional)</label><input type="text" id="note" name="note" placeholder="What you checked, what you saw"></div>
             <div class="btn-row">
-              <button class="btn ok" type="submit" name="status" value="done">Mark done and continue</button>
+              <button class="btn ok" type="submit" name="status" value="done">#{done}</button>
               <button class="btn" type="submit" name="status" value="skipped">Skip</button>
             </div>
           </form>
@@ -342,17 +383,20 @@ module Runsheets
       "<nav class=\"step-nav\">#{left}#{right}</nav>"
     end
 
-    # The last execution of each block on this step, for the page to restore.
+    # The last execution of each block on this step, and the terminal
+    # blocks the operator has confirmed, for the page to restore.
     def self.prior_executions_json(session, step)
       run = session.run
       return "{}" unless run
 
       latest = {}
       run.executions.each { latest[it[:block_id]] = it if step.block(it[:block_id]) }
-      JSON.generate(latest.transform_values do |hash|
+      executions = latest.transform_values do |hash|
         live = session.execution(hash[:id])
         (live ? live.to_h : hash).merge(output: output_for(run, live, hash), success: hash[:state] == "finished" && hash[:exit_status] == 0)
-      end).gsub("</", "<\\/")
+      end
+      acks = run.acks.select { |block_id, _| step.block(block_id) }
+      JSON.generate({ executions:, acks: }).gsub("</", "<\\/")
     end
 
     def self.output_for(run, live, hash)

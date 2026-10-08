@@ -63,6 +63,50 @@ class TestExecutor < Minitest::Test
     end
   end
 
+  def test_redacts_secrets_in_output_even_across_chunks
+    Dir.mktmpdir do |dir|
+      redactor = Runsheets::Redactor.new("PW" => "swordfish")
+      ex = Runsheets::Executor.new.run(execution(dir), code: "printf 'pw=swor'; sleep 0.2; printf 'dfish ok\\n'; echo swordfish >&2\n",
+                                                       env: { "PW" => "swordfish" }, redactor:)
+      assert ex.success?
+      assert_equal "pw=[redacted PW] ok\n[redacted PW]\n", ex.output
+      refute_includes File.binread(ex.log_path), "swordfish"
+    end
+  end
+
+  def test_stop_ends_the_process_group_and_records_stopped
+    Dir.mktmpdir do |dir|
+      executor = Runsheets::Executor.new
+      ex = executor.start(execution(dir), code: "echo up; sleep 30; echo never\n")
+      wait_for { ex.output.include?("up") }
+      assert ex.running?
+      executor.stop(ex)
+      ex.wait(10)
+      assert ex.stopped?
+      refute ex.failure?
+      refute ex.success?
+      assert_equal "up\n", ex.output
+      assert_equal "stopped", ex.to_h[:state]
+      assert_raises(Errno::ESRCH) { Process.kill(0, -ex.pid) }
+    end
+  end
+
+  def test_stop_on_a_finished_execution_is_a_no_op
+    Dir.mktmpdir do |dir|
+      ex = Runsheets::Executor.new.run(execution(dir), code: "true\n")
+      refute ex.request_stop!
+      assert ex.success?
+    end
+  end
+
+  def test_background_flag_is_carried
+    Dir.mktmpdir do |dir|
+      ex = Runsheets::Execution.new(id: "e", block_id: "b", step_slug: "s", command: %w[bash], cmd_path: File.join(dir, "c"), log_path: File.join(dir, "o"), background: true)
+      assert ex.background?
+      assert ex.to_h[:background]
+    end
+  end
+
   def test_output_tail
     Dir.mktmpdir do |dir|
       ex = Runsheets::Executor.new.run(execution(dir), code: "printf 'abcdef'\n")

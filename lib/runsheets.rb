@@ -7,12 +7,20 @@ require "shellwords"
 require "yaml"
 
 require_relative "runsheets/version"
+
+module Runsheets
+  class Error < StandardError; end
+  class RunbookError < Error; end
+  class RunError < Error; end
+end
+
 require_relative "runsheets/front_matter"
 require_relative "runsheets/fences"
 require_relative "runsheets/block"
 require_relative "runsheets/renderer"
 require_relative "runsheets/step"
 require_relative "runsheets/runbook"
+require_relative "runsheets/redactor"
 require_relative "runsheets/execution"
 require_relative "runsheets/executor"
 require_relative "runsheets/run_record"
@@ -27,10 +35,6 @@ require_relative "runsheets/session"
 # The web layer (Web, Pages, Assets) and the command line (CLI) are loaded on
 # demand so the model can be used without Sinatra.
 module Runsheets
-  class Error < StandardError; end
-  class RunbookError < Error; end
-  class RunError < Error; end
-
   DEFAULT_RUNS_DIR = File.join(Dir.home, ".local", "share", "runsheets", "runs")
 
   autoload :Assets, File.expand_path("runsheets/assets", __dir__)

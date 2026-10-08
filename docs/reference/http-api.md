@@ -53,7 +53,8 @@ curl -X POST --data-urlencode "_token=$TOKEN" \
 ### `POST /run/finish`
 
 Form fields: `_token`, `status` (`completed`, default, or `abandoned`).
-Responds **303** to the landing page, or **409** with no active run.
+Anything still running is stopped first. Responds **303** to the landing
+page, or **409** with no active run.
 
 ### `POST /steps/:slug/mark`
 
@@ -65,8 +66,9 @@ status; **409** with no active run.
 
 ### `POST /blocks/:id/execute`
 
-Starts executing a block. No body. Responds **202** with the execution as
-JSON, including its initial (usually empty) output.
+Starts executing a `run`, `destructive` or `background` block. Responds
+**202** with the execution as JSON, including its initial (usually empty)
+output.
 
 ```bash
 curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
@@ -78,6 +80,7 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
   "block_id": "010-say-hello-1",
   "step": "010-say-hello",
   "command": ["bash"],
+  "background": false,
   "state": "running",
   "pid": 83412,
   "started_at": "2026-10-07T17:33:48.871-05:00",
@@ -90,8 +93,26 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
   "log": "010-say-hello-1.1.out",
   "output": "",
   "output_size": 0,
+  "output_truncated": false,
   "success": false
 }
+```
+
+A **destructive** block needs a confirmation code. The first request
+without one is answered **428** with the code to type:
+
+```json
+{ "error": "destructive block 040-exercise-failure-1 needs confirmation: type 72bd",
+  "challenge": "72bd", "block_id": "040-exercise-failure-1" }
+```
+
+Send it back as the `confirm` form field. The code is issued per block,
+stays the same until it is used, and is retired by the execution it
+confirmed. A wrong code gets the same 428 again.
+
+```bash
+CODE=$(curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/040-exercise-failure-1/execute | jq -r .challenge)
+curl -s -X POST -H "X-Runsheets-Token: $TOKEN" -d "confirm=$CODE" $B/blocks/040-exercise-failure-1/execute
 ```
 
 Errors are **409** with `{"error": "..."}`:
@@ -101,17 +122,43 @@ Errors are **409** with `{"error": "..."}`:
 - `block <id> is not executable (<kind>)`
 - `blank input referenced by block: NAME`
 
+### `POST /blocks/:id/acknowledge`
+
+Records that the operator ran a `terminal` block in their own terminal.
+Form field `note` is optional. Responds **201** with the acknowledgement:
+
+```json
+{ "at": "2026-10-07T17:33:55.120-05:00", "step": "020-inspect-ruby",
+  "note": "pressed enter", "block_id": "020-inspect-ruby-3" }
+```
+
+**409** with no active run, an unknown block, or a block that is not
+`terminal`.
+
 ### `GET /executions/:id`
 
 The current state of an execution, same shape as above. `output` is the
-last 256 KB of the log; `output_size` is the full size. **404** for an
-unknown id. Requires no token (it is a GET) but, like every request, a
-loopback `Host`.
+last 256 KB of the log, `output_size` is the full size and
+`output_truncated` says whether anything was cut. **404** for an unknown
+id. Requires no token (it is a GET) but, like every request, a loopback
+`Host`.
 
 The page polls this every 500 ms until `state` is no longer `running`.
 
 ```bash
 curl -s $B/executions/1b6a8f0c2d3e | jq '{state, exit_status, output}'
+```
+
+### `POST /executions/:id/stop`
+
+Asks a running execution to stop: `TERM` to its process group, `KILL` two
+seconds later if needed. Responds **202** with the execution as it is at
+that moment (usually still `running`); poll `GET /executions/:id` until the
+state is `stopped`. Stopping an execution that has already ended is a
+no-op. **409** for an unknown id.
+
+```bash
+curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e/stop
 ```
 
 ## Errors
@@ -122,6 +169,7 @@ curl -s $B/executions/1b6a8f0c2d3e | jq '{state, exit_status, output}'
 | 404 | Unknown step, run, execution or file. |
 | 409 | The operation is not allowed in the current run state (`Runsheets::RunError`). |
 | 422 | Invalid step status. |
+| 428 | A destructive block needs its confirmation code (`Runsheets::Session::ConfirmationRequired`); the body carries `challenge`. |
 | 500 | The runbook failed to load (`Runsheets::RunbookError`). |
 | 503 | The server has no runbook configured. |
 
