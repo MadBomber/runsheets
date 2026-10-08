@@ -1526,17 +1526,20 @@ on Sinatra and is tested in isolation.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  block.rb                    a fenced block and the kind its flags ask for
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  renderer.rb                 kramdown + rouge, wraps executable blocks
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  step.rb                     one markdown file: front matter, body, html, blocks
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  runbook.rb                  the directory: runbook.md, steps/, verify, rollback
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  execution.rb                one execution: state, pid, files, timing
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  executor.rb                 spawns, captures, reaps, times out
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  run_record.rb               run.json, run.md, blocks/; list and load
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  session.rb                  the active run, inputs, live executions
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  web.rb                      Sinatra routes and the security checks
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  pages.rb                    pure functions that build the HTML
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  assets.rb                   inline CSS and JavaScript
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  cli.rb                      option parsing and the exe entry point
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>exe/runsheet
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>examples/hello/               a safe runbook; also the test fixture
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  single_file.rb              splits a one-file runbook into preamble and ## sections
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  runbook.rb                  a directory or a single file: steps, verify, rollback; last_verified stamp
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  diff.rb                     line diff for drift between a record and the runbook
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  redactor.rb                 replaces secret values in captured output
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  execution.rb                one execution: state, pid, files, timing
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  executor.rb                 spawns, pumps output through the redactor, reaps, times out, stops
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  run_record.rb               run.json, run.md, blocks/; list, load, verdicts, drift
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  session.rb                  the active run, inputs, live executions, confirmation codes, stamp offer
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  web.rb                      Sinatra routes and the security checks
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  pages.rb                    pure functions that build the HTML
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  assets.rb                   inline CSS and JavaScript
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  cli.rb                      option parsing and the exe entry point
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>exe/runsheet
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>examples/hello/               a safe runbook; also the test fixture
 </span></code></pre></div>
 <div class="diagram">
 <p><img alt="Rendering and execution pipelines" src="../../assets/images/pipeline.svg" /></p>
@@ -1596,7 +1599,13 @@ before spawning, so the order in the record is the order of clicks. Live
 state into the hashes before any write. <code>write!</code> produces both <code>run.json</code>
 and the <code>run.md</code> transcript from the same data.</p>
 <p><code>RunRecord.load</code> and <code>RunRecord.list</code> read records back for the history
-panel and the <code>/runs/:id</code> page.</p>
+panel and the <code>/runs/:id</code> page. A record also knows how to judge itself:
+<code>verified?</code> says whether a completed run exercised the whole runbook with
+nothing left failing, and <code>drift</code> compares each block's recorded <code>.cmd</code>
+with the runbook as it reads now, using the small LCS diff in <code>diff.rb</code>.</p>
+<p>The session reloads the runbook whenever one of its markdown files changes
+on disk (checked on every GET), so a runbook can be edited while the
+server is up and the drift view compares against what is there now.</p>
 <h2 id="the-session">The session<a class="headerlink" href="#the-session" title="Permanent link">&para;</a></h2>
 <p><code>Session</code> is the in-memory operator state: the runbook, the active
 <code>RunRecord</code>, the resolved inputs (secrets included, never written), and

@@ -637,6 +637,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#8-verify-on-its-own-and-stamp-the-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Verify on its own, and stamp the date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-start-your-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Start your own
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#7-read-the-record" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1480,6 +1502,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#8-verify-on-its-own-and-stamp-the-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Verify on its own, and stamp the date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-start-your-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Start your own
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#7-read-the-record" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1673,24 +1717,48 @@ Nothing is left running.</p>
 ran and how many steps are done. <strong>Finish run</strong> marks the record
 <code>completed</code>; <strong>Abandon run</strong> marks it <code>abandoned</code>. Either way the run is
 closed and the record is final.</p>
-<p>The landing page now lists it under <strong>Previous runs</strong>, with a link to the
-rendered transcript.</p>
+<p>The landing page now lists it under <strong>Previous runs</strong>, with its verdict,
+duration, and a link to the rendered transcript.</p>
+<h3 id="8-verify-on-its-own-and-stamp-the-date">8. Verify on its own, and stamp the date<a class="headerlink" href="#8-verify-on-its-own-and-stamp-the-date" title="Permanent link">&para;</a></h3>
+<p>Step 6, <em>Check the greeting</em>, is a <code>verify</code> step, and <code>verify.md</code> holds
+whole-procedure checks. Click <strong>Verify only</strong> next to Start run: this
+starts a verification run and lands on the <strong>Checks</strong> page with both
+documents on it. Click <strong>Run all</strong>; three checks run in order and the
+status line reports the tally.</p>
+<p><strong>Finish verification</strong> on the home page. Because every check ran and
+none is failing, the landing page offers to <strong>Stamp runbook.md</strong> with
+today's date as <code>last_verified</code>. Click it: the front-matter line changes,
+the header shows the new date, and the run record notes the stamp. That
+is the only change runsheets ever makes to a runbook, and only when asked.</p>
+<p>Now edit <code>steps/010-say-hello.md</code>, change the greeting, and open the
+earlier run from <strong>Previous runs</strong>: a <strong>Runbook changed since this run</strong>
+panel shows the diff between what ran and what the runbook says now.</p>
+<h3 id="9-start-your-own">9. Start your own<a class="headerlink" href="#9-start-your-own" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure<span class="w">       </span><span class="c1"># a directory runbook</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure.md<span class="w">    </span><span class="c1"># or one file, ## headings as steps</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>runsheet<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
+</span></code></pre></div>
+<p>For the shape of a real one, read <code>examples/staging-teardown</code> (a
+directory, every block kind, a blast radius and a rollback) and
+<code>examples/db-maintenance.md</code> (a single file whose <code>sql run</code> blocks go
+through <code>psql</code>). Neither runs against your machine as written; they are
+there to copy from.</p>
 <h3 id="7-read-the-record">7. Read the record<a class="headerlink" href="#7-read-the-record" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.local/share/runsheets/runs/hello/20261007T173348/
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  run.json
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  run.md
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  blocks/
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    010-say-hello-1.1.cmd
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    010-say-hello-1.1.out
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    040-exercise-failure-2.1.cmd
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    040-exercise-failure-2.1.out
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>~/.local/share/runsheets/runs/hello/20261007T173348/
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  run.json
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  run.md
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>  blocks/
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    010-say-hello-1.1.cmd
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    010-say-hello-1.1.out
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    040-exercise-failure-2.1.cmd
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    040-exercise-failure-2.1.out
 </span></code></pre></div>
 <p><code>run.md</code> is the transcript: every execution in order with the exact code
 that ran, its output and its verdict, interleaved with the step
 acknowledgements. <code>run.json</code> is the same as data. See
 <a href="../running/run-record/">The Run Record</a> for the schema.</p>
 <h2 id="check-a-runbook-without-serving-it">Check a runbook without serving it<a class="headerlink" href="#check-a-runbook-without-serving-it" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runsheet<span class="w"> </span>--check<span class="w"> </span>path/to/runbook
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>runsheet<span class="w"> </span>--check<span class="w"> </span>path/to/runbook
 </span></code></pre></div>
 <p>Loads the runbook, prints every authoring warning (unknown block flags,
 automated steps with nothing to run, bad input names), and exits 1 if there

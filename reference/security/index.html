@@ -1704,9 +1704,12 @@ components are normalised and checked against the real root; hidden entries
 (anything starting with <code>.</code>) are never served, which keeps <code>.git</code>, <code>.env</code>
 and editor state out of reach.</p>
 <h3 id="no-writes-to-the-runbook">No writes to the runbook<a class="headerlink" href="#no-writes-to-the-runbook" title="Permanent link">&para;</a></h3>
-<p>runsheets writes nothing inside the runbook directory. The planned
-<code>last_verified</code> stamp (milestone 3) will be the single exception, applied
-only on request.</p>
+<p>runsheets writes nothing inside the runbook directory, with one exception:
+the <code>last_verified</code> stamp. It is offered only after a run that verified the
+runbook, applied only when the operator clicks <strong>Stamp runbook.md</strong>, and it
+replaces exactly one front-matter line (adding it if absent). The write is
+recorded as a <code>stamp</code> event in the run record. Nothing else in the
+directory is ever touched.</p>
 <h2 id="what-is-deliberately-not-done">What is deliberately not done<a class="headerlink" href="#what-is-deliberately-not-done" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>No sandboxing of blocks.</strong> They run as the operator on purpose.</li>

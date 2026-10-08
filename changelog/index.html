@@ -1172,6 +1172,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added-milestone-4-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 4: packaging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-milestone-3-verification-and-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 3: verification and history)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added-milestone-2-the-full-block-set" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1247,6 +1280,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added-milestone-4-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 4: packaging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-milestone-3-verification-and-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 3: verification and history)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added-milestone-2-the-full-block-set" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1316,6 +1382,54 @@
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="added-milestone-4-packaging">Added (milestone 4: packaging)<a class="headerlink" href="#added-milestone-4-packaging" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Single-file runbooks: <code>runsheet path/to/file.md</code> reads one markdown
+  file whose <code>##</code> headings are the steps, with step attributes in an HTML
+  comment after the heading and Verify and Rollback sections standing in
+  for <code>verify.md</code> and <code>rollback.md</code> (<code>Runsheets::SingleFile</code>).</li>
+<li>A language mapped under <code>interpreters</code> in the front matter now executes;
+  <code>sql run</code> through <code>psql</code> works. Previously the mapping was honoured at
+  spawn time but blocks were classified against the built-in languages
+  only, so such blocks warned and had no Run button.</li>
+<li><code>runsheet --init PATH</code> scaffolds a starter runbook (directory, or a
+  single file when the path ends in <code>.md</code>) that passes <code>--check</code>.</li>
+<li><code>examples/staging-teardown</code> (directory, the shape of a real AWS
+  teardown) and <code>examples/db-maintenance.md</code> (single file, <code>sql run</code>
+  blocks via <code>psql</code>).</li>
+<li>Vocabulary: the record of a run is the <em>runsheet</em> in the page, sidebar
+  and buttons.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>Runbook.load</code> raises "no such runbook" for a missing path; <code>Runbook</code>
+  gains <code>main_path</code>, <code>single_file?</code>; <code>Step.new</code> takes <code>data:</code> and
+  <code>interpreters:</code>; <code>Renderer.render</code> and <code>Block.new</code> take <code>interpreters:</code>.</li>
+<li>The CLI's parsed option is <code>:runbook</code> (was <code>:dir</code>).</li>
+</ul>
+<h3 id="added-milestone-3-verification-and-history">Added (milestone 3: verification and history)<a class="headerlink" href="#added-milestone-3-verification-and-history" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Verification runs: <code>POST /run</code> with <code>kind=verify</code> (the landing page's
+  "Verify only" button) starts a run that may execute only verify-kind
+  steps and <code>verify.md</code>. Run ids get a <code>-verify</code> suffix and <code>run.json</code> a
+  <code>kind</code> field.</li>
+<li>A Checks page (<code>GET /verify</code>) gathers every verify document with a
+  "Run all" button that executes each check in order.</li>
+<li><code>last_verified</code> write-back: after a completed run with every step done,
+  or a verification with every check run and nothing left failing, the
+  landing page offers to stamp the run's date into <code>runbook.md</code>
+  (<code>POST /run/stamp</code>, <code>POST /run/stamp/dismiss</code>). The stamp replaces that
+  one front-matter line and is recorded as a <code>stamp</code> event.</li>
+<li>Run verdicts: <code>RunRecord#verified?</code>, <code>latest_executions</code>,
+  <code>unresolved_failures</code>, <code>last_step</code>. The history list shows kind, verdict,
+  start time, duration, counts, and the step a run stopped at.</li>
+<li>Drift: a finished run's page shows a line diff for every block whose
+  code has changed since it ran, or that is gone (<code>Runsheets::Diff</code>,
+  <code>RunRecord#drift</code>).</li>
+<li>The runbook is re-read on the next GET whenever one of its markdown
+  files changes on disk.</li>
+<li><code>examples/hello</code> gains a <code>verify</code> step.</li>
+</ul>
 <h3 id="added-milestone-2-the-full-block-set">Added (milestone 2: the full block set)<a class="headerlink" href="#added-milestone-2-the-full-block-set" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>background</code> blocks execute: Start and Stop buttons, no timeout, output

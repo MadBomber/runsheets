@@ -1405,30 +1405,53 @@ cheap once the pieces existed.</p>
 stdout as a named input for later blocks. It needs a syntax for the name
 and a real runbook to prove it; see the plan's open questions.</p>
 <h2 id="milestone-3-verification-and-history">Milestone 3: verification and history<a class="headerlink" href="#milestone-3-verification-and-history" title="Permanent link">&para;</a></h2>
+<p>Done.</p>
 <ul>
-<li><code>verify</code> steps and <code>verify.md</code> runnable standalone from the landing page,
-  outside a run.</li>
-<li><strong><code>last_verified</code> write-back</strong>: finishing a run with every step done
-  offers to stamp the date into <code>runbook.md</code>. The only file the tool will
-  ever modify in a runbook, by targeted line replacement, only on request.</li>
-<li>Richer run history on the landing page: duration, which step it stopped
-  at, diffs of the <code>.cmd</code> files against the current runbook.</li>
+<li><strong>Verification runs</strong>: the landing page's <strong>Verify only</strong> button starts a
+  run of kind <code>verify</code> that may execute only verify-kind steps and
+  <code>verify.md</code>. A <strong>Checks</strong> page gathers those documents with a <strong>Run all</strong>
+  button that runs every check in order. The record is written like any
+  other run and listed in history with a <code>verify</code> badge.</li>
+<li><strong><code>last_verified</code> write-back</strong>: after a completed run with every step
+  done, or a completed verification with every check run and nothing left
+  failing, the landing page offers to stamp the run's date into
+  <code>runbook.md</code>. Targeted replacement of that one front-matter line, only on
+  request, noted in the run record as a <code>stamp</code> event. The only write the
+  tool ever makes inside a runbook directory.</li>
+<li><strong>Richer history</strong>: each previous run shows its kind, verdict
+  (<code>verified</code>, <code>completed</code>, <code>abandoned</code>), start time, duration, executions
+  and failures, steps done or checks run, and which step it stopped at.</li>
+<li><strong>Drift</strong>: a run record page shows, for every block that ran, whether
+  its code in the runbook has changed since, with a line diff, or whether
+  the block is gone.</li>
 </ul>
 <h2 id="milestone-4-packaging">Milestone 4: packaging<a class="headerlink" href="#milestone-4-packaging" title="Permanent link">&para;</a></h2>
+<p>Done.</p>
 <ul>
-<li>A README-sized sample beyond <code>hello</code>, converted from a real runbook.</li>
-<li>Single-file runbooks: one markdown file whose <code>##</code> headings are the steps,
-  so existing docs can be used without restructuring. The model is already
-  independent of the source shape.</li>
-<li>SQL blocks through a configured client, which the <code>interpreters</code> map can
-  already express; needs a real runbook to prove the convention.</li>
+<li><strong>Single-file runbooks</strong>: <code>runsheet path/to/runbook.md</code> reads one file
+  whose <code>##</code> headings are the steps, with step attributes in an HTML
+  comment after the heading and Verify and Rollback sections standing in
+  for the extra files. Everything downstream sees the same <code>Runbook</code>.</li>
+<li><strong>SQL through the interpreters map</strong>: a language the front matter maps
+  now executes. Before this, <code>sql run</code> warned and stayed inert even with a
+  mapping, because block classification only knew the built-in languages.</li>
+<li><strong>Two realistic samples</strong>: <code>examples/staging-teardown</code>, a directory
+  runbook with the shape of a real AWS teardown (manual, automated,
+  terminal, background, destructive and verify steps, blast radius,
+  rollback), and <code>examples/db-maintenance.md</code>, a single-file PostgreSQL
+  runbook whose blocks are <code>sql run</code> through <code>psql</code>. Neither can run
+  against this machine; both load clean under <code>--check</code> and are test
+  fixtures for the loader.</li>
+<li><strong><code>runsheet --init</code></strong> scaffolds a starter runbook, directory or single
+  file, that passes <code>--check</code>.</li>
+<li><strong>Vocabulary settled</strong>: the document is the <em>runbook</em>; the record of a
+  run is the <em>runsheet</em>. The page, sidebar and buttons now say so.</li>
 </ul>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Vocabulary.</strong> Whether the document is a "runbook" and only the recorded
-  run is the "runsheet" (closer to the theatre meaning, and it keeps the
-  record in the name), or whether "runsheet" is used throughout. The split
-  is leaning.</li>
+<li><strong><code>capture</code>.</strong> A flag that stores a block's stdout as a named input for
+  later blocks, the one escape hatch from "nothing carries over". Still
+  waiting for a runbook that needs it and a syntax for the name.</li>
 <li><strong>Persistent shell per run.</strong> Rejected for milestone 1 in favour of a
   fresh process per block. If <code>capture</code> turns out not to be enough, this
   comes back.</li>

@@ -1004,6 +1004,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verdict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#executions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1397,6 +1408,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verdict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#executions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1528,8 +1550,9 @@ outside the runbook:</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    010-say-hello-1.2.out
 </span></code></pre></div>
 <p>The directory name is the start time in basic ISO 8601 form, which sorts
-correctly and contains no colons (awkward on macOS and in archives). Two
-runs started in the same second get <code>-2</code>, <code>-3</code> suffixes.</p>
+correctly and contains no colons (awkward on macOS and in archives). A
+verification run adds <code>-verify</code>. Two runs started in the same second get
+<code>-2</code>, <code>-3</code> suffixes.</p>
 <h2 id="location">Location<a class="headerlink" href="#location" title="Permanent link">&para;</a></h2>
 <p>Default: <code>~/.local/share/runsheets/runs</code>. Override with <code>--runs-dir</code> or
 <code>RUNSHEETS_RUNS_DIR</code>.</p>
@@ -1574,10 +1597,13 @@ runbook shows whether the markdown changed after the run.</p>
 <p>2026-10-07T17:33:55.120-05:00 <code>020-inspect-ruby-3</code> (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter</p>
 </li>
 <li>
-<p>2026-10-07T17:33:58.448-05:00 step <strong>010-say-hello</strong> marked done — smoke ok
+<p>2026-10-07T17:33:58.448-05:00 step <strong>010-say-hello</strong> marked done — smoke ok</p>
+</li>
+<li>
+<p>2026-10-07T17:34:10.001-05:00 runbook.md stamped <code>last_verified: 2026-10-07</code>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Events appear in the order they happened: executions, terminal
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>confirmations and step marks interleaved, so jumping around is visible
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>rather than hidden. Output longer than 64 KB is trimmed to its tail in the
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>confirmations, step marks and the stamp interleaved, so jumping around is
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>visible rather than hidden. Output longer than 64 KB is trimmed to its tail in the
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>transcript with a marker; the `.out` file is complete.
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>The verdict after the block id is one of `ok`, `exit N`, `timed out`,
@@ -1592,45 +1618,46 @@ runbook shows whether the markdown changed after the run.</p>
 </span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  "runbook": "hello",
 </span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  "title": "Hello, runsheets",
 </span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  "id": "20261007T173348",
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>  "status": "completed",
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>  "started_at": "2026-10-07T17:33:48.859-05:00",
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>  "finished_at": "2026-10-07T17:33:58.515-05:00",
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  "duration": 9.656,
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  "inputs": { "NAME": "smoke" },
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>  "steps": { "010-say-hello": "done" },
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>  "acks": {
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    "020-inspect-ruby-3": { "at": "2026-10-07T17:33:55.120-05:00", "step": "020-inspect-ruby", "note": "pressed enter" }
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>  },
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>  "events": [
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>    { "type": "execute", "at": "2026-10-07T17:33:48.863-05:00",
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>      "step": "010-say-hello", "block": "010-say-hello-1", "execution": "1b6a8f0c2d3e" },
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>    { "type": "execute", "at": "2026-10-07T17:33:50.134-05:00",
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>      "step": "040-exercise-failure", "block": "040-exercise-failure-1", "execution": "9c1d2e3f4a5b", "confirmed": true },
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>    { "type": "ack", "block": "020-inspect-ruby-3", "at": "2026-10-07T17:33:55.120-05:00",
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>      "step": "020-inspect-ruby", "note": "pressed enter" },
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>    { "type": "step", "at": "2026-10-07T17:33:58.448-05:00",
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>      "step": "010-say-hello", "status": "done", "note": "smoke ok" }
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>  ],
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>  "executions": [
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>    {
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>      "id": "1b6a8f0c2d3e",
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>      "block_id": "010-say-hello-1",
-</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>      "step": "010-say-hello",
-</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>      "command": ["bash"],
-</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>      "background": false,
-</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>      "state": "finished",
-</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>      "pid": 83412,
-</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>      "started_at": "2026-10-07T17:33:48.871-05:00",
-</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>      "finished_at": "2026-10-07T17:33:48.925-05:00",
-</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>      "duration": 0.054,
-</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>      "exit_status": 0,
-</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>      "signal": null,
-</span><span id="__span-3-51"><a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>      "error": null,
-</span><span id="__span-3-52"><a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>      "cmd": "010-say-hello-1.1.cmd",
-</span><span id="__span-3-53"><a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>      "log": "010-say-hello-1.1.out"
-</span><span id="__span-3-54"><a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>    }
-</span><span id="__span-3-55"><a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>  ]
-</span><span id="__span-3-56"><a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>}
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>  "kind": "run",
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>  "status": "completed",
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>  "started_at": "2026-10-07T17:33:48.859-05:00",
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  "finished_at": "2026-10-07T17:33:58.515-05:00",
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  "duration": 9.656,
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>  "inputs": { "NAME": "smoke" },
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>  "steps": { "010-say-hello": "done" },
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>  "acks": {
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>    "020-inspect-ruby-3": { "at": "2026-10-07T17:33:55.120-05:00", "step": "020-inspect-ruby", "note": "pressed enter" }
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>  },
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>  "events": [
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    { "type": "execute", "at": "2026-10-07T17:33:48.863-05:00",
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>      "step": "010-say-hello", "block": "010-say-hello-1", "execution": "1b6a8f0c2d3e" },
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>    { "type": "execute", "at": "2026-10-07T17:33:50.134-05:00",
+</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>      "step": "040-exercise-failure", "block": "040-exercise-failure-1", "execution": "9c1d2e3f4a5b", "confirmed": true },
+</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>    { "type": "ack", "block": "020-inspect-ruby-3", "at": "2026-10-07T17:33:55.120-05:00",
+</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>      "step": "020-inspect-ruby", "note": "pressed enter" },
+</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>    { "type": "step", "at": "2026-10-07T17:33:58.448-05:00",
+</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>      "step": "010-say-hello", "status": "done", "note": "smoke ok" }
+</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>  ],
+</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>  "executions": [
+</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>    {
+</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>      "id": "1b6a8f0c2d3e",
+</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>      "block_id": "010-say-hello-1",
+</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>      "step": "010-say-hello",
+</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>      "command": ["bash"],
+</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>      "background": false,
+</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>      "state": "finished",
+</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>      "pid": 83412,
+</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>      "started_at": "2026-10-07T17:33:48.871-05:00",
+</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>      "finished_at": "2026-10-07T17:33:48.925-05:00",
+</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>      "duration": 0.054,
+</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>      "exit_status": 0,
+</span><span id="__span-3-51"><a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>      "signal": null,
+</span><span id="__span-3-52"><a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>      "error": null,
+</span><span id="__span-3-53"><a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>      "cmd": "010-say-hello-1.1.cmd",
+</span><span id="__span-3-54"><a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>      "log": "010-say-hello-1.1.out"
+</span><span id="__span-3-55"><a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>    }
+</span><span id="__span-3-56"><a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>  ]
+</span><span id="__span-3-57"><a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a>}
 </span></code></pre></div></p>
 </li>
 </ul>
@@ -1654,6 +1681,10 @@ runbook shows whether the markdown changed after the run.</p>
 <tr>
 <td><code>id</code></td>
 <td>The run id, equal to the directory name.</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>run</code> for the whole procedure, <code>verify</code> for a verification run that executed only the verify documents.</td>
 </tr>
 <tr>
 <td><code>status</code></td>
@@ -1690,7 +1721,7 @@ runbook shows whether the markdown changed after the run.</p>
 </tbody>
 </table>
 <h3 id="events">Events<a class="headerlink" href="#events" title="Permanent link">&para;</a></h3>
-<p>Three types:</p>
+<p>Four types:</p>
 <ul>
 <li><code>execute</code>: <code>at</code>, <code>step</code>, <code>block</code>, and the <code>execution</code> id to look up in
   <code>executions</code>. <code>confirmed: true</code> when the block was destructive and the
@@ -1699,7 +1730,17 @@ runbook shows whether the markdown changed after the run.</p>
   confirmed they ran a <code>terminal</code> block themselves.</li>
 <li><code>step</code>: <code>at</code>, <code>step</code>, <code>status</code> (<code>done</code> or <code>skipped</code>), and <code>note</code> when one
   was given.</li>
+<li><code>stamp</code>: <code>at</code> and <code>last_verified</code>, the date written into <code>runbook.md</code>.
+  Added after the run finished, which is why a stamped record is written
+  once more.</li>
 </ul>
+<h3 id="verdict">Verdict<a class="headerlink" href="#verdict" title="Permanent link">&para;</a></h3>
+<p>A record is <strong>verified</strong> when its status is <code>completed</code>, no block's most
+recent execution is a failure (an earlier failure that was re-run
+successfully does not count), and either every step of the runbook is
+marked done (kind <code>run</code>) or at least one check ran (kind <code>verify</code>). The
+history list shows <code>verified</code> in place of <code>completed</code> for such runs, and
+only such runs are offered the <code>last_verified</code> stamp.</p>
 <h3 id="executions">Executions<a class="headerlink" href="#executions" title="Permanent link">&para;</a></h3>
 <table>
 <thead>

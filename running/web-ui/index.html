@@ -921,6 +921,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#verification-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-the-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record the verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#starting-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -998,10 +1020,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-record-page" class="md-nav__link">
+  <a href="#runsheet-page" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run record page
+        Runsheet page
       
     </span>
   </a>
@@ -1415,6 +1437,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#verification-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-the-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record the verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#starting-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1492,10 +1536,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-record-page" class="md-nav__link">
+  <a href="#runsheet-page" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run record page
+        Runsheet page
       
     </span>
   </a>
@@ -1675,13 +1719,39 @@ the record.</p>
    markdown; the page updates on reload.</li>
 <li><strong>Metadata table</strong>: when to use, prerequisites, blast radius,
    escalation, last verified.</li>
+<li><strong>Record the verification</strong> offer, after a run that verified the
+   runbook (see below).</li>
 <li><strong>Start a run</strong> form, or the <strong>Active run</strong> panel.</li>
 <li><strong>Step list</strong> with kind badges, destructive badges, the number of
    executable blocks, and status marks.</li>
-<li><strong>Previous runs</strong>, newest first, with status, execution and failure
-   counts, and steps done. Each links to the rendered transcript.</li>
+<li><strong>Previous runs</strong>, newest first. Each row shows the run id (linking to
+   the transcript), a <code>run</code> or <code>verify</code> badge, the verdict (<code>verified</code>,
+   <code>completed</code>, <code>abandoned</code> or <code>running</code>, plus <code>stamped</code> if the run stamped
+   the runbook), start time and duration, execution and failure counts,
+   and either steps done with the step it stopped at, or checks run and how
+   many are still failing.</li>
 <li>The <strong>preamble</strong> from <code>runbook.md</code>.</li>
 </ol>
+<h3 id="verification-runs">Verification runs<a class="headerlink" href="#verification-runs" title="Permanent link">&para;</a></h3>
+<p>Next to <strong>Start run</strong> is <strong>Verify only</strong>, shown when the runbook has verify
+steps or a <code>verify.md</code>. It starts a run of kind <code>verify</code> with the same
+inputs and goes to the <strong>Checks</strong> page, which gathers every verify
+document in order. <strong>Run all</strong> executes each <code>run</code> block on the page one
+after another and reports how many passed. During a verification run,
+blocks outside the verify documents refuse to execute and their step pages
+say so. The record is written like any other run and gets a <code>-verify</code>
+suffix in its id.</p>
+<p>The Checks page is also reachable from the sidebar at any time; without an
+active run it is read-only.</p>
+<h3 id="record-the-verification">Record the verification<a class="headerlink" href="#record-the-verification" title="Permanent link">&para;</a></h3>
+<p>After <strong>Finish</strong> on a full run with every step marked done, or on a
+verification that ran at least one check, with no block left in a failed
+state (a failure that was re-run successfully does not count), the landing
+page offers to stamp the run's date into <code>runbook.md</code> as <code>last_verified</code>.
+<strong>Stamp runbook.md</strong> rewrites that one front-matter line, notes a <code>stamp</code>
+event in the run record, and reloads the runbook. <strong>Not now</strong> hides the
+offer for that run. The offer is not made when the runbook's
+<code>last_verified</code> is already that date or later.</p>
 <h3 id="starting-a-run">Starting a run<a class="headerlink" href="#starting-a-run" title="Permanent link">&para;</a></h3>
 <p>The form has one field per declared input, pre-filled from the environment
 and the defaults. Secret inputs are password fields. Submitting creates the
@@ -1756,11 +1826,18 @@ one.</p>
 <p>Nothing re-runs on reload. The page restores the last execution of each
 block from the run record, including output, resumes polling if one is
 still running, and restores terminal confirmations.</p>
-<h2 id="run-record-page">Run record page<a class="headerlink" href="#run-record-page" title="Permanent link">&para;</a></h2>
+<h2 id="runsheet-page">Runsheet page<a class="headerlink" href="#runsheet-page" title="Permanent link">&para;</a></h2>
+<p>The record of a run is the <em>runsheet</em>; the page, the sidebar and the run
+pill call it that. On disk it is still <code>run.json</code> and <code>run.md</code>.</p>
 <p><code>/run</code> shows the active run's transcript, rendered. After the run is
 finished the same URL shows the most recent run. <code>/runs/&lt;id&gt;</code> shows any
 previous run. The transcript is <code>run.md</code> from the run directory; see
 <a href="../run-record/">The Run Record</a>.</p>
+<p>Above the transcript of a finished run, a <strong>Runbook changed since this
+run</strong> panel appears when any block that ran now reads differently in the
+runbook, with a line diff from what ran to what is there now, or when a
+block is gone. The record itself is never changed; this is the runbook
+drifting away from it.</p>
 <h2 id="keyboard-shortcuts">Keyboard shortcuts<a class="headerlink" href="#keyboard-shortcuts" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

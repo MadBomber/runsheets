@@ -1161,6 +1161,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#post-runstamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /run/stamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-runstampdismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /run/stamp/dismiss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#post-stepsslugmark" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1414,6 +1436,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#post-runstamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /run/stamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-runstampdismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /run/stamp/dismiss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#post-stepsslugmark" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1629,8 +1673,12 @@ address, or the request gets <strong>403</strong> before routing.</p>
 <td>A step page. <code>verify</code> and <code>rollback</code> are slugs too. 404 for an unknown slug.</td>
 </tr>
 <tr>
+<td><code>GET /verify</code></td>
+<td>The Checks page: every verify step and <code>verify.md</code>. 404 if the runbook has none.</td>
+</tr>
+<tr>
 <td><code>GET /run</code></td>
-<td>The active run's transcript, or the most recent run's. 404 if there has never been a run.</td>
+<td>The active run's transcript, or the most recent run's, with the drift panel for a finished run. 404 if there has never been a run.</td>
 </tr>
 <tr>
 <td><code>GET /runs/:id</code></td>
@@ -1644,9 +1692,13 @@ address, or the request gets <strong>403</strong> before routing.</p>
 </table>
 <h2 id="run-lifecycle">Run lifecycle<a class="headerlink" href="#run-lifecycle" title="Permanent link">&para;</a></h2>
 <h3 id="post-run"><code>POST /run</code><a class="headerlink" href="#post-run" title="Permanent link">&para;</a></h3>
-<p>Starts a run. Form fields: <code>_token</code>, and <code>inputs[NAME]</code> for each input.
-Missing inputs resolve from the environment and defaults.</p>
-<p>Responds <strong>303</strong> to the first step, or <strong>409</strong> if a run is already active.</p>
+<p>Starts a run. Form fields: <code>_token</code>, <code>inputs[NAME]</code> for each input, and
+<code>kind</code> (<code>run</code>, the default, or <code>verify</code> for a verification run that may
+only execute verify steps and <code>verify.md</code>). Missing inputs resolve from the
+environment and defaults.</p>
+<p>Responds <strong>303</strong> to the first step (or to <code>/verify</code> for a verification),
+or <strong>409</strong> if a run is already active or <code>kind=verify</code> is asked of a
+runbook with no verify documents.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--data-urlencode<span class="w"> </span><span class="s2">"inputs[NAME]=smoke"</span><span class="w"> </span><span class="nv">$B</span>/run
 </span></code></pre></div>
@@ -1654,6 +1706,15 @@ Missing inputs resolve from the environment and defaults.</p>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>completed</code>, default, or <code>abandoned</code>).
 Anything still running is stopped first. Responds <strong>303</strong> to the landing
 page, or <strong>409</strong> with no active run.</p>
+<h3 id="post-runstamp"><code>POST /run/stamp</code><a class="headerlink" href="#post-runstamp" title="Permanent link">&para;</a></h3>
+<p>Writes <code>last_verified</code> into <code>runbook.md</code> with the last run's start date,
+when that run qualifies (completed; every step done for a full run, or
+every check run for a verification; no block left failing; the runbook's
+current <code>last_verified</code> is older). Form field: <code>_token</code>. Responds <strong>303</strong>
+to the landing page, or <strong>409</strong> when the last run cannot stamp.</p>
+<h3 id="post-runstampdismiss"><code>POST /run/stamp/dismiss</code><a class="headerlink" href="#post-runstampdismiss" title="Permanent link">&para;</a></h3>
+<p>Hides the stamp offer for the last run. Form field: <code>_token</code>. Responds
+<strong>303</strong> to the landing page.</p>
 <h3 id="post-stepsslugmark"><code>POST /steps/:slug/mark</code><a class="headerlink" href="#post-stepsslugmark" title="Permanent link">&para;</a></h3>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>done</code> or <code>skipped</code>), <code>note</code> (optional).
 Responds <strong>303</strong> to the next step or the landing page; <strong>422</strong> for another
@@ -1703,6 +1764,7 @@ confirmed. A wrong code gets the same 428 again.</p>
 <li><code>start a run before executing blocks</code></li>
 <li><code>unknown block &lt;id&gt;</code></li>
 <li><code>block &lt;id&gt; is not executable (&lt;kind&gt;)</code></li>
+<li><code>a verification run only executes verify steps and verify.md; &lt;id&gt; is in &lt;step&gt;</code></li>
 <li><code>blank input referenced by block: NAME</code></li>
 </ul>
 <h3 id="post-blocksidacknowledge"><code>POST /blocks/:id/acknowledge</code><a class="headerlink" href="#post-blocksidacknowledge" title="Permanent link">&para;</a></h3>

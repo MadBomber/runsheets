@@ -1438,10 +1438,12 @@
 
 
 <h1 id="command-line">Command Line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h1>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheet [options] RUNBOOK_DIR
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheet [options] RUNBOOK
 </span></code></pre></div>
-<p><code>RUNBOOK_DIR</code> is the runbook directory: it must contain <code>runbook.md</code>. It is
-the only positional argument.</p>
+<p><code>RUNBOOK</code> is either a runbook directory (it must contain <code>runbook.md</code>) or
+a single markdown file whose <code>##</code> headings are the steps (see
+<a href="../../runbooks/structure/#single-file-runbooks">Directory Structure</a>). It
+is the only positional argument.</p>
 <h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1478,6 +1480,11 @@ the only positional argument.</p>
 <td>Load the runbook, print authoring warnings, and exit without serving.</td>
 </tr>
 <tr>
+<td><code>--init</code></td>
+<td>off</td>
+<td>Create a starter runbook at <code>RUNBOOK</code> and exit: a directory with <code>runbook.md</code>, two steps, <code>verify.md</code> and <code>rollback.md</code>, or a single file when the path ends in <code>.md</code>. Refuses to touch an existing file or a non-empty directory.</td>
+</tr>
+<tr>
 <td><code>-v</code>, <code>--version</code></td>
 <td></td>
 <td>Print the version and exit.</td>
@@ -1490,25 +1497,31 @@ the only positional argument.</p>
 </tbody>
 </table>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<p>Start a new runbook, then serve it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># a directory</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh.md<span class="w">     </span><span class="c1"># or a single file</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-refresh
+</span></code></pre></div>
 <p>Serve a runbook and open it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/staging-teardown
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/staging-teardown
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-maintenance.md
 </span></code></pre></div>
 <p>Serve on another port because something else has 4567:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheet<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>ops/runbooks/staging-teardown
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runsheet<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>ops/runbooks/staging-teardown
 </span></code></pre></div>
 <p>Keep run records inside a project (but outside the runbook):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runsheet<span class="w"> </span>--runs-dir<span class="w"> </span>./tmp/runs<span class="w"> </span>ops/runbooks/staging-teardown
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheet<span class="w"> </span>--runs-dir<span class="w"> </span>./tmp/runs<span class="w"> </span>ops/runbooks/staging-teardown
 </span></code></pre></div>
 <p>Validate every runbook in a repository:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">for</span><span class="w"> </span>dir<span class="w"> </span><span class="k">in</span><span class="w"> </span>ops/runbooks/*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>runsheet<span class="w"> </span>--check<span class="w"> </span><span class="s2">"</span><span class="nv">$dir</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">failed</span><span class="o">=</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">exit</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">failed</span><span class="k">:-</span><span class="nv">0</span><span class="si">}</span><span class="s2">"</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">for</span><span class="w"> </span>dir<span class="w"> </span><span class="k">in</span><span class="w"> </span>ops/runbooks/*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>runsheet<span class="w"> </span>--check<span class="w"> </span><span class="s2">"</span><span class="nv">$dir</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">failed</span><span class="o">=</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">exit</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">failed</span><span class="k">:-</span><span class="nv">0</span><span class="si">}</span><span class="s2">"</span>
 </span></code></pre></div>
 <h2 id="what-it-prints">What it prints<a class="headerlink" href="#what-it-prints" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>runsheet 0.1.0
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Open http://127.0.0.1:4567/ in your browser
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Press Ctrl-C to stop
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheet 0.1.0
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Open http://127.0.0.1:4567/ in your browser
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>Press Ctrl-C to stop
 </span></code></pre></div>
 <p>Authoring warnings are printed to stderr before the banner, prefixed
 <code>runsheet: warning:</code>. The server still starts; warnings mark blocks and
@@ -1567,7 +1580,7 @@ exposes shell execution on your machine to whoever can reach that address,
 protected only by the session token embedded in the pages. Do not do it on
 a network you do not control.</p>
 <h2 id="running-from-a-checkout">Running from a checkout<a class="headerlink" href="#running-from-a-checkout" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>exe/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>exe/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
 </span></code></pre></div>
 
 

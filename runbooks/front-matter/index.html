@@ -1514,7 +1514,7 @@ that is not valid YAML, stops the runbook from loading with a clear error.</p>
 <td><code>last_verified</code></td>
 <td>date</td>
 <td>none</td>
-<td>Landing page. A YAML date (<code>2026-09-12</code>) parses as a <code>Date</code>.</td>
+<td>Landing page and Checks page. A YAML date (<code>2026-09-12</code>) parses as a <code>Date</code>. The only key runsheets ever writes: after a run that verified the runbook, the landing page offers to stamp the run's date here.</td>
 </tr>
 <tr>
 <td><code>tags</code></td>
@@ -1648,9 +1648,10 @@ if a block asks for <code>run</code>; the block renders with a warning instead.<
 <li><strong><code>manual</code></strong>: no executable blocks are expected. The body is an
   instruction. The step is complete when the operator marks it done,
   optionally with a note.</li>
-<li><strong><code>verify</code></strong>: a read-only check. Runs during the procedure and is also
-  meaningful standalone. Today it behaves like <code>automated</code>; later milestones
-  will let verify steps run from the landing page outside a run.</li>
+<li><strong><code>verify</code></strong>: a read-only check. Runs in its place during the procedure
+  and also standalone: a verification run started from the landing page
+  executes only verify steps and <code>verify.md</code>, and the <strong>Checks</strong> page shows
+  them all together with a <strong>Run all</strong> button.</li>
 </ul>
 <p><code>verify.md</code> and <code>rollback.md</code> take the same keys. <code>verify.md</code> is usually
 <code>kind: verify</code>.</p>
