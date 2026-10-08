@@ -971,6 +971,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#expected-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reloading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1454,6 +1465,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#expected-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#reloading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1597,6 +1619,9 @@ a footer with the keyboard shortcuts.</p>
 </ul>
 <h2 id="sidebar">Sidebar<a class="headerlink" href="#sidebar" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>Running</strong>: during a run, every process still running, with the block
+  id (linking to its step), elapsed time, pid, and a <strong>Stop</strong> button. The
+  panel appears only while something is running and keeps itself current.</li>
 <li><strong>Steps</strong>: every numbered step with its number, title and status mark.
   The current step is highlighted.</li>
 <li><strong>Also</strong>: <code>verify</code>, <code>rollback</code> and, during a run, the run record.</li>
@@ -1621,7 +1646,7 @@ in the browser.</p>
 </tr>
 <tr>
 <td><code>•</code></td>
-<td>At least one block ran and none failed.</td>
+<td>At least one block ran or was confirmed, and none failed. A stopped background block counts as ran.</td>
 </tr>
 <tr>
 <td><code>✗</code></td>
@@ -1662,8 +1687,8 @@ the record.</p>
 and the defaults. Secret inputs are password fields. Submitting creates the
 run directory and redirects to the first step.</p>
 <h3 id="the-active-run-panel">The active run panel<a class="headerlink" href="#the-active-run-panel" title="Permanent link">&para;</a></h3>
-<p>Shows the run id, start time, counts, the non-secret inputs, and three
-actions: <strong>Go to first step</strong>, <strong>Finish run</strong> (status <code>completed</code>), and
+<p>Shows the run id, start time, counts, the inputs (values for plain inputs,
+<code>NAME=•••</code> for a secret that is set), and three actions: <strong>Go to first step</strong>, <strong>Finish run</strong> (status <code>completed</code>), and
 <strong>Abandon run</strong> (status <code>abandoned</code>). Finishing writes the final record;
 the landing page then lists the run under previous runs.</p>
 <h2 id="step-pages">Step pages<a class="headerlink" href="#step-pages" title="Permanent link">&para;</a></h2>
@@ -1680,7 +1705,9 @@ the landing page then lists the run under previous runs.</p>
 <li><strong>The body</strong>, rendered.</li>
 <li><strong>Step status</strong> panel (only during a run): a note field and two buttons,
    <strong>Mark done and continue</strong> and <strong>Skip</strong>. Both record an event and move
-   to the next step, or home after the last one.</li>
+   to the next step, or home after the last one. On a <code>manual</code> step the
+   panel is headed <strong>Acknowledge this step</strong> and the button reads <strong>I have
+   done this, continue</strong>; it is the same event.</li>
 <li><strong>Prev / Next</strong> navigation.</li>
 </ol>
 <h3 id="blocks">Blocks<a class="headerlink" href="#blocks" title="Permanent link">&para;</a></h3>
@@ -1688,28 +1715,47 @@ the landing page then lists the run under previous runs.</p>
 <ul>
 <li>a <strong>badge</strong> with the language and flags,</li>
 <li>any <strong>warnings</strong> for the block,</li>
-<li>a <strong>note</strong> for <code>terminal</code>, <code>expect</code> and <code>background</code> blocks,</li>
+<li>a <strong>note</strong> for <code>terminal</code>, <code>expect</code> and <code>background</code> blocks; an expect
+  block's note links to the block it illustrates,</li>
 <li><strong>Copy</strong>, which puts the code on the clipboard,</li>
-<li><strong>Run</strong> or <strong>Run (destructive)</strong> on executable blocks,</li>
+<li><strong>Run</strong> or <strong>Run (destructive)</strong> on <code>run</code> and <code>destructive</code> blocks,
+  <strong>Start</strong> and <strong>Stop</strong> on <code>background</code> blocks, <strong>I ran this</strong> on
+  <code>terminal</code> blocks,</li>
 <li>a <strong>status</strong> area.</li>
 </ul>
 <p>Clicking Run posts to the server and starts polling. The status shows
 <code>running</code> with the elapsed time, and the output area below the code fills
 in as the process writes, scrolled to the bottom. When the process ends the
-block's border turns green (exit 0) or red (anything else), the status shows
-<code>ok</code>, <code>exit N</code>, <code>timed out</code> or <code>failed to start</code>, and the footer shows the
-exit status, duration, finish time and the name of the <code>.out</code> file in the
-run directory.</p>
-<p>Run (destructive) first asks you to type a short random word shown in the
-prompt. This is a speed bump against a reflexive click, not a security
-control; the real guard is reading the banner above it.</p>
+block's border turns green (exit 0), amber (stopped) or red (anything
+else), the status shows <code>ok</code>, <code>exit N</code>, <code>timed out</code>, <code>stopped</code> or
+<code>failed to start</code>, and the footer shows the exit status, duration, finish
+time and the name of the <code>.out</code> file in the run directory. Output longer
+than 256 KB is shown from its tail with a marker on the first line.</p>
+<p><strong>Run (destructive)</strong> asks the server to run the block; the server answers
+with a four-character code instead, the page shows it in a prompt, and the
+block runs only when you type the code back. The code is per block and is
+retired once used. It is a speed bump against a reflexive click, not a
+security control; the real guard is reading the banner above it.</p>
+<p><strong>Start</strong> on a background block is Run without a timeout. While it runs
+the Stop button is shown and the process is listed in the sidebar's
+Running panel. <strong>Stop</strong> ends the process group; the status becomes
+<code>stopped</code>.</p>
+<p><strong>I ran this</strong> on a terminal block opens a prompt for an optional note and
+records the confirmation. The block's border turns green, the status reads
+<code>confirmed</code>, and the time and note are shown in the footer. It can be
+confirmed again; the record keeps every confirmation.</p>
+<h3 id="expected-output">Expected output<a class="headerlink" href="#expected-output" title="Permanent link">&para;</a></h3>
+<p>When an executable block is followed by an <code>expect</code> block, the real output
+and the expected text are shown side by side once the block has run, and
+the footer says <code>matches expected</code> or <code>differs from expected</code> (trailing
+whitespace ignored). The expect block itself stays where the author put it.</p>
 <p>A block can be run again while the run is active. Each execution gets its
 own files and its own entry in the record. The page shows the most recent
 one.</p>
 <h3 id="reloading">Reloading<a class="headerlink" href="#reloading" title="Permanent link">&para;</a></h3>
 <p>Nothing re-runs on reload. The page restores the last execution of each
-block from the run record, including output, and resumes polling if one is
-still running.</p>
+block from the run record, including output, resumes polling if one is
+still running, and restores terminal confirmations.</p>
 <h2 id="run-record-page">Run record page<a class="headerlink" href="#run-record-page" title="Permanent link">&para;</a></h2>
 <p><code>/run</code> shows the active run's transcript, rendered. After the run is
 finished the same URL shows the most recent run. <code>/runs/&lt;id&gt;</code> shows any
@@ -1764,11 +1810,15 @@ poll endpoints) with the reason:</p>
 </tr>
 <tr>
 <td>409</td>
-<td>No active run, a run already active, block not executable, blank input referenced.</td>
+<td>No active run, a run already active, block not executable, blank input referenced, unknown execution to stop, acknowledging a block that is not <code>terminal</code>.</td>
 </tr>
 <tr>
 <td>422</td>
 <td>A step mark with a status other than <code>done</code> or <code>skipped</code>.</td>
+</tr>
+<tr>
+<td>428</td>
+<td>A destructive block was asked to run without its confirmation code. The page handles this by prompting for the code.</td>
 </tr>
 </tbody>
 </table>

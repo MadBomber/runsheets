@@ -686,6 +686,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The convention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expect-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expect blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1294,6 +1322,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The convention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expect-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expect blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1482,7 +1538,7 @@ commands. runsheets therefore executes nothing unless a block opts in.</p>
 <tr>
 <td><code>```bash destructive</code></td>
 <td><span class="kind destructive">destructive</span></td>
-<td>Run button behind a typed confirmation. Implies <code>run</code>. The step shows the blast-radius banner.</td>
+<td>Run button behind a typed confirmation code that the server issues per block. Implies <code>run</code>. The step shows the blast-radius banner.</td>
 </tr>
 <tr>
 <td><code>```ruby run</code></td>
@@ -1490,24 +1546,39 @@ commands. runsheets therefore executes nothing unless a block opts in.</p>
 <td>Same as <code>bash run</code>, executed with <code>ruby</code> or the runbook's <code>interpreters.ruby</code>.</td>
 </tr>
 <tr>
+<td><code>```bash background</code></td>
+<td><span class="kind background">background</span></td>
+<td>Start and Stop buttons for long-running processes such as a tunnel or a log tail. No timeout. Output streams into the page; the process is listed in the sidebar's <strong>Running</strong> panel on every page; anything still running is stopped when the run ends and recorded as <code>stopped</code>, not as a failure.</td>
+</tr>
+<tr>
 <td><code>```bash terminal</code></td>
 <td><span class="kind terminal">terminal</span></td>
-<td>No Run button. Labelled "run this in your own terminal". For anything interactive: <code>read -s</code>, an SSO login that opens a browser, an interactive <code>psql</code> session.</td>
+<td>No Run button. Labelled "run this in your own terminal, then confirm". For anything interactive: <code>read -s</code>, an SSO login that opens a browser, an interactive <code>psql</code> session. An <strong>I ran this</strong> button records the operator's confirmation, with an optional note.</td>
 </tr>
 <tr>
 <td><code>```text expect</code></td>
 <td><span class="kind expect">expect</span></td>
-<td>Never executed. Labelled "expected output". A visual hint for the operator; it does not gate pass or fail.</td>
-</tr>
-<tr>
-<td><code>```bash background</code></td>
-<td><span class="kind background">background</span></td>
-<td>Reserved for long-running processes such as a tunnel, with Start and Stop buttons. Recognised but not executable yet.</td>
+<td>Never executed. Linked to the nearest executable block above it and shown beside that block's real output with a "matches expected" or "differs from expected" hint. A hint for the operator; it does not gate pass or fail.</td>
 </tr>
 </tbody>
 </table>
 <p>Flags are additive where it makes sense: <code>bash run destructive</code> and
 <code>bash destructive</code> are the same thing.</p>
+<h3 id="expect-blocks">Expect blocks<a class="headerlink" href="#expect-blocks" title="Permanent link">&para;</a></h3>
+<p>An <code>expect</code> block illustrates the executable block nearest above it in the
+same document, whatever prose sits between them. Its toolbar says which
+block it belongs to and links to it. When that block has run, the page
+shows the expected text in a pane beside the actual output and compares
+them with trailing whitespace ignored. An expect block with no executable
+block above it is just displayed.</p>
+<h3 id="background-blocks">Background blocks<a class="headerlink" href="#background-blocks" title="Permanent link">&para;</a></h3>
+<p>A background block is for something that must stay up while later steps
+run. It has no timeout, so the step's <code>timeout</code> does not apply to it. Stop
+it from its own Stop button, from the Running panel on any page, or by
+finishing the run. The process group gets <code>TERM</code>, then <code>KILL</code> two seconds
+later if needed, and the execution is recorded with state <code>stopped</code>. A
+background process that exits on its own is recorded like a <code>run</code> block:
+<code>finished</code> with its exit status, which counts as a failure if non-zero.</p>
 <h2 id="which-languages-execute">Which languages execute<a class="headerlink" href="#which-languages-execute" title="Permanent link">&para;</a></h2>
 <p>Only languages with an interpreter can execute. The defaults are <code>bash</code>,
 <code>sh</code>, <code>zsh</code> and <code>ruby</code>. A block in any other language that asks for <code>run</code>

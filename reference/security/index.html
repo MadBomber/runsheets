@@ -1132,10 +1132,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#process-groups-and-timeouts" class="md-nav__link">
+  <a href="#process-groups-timeouts-and-stops" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Process groups and timeouts
+        Process groups, timeouts and stops
       
     </span>
   </a>
@@ -1485,10 +1485,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#process-groups-and-timeouts" class="md-nav__link">
+  <a href="#process-groups-timeouts-and-stops" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Process groups and timeouts
+        Process groups, timeouts and stops
       
     </span>
   </a>
@@ -1665,31 +1665,39 @@ operator happens to have open.</p>
 <p>Sinatra's rack-protection middleware is left enabled as well, including its
 <code>Origin</code> check on non-GET requests.</p>
 <h3 id="opt-in-execution">Opt-in execution<a class="headerlink" href="#opt-in-execution" title="Permanent link">&para;</a></h3>
-<p>Only fenced blocks whose info string carries <code>run</code> or <code>destructive</code>
-execute, and only in languages with an interpreter. Unknown flags and
-unrunnable languages are surfaced as warnings so a typo cannot quietly turn
-a block inert, or quietly make one runnable.</p>
+<p>Only fenced blocks whose info string carries <code>run</code>, <code>destructive</code> or
+<code>background</code> execute, and only in languages with an interpreter. Unknown
+flags and unrunnable languages are surfaced as warnings so a typo cannot
+quietly turn a block inert, or quietly make one runnable.</p>
 <h3 id="active-run-required">Active run required<a class="headerlink" href="#active-run-required" title="Permanent link">&para;</a></h3>
 <p>A block cannot execute unless a run is active. Every execution therefore
 belongs to a record, and the record is written as it happens, not
 afterwards.</p>
 <h3 id="destructive-confirmation">Destructive confirmation<a class="headerlink" href="#destructive-confirmation" title="Permanent link">&para;</a></h3>
 <p>Destructive blocks sit under a banner with the runbook's blast radius and
-escalation contact, and Run asks for a typed random word. The confirmation
-is client-side and is a guard against a reflexive click, not against a
-hostile operator, who could run the command in a terminal anyway.</p>
+escalation contact. The server refuses to run one until the request carries
+a four-character code it issued for that block (HTTP 428 carries the code;
+the page prompts for it). The code is random rather than the runbook slug
+so it cannot become muscle memory, it is checked server-side so a script
+driving the API cannot skip it, and it is retired once used. It is a guard
+against a reflexive click, not against a hostile operator, who could run
+the command in a terminal anyway. The record marks the execution as
+confirmed.</p>
 <h3 id="blank-inputs-refused">Blank inputs refused<a class="headerlink" href="#blank-inputs-refused" title="Permanent link">&para;</a></h3>
 <p>A block that references a declared input whose value is blank is refused
 before anything spawns. See <a href="../../runbooks/inputs/">Inputs and Secrets</a>.</p>
 <h3 id="secrets-stay-out-of-the-record">Secrets stay out of the record<a class="headerlink" href="#secrets-stay-out-of-the-record" title="Permanent link">&para;</a></h3>
 <p>Inputs marked <code>secret</code> reach the child process and nothing else: not
-<code>run.json</code>, not <code>run.md</code>, not the active-run panel. Redaction of secrets
-that a block itself prints is not implemented yet; see
-<a href="../../roadmap/">Roadmap</a>.</p>
-<h3 id="process-groups-and-timeouts">Process groups and timeouts<a class="headerlink" href="#process-groups-and-timeouts" title="Permanent link">&para;</a></h3>
-<p>Every execution is its own process group. Timeouts kill the group, so a
-block cannot leave a child behind. The group is created at spawn, so
-nothing runsheets kills can reach the operator's shell or the server.</p>
+<code>run.json</code>, not <code>run.md</code>, not the active-run panel (which shows only that
+the secret is set). Output is redacted on its way from the child to the
+<code>.out</code> file, so a block that prints a secret records <code>[redacted NAME]</code>
+instead. This is exact string replacement and does not catch encoded or
+transformed forms; see <a href="../../runbooks/inputs/#redaction">Inputs and Secrets</a>.</p>
+<h3 id="process-groups-timeouts-and-stops">Process groups, timeouts and stops<a class="headerlink" href="#process-groups-timeouts-and-stops" title="Permanent link">&para;</a></h3>
+<p>Every execution is its own process group. Timeouts, operator stops and the
+end of the run kill the group, so a block cannot leave a child behind. The
+group is created at spawn, so nothing runsheets kills can reach the
+operator's shell or the server.</p>
 <h3 id="file-serving">File serving<a class="headerlink" href="#file-serving" title="Permanent link">&para;</a></h3>
 <p><code>/files/*</code> serves only regular files inside the runbook directory. Path
 components are normalised and checked against the real root; hidden entries

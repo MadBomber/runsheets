@@ -1381,19 +1381,29 @@ record. Manual acknowledgements, destructive confirmation, <code>terminal</code>
 <code>--check</code>, and the security controls all landed here too, because they were
 cheap once the pieces existed.</p>
 <h2 id="milestone-2-the-full-block-set">Milestone 2: the full block set<a class="headerlink" href="#milestone-2-the-full-block-set" title="Permanent link">&para;</a></h2>
+<p>Done.</p>
 <ul>
-<li><strong><code>background</code> blocks</strong>: Start and Stop buttons for long-running
-  processes such as a tunnel, output streamed, a "running processes" panel,
-  everything stopped when the run ends. The executor already writes every
-  execution to a log file the page tails, so this is mostly lifecycle.</li>
-<li><strong>Redaction</strong>: occurrences of secret input values are replaced in captured
-  output before it is written. String replacement only; encoded forms are
-  out of scope and the docs will say so.</li>
-<li><strong>Output size</strong>: a cap or a tail-with-marker for very large outputs in
-  the page. The file keeps everything.</li>
-<li><strong><code>capture</code></strong>: a flag that stores a block's stdout as a named input for
-  later blocks, the one escape hatch from "nothing carries over".</li>
+<li><strong><code>background</code> blocks</strong>: Start and Stop buttons, no timeout, output
+  streamed, a <strong>Running</strong> panel in the sidebar on every page, everything
+  still running stopped when the run ends and recorded as <code>stopped</code>.</li>
+<li><strong><code>terminal</code> blocks</strong>: an <strong>I ran this</strong> button records the operator's
+  confirmation, with an optional note, as an <code>ack</code> event.</li>
+<li><strong>Destructive confirmation moved server-side</strong>: the first execute request
+  gets a four-character code back (HTTP 428); the block runs only when the
+  code is typed back. The record notes that the execution was confirmed.</li>
+<li><strong><code>expect</code> panels</strong>: an expect block is linked to the executable block
+  above it and shown beside that block's real output with a matches/differs
+  hint.</li>
+<li><strong>Redaction</strong>: secret input values are replaced in captured output before
+  it reaches the <code>.out</code> file, even when a secret is split across two writes.
+  String replacement only; encoded forms are not caught and
+  <a href="../runbooks/inputs/">Inputs and Secrets</a> says so.</li>
+<li><strong>Output size</strong>: the page shows the last 256 KB with a marker when there
+  is more. The file keeps everything.</li>
 </ul>
+<p>Deferred from the original list: <strong><code>capture</code></strong>, a flag that stores a block's
+stdout as a named input for later blocks. It needs a syntax for the name
+and a real runbook to prove it; see the plan's open questions.</p>
 <h2 id="milestone-3-verification-and-history">Milestone 3: verification and history<a class="headerlink" href="#milestone-3-verification-and-history" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>verify</code> steps and <code>verify.md</code> runnable standalone from the landing page,

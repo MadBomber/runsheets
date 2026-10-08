@@ -953,6 +953,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#states-and-verdicts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1346,6 +1357,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#states-and-verdicts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1492,16 +1514,25 @@ use a <code>terminal</code> block for anything interactive.</p>
 resolved relative to the runbook directory. Relative paths in a block
 therefore mean the same thing on every operator's machine.</p>
 <h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
-<p>Standard output and standard error are both redirected to the execution's
-<code>.out</code> file, interleaved in the order the process wrote them. The page polls
-the tail of that file every half second while the process runs, so a
-command that prints progress is seen printing it. Up to 256 KB of the tail
-is shown in the page; the file holds everything.</p>
+<p>Standard output and standard error both go to one pipe, interleaved in the
+order the process wrote them. A thread in the <code>runsheet</code> process reads the
+pipe, passes each chunk through the run's redactor (see
+<a href="../../runbooks/inputs/#redaction">Inputs and Secrets</a>), and appends it to
+the execution's <code>.out</code> file, flushing after every chunk. The page polls the
+tail of that file every half second while the process runs, so a command
+that prints progress is seen printing it. Up to 256 KB of the tail is shown
+in the page, with a marker when there is more; the file holds everything.</p>
 <p>Output is decoded as UTF-8 with invalid bytes replaced, both for the page
 and for the transcript.</p>
+<p>When the process exits, runsheets waits up to one second for the reader to
+drain the pipe before marking the execution finished. A grandchild the
+block left behind (<code>nohup something &amp;</code>) keeps the pipe open; its later
+output still lands in the file, but the execution is reported finished
+without waiting for it.</p>
 <h2 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h2>
 <p>Each step's <code>timeout</code> (default 600 seconds) bounds every execution of its
-blocks. When it expires:</p>
+<code>run</code> and <code>destructive</code> blocks. <code>background</code> blocks have no timeout. When
+it expires:</p>
 <ol>
 <li><code>SIGTERM</code> is sent to the process <strong>group</strong>, not just the interpreter, so
    a <code>sleep</code> or an <code>aws</code> command started by bash receives it too.</li>
@@ -1514,6 +1545,15 @@ report, and <code>signal</code> holds the raw number.</p>
 <p>The process group is created with <code>pgroup: true</code> at spawn, so the killing
 cannot reach anything the operator's shell started. Stopping the <code>runsheet</code>
 server itself does not kill running blocks; finish the run first.</p>
+<h2 id="stopping">Stopping<a class="headerlink" href="#stopping" title="Permanent link">&para;</a></h2>
+<p>A running execution can be stopped by the operator: the Stop button on a
+<code>background</code> block, the Stop button in the sidebar's <strong>Running</strong> panel, or
+<code>POST /executions/:id/stop</code>. The same TERM, wait, KILL sequence runs and
+the execution is recorded with state <code>stopped</code>. Stopping is not a failure:
+the block's border turns amber, not red, and the step is not marked failed.</p>
+<p>Finishing or abandoning the run stops everything still running first and
+waits up to three seconds for the process groups to go away before the
+record is closed.</p>
 <h2 id="states-and-verdicts">States and verdicts<a class="headerlink" href="#states-and-verdicts" title="Permanent link">&para;</a></h2>
 <div class="diagram">
 <p><img alt="Execution states" src="../../assets/images/run-lifecycle.svg" /></p>
@@ -1544,7 +1584,12 @@ server itself does not kill running blocks; finish the run first.</p>
 </tr>
 <tr>
 <td><code>timed_out</code></td>
-<td>runsheets killed it.</td>
+<td>runsheets killed it when the step's timeout expired.</td>
+<td><code>128 + signal</code></td>
+</tr>
+<tr>
+<td><code>stopped</code></td>
+<td>The operator stopped it, or the run ended while it was running.</td>
 <td><code>128 + signal</code></td>
 </tr>
 <tr>
@@ -1555,8 +1600,10 @@ server itself does not kill running blocks; finish the run first.</p>
 </tbody>
 </table>
 <p>An execution is a <strong>success</strong> only when its state is <code>finished</code> and its
-exit status is <code>0</code>. The page colours the block, and the sidebar marks the
-step, on that definition.</p>
+exit status is <code>0</code>. It is a <strong>failure</strong> when it is <code>finished</code> with any
+other status, <code>timed_out</code>, or <code>failed</code>. A <code>stopped</code> execution is neither.
+The page colours the block, and the sidebar marks the step, on those
+definitions.</p>
 <h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
 <p>Blocks can run concurrently: clicking Run on two blocks starts two
 processes. Each has its own files and its own entry in the record, ordered

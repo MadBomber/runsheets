@@ -1200,10 +1200,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#post-blocksidacknowledge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /blocks/:id/acknowledge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-executionsid" class="md-nav__link">
     <span class="md-ellipsis">
       
         GET /executions/:id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-executionsidstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /executions/:id/stop
       
     </span>
   </a>
@@ -1431,10 +1453,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#post-blocksidacknowledge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /blocks/:id/acknowledge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-executionsid" class="md-nav__link">
     <span class="md-ellipsis">
       
         GET /executions/:id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-executionsidstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /executions/:id/stop
       
     </span>
   </a>
@@ -1608,15 +1652,17 @@ Missing inputs resolve from the environment and defaults.</p>
 </span></code></pre></div>
 <h3 id="post-runfinish"><code>POST /run/finish</code><a class="headerlink" href="#post-runfinish" title="Permanent link">&para;</a></h3>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>completed</code>, default, or <code>abandoned</code>).
-Responds <strong>303</strong> to the landing page, or <strong>409</strong> with no active run.</p>
+Anything still running is stopped first. Responds <strong>303</strong> to the landing
+page, or <strong>409</strong> with no active run.</p>
 <h3 id="post-stepsslugmark"><code>POST /steps/:slug/mark</code><a class="headerlink" href="#post-stepsslugmark" title="Permanent link">&para;</a></h3>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>done</code> or <code>skipped</code>), <code>note</code> (optional).
 Responds <strong>303</strong> to the next step or the landing page; <strong>422</strong> for another
 status; <strong>409</strong> with no active run.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <h3 id="post-blocksidexecute"><code>POST /blocks/:id/execute</code><a class="headerlink" href="#post-blocksidexecute" title="Permanent link">&para;</a></h3>
-<p>Starts executing a block. No body. Responds <strong>202</strong> with the execution as
-JSON, including its initial (usually empty) output.</p>
+<p>Starts executing a <code>run</code>, <code>destructive</code> or <code>background</code> block. Responds
+<strong>202</strong> with the execution as JSON, including its initial (usually empty)
+output.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/blocks/010-say-hello-1/execute
 </span></code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
@@ -1624,20 +1670,33 @@ JSON, including its initial (usually empty) output.</p>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"block_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello-1"</span><span class="p">,</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"step"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello"</span><span class="p">,</span>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"bash"</span><span class="p">],</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"running"</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">"pid"</span><span class="p">:</span><span class="w"> </span><span class="mi">83412</span><span class="p">,</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">"started_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-10-07T17:33:48.871-05:00"</span><span class="p">,</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">"finished_at"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nt">"duration"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">"exit_status"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">"signal"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="nt">"cmd"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello-1.1.cmd"</span><span class="p">,</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">  </span><span class="nt">"log"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello-1.1.out"</span><span class="p">,</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="nt">"output_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">"background"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"running"</span><span class="p">,</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">"pid"</span><span class="p">:</span><span class="w"> </span><span class="mi">83412</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">"started_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-10-07T17:33:48.871-05:00"</span><span class="p">,</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nt">"finished_at"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">"duration"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">"exit_status"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="nt">"signal"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">  </span><span class="nt">"cmd"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello-1.1.cmd"</span><span class="p">,</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">  </span><span class="nt">"log"</span><span class="p">:</span><span class="w"> </span><span class="s2">"010-say-hello-1.1.out"</span><span class="p">,</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">  </span><span class="nt">"output_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">  </span><span class="nt">"output_truncated"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>A <strong>destructive</strong> block needs a confirmation code. The first request
+without one is answered <strong>428</strong> with the code to type:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"destructive block 040-exercise-failure-1 needs confirmation: type 72bd"</span><span class="p">,</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"challenge"</span><span class="p">:</span><span class="w"> </span><span class="s2">"72bd"</span><span class="p">,</span><span class="w"> </span><span class="nt">"block_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"040-exercise-failure-1"</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<p>Send it back as the <code>confirm</code> form field. The code is issued per block,
+stays the same until it is used, and is retired by the execution it
+confirmed. A wrong code gets the same 428 again.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">CODE</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/blocks/040-exercise-failure-1/execute<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.challenge<span class="k">)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"confirm=</span><span class="nv">$CODE</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/blocks/040-exercise-failure-1/execute
 </span></code></pre></div>
 <p>Errors are <strong>409</strong> with <code>{"error": "..."}</code>:</p>
 <ul>
@@ -1646,13 +1705,30 @@ JSON, including its initial (usually empty) output.</p>
 <li><code>block &lt;id&gt; is not executable (&lt;kind&gt;)</code></li>
 <li><code>blank input referenced by block: NAME</code></li>
 </ul>
+<h3 id="post-blocksidacknowledge"><code>POST /blocks/:id/acknowledge</code><a class="headerlink" href="#post-blocksidacknowledge" title="Permanent link">&para;</a></h3>
+<p>Records that the operator ran a <code>terminal</code> block in their own terminal.
+Form field <code>note</code> is optional. Responds <strong>201</strong> with the acknowledgement:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-10-07T17:33:55.120-05:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"step"</span><span class="p">:</span><span class="w"> </span><span class="s2">"020-inspect-ruby"</span><span class="p">,</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pressed enter"</span><span class="p">,</span><span class="w"> </span><span class="nt">"block_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"020-inspect-ruby-3"</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<p><strong>409</strong> with no active run, an unknown block, or a block that is not
+<code>terminal</code>.</p>
 <h3 id="get-executionsid"><code>GET /executions/:id</code><a class="headerlink" href="#get-executionsid" title="Permanent link">&para;</a></h3>
 <p>The current state of an execution, same shape as above. <code>output</code> is the
-last 256 KB of the log; <code>output_size</code> is the full size. <strong>404</strong> for an
-unknown id. Requires no token (it is a GET) but, like every request, a
-loopback <code>Host</code>.</p>
+last 256 KB of the log, <code>output_size</code> is the full size and
+<code>output_truncated</code> says whether anything was cut. <strong>404</strong> for an unknown
+id. Requires no token (it is a GET) but, like every request, a loopback
+<code>Host</code>.</p>
 <p>The page polls this every 500 ms until <code>state</code> is no longer <code>running</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/1b6a8f0c2d3e<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{state, exit_status, output}'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/1b6a8f0c2d3e<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{state, exit_status, output}'</span>
+</span></code></pre></div>
+<h3 id="post-executionsidstop"><code>POST /executions/:id/stop</code><a class="headerlink" href="#post-executionsidstop" title="Permanent link">&para;</a></h3>
+<p>Asks a running execution to stop: <code>TERM</code> to its process group, <code>KILL</code> two
+seconds later if needed. Responds <strong>202</strong> with the execution as it is at
+that moment (usually still <code>running</code>); poll <code>GET /executions/:id</code> until the
+state is <code>stopped</code>. Stopping an execution that has already ended is a
+no-op. <strong>409</strong> for an unknown id.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/executions/1b6a8f0c2d3e/stop
 </span></code></pre></div>
 <h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
 <table>
@@ -1680,6 +1756,10 @@ loopback <code>Host</code>.</p>
 <td>Invalid step status.</td>
 </tr>
 <tr>
+<td>428</td>
+<td>A destructive block needs its confirmation code (<code>Runsheets::Session::ConfirmationRequired</code>); the body carries <code>challenge</code>.</td>
+</tr>
+<tr>
 <td>500</td>
 <td>The runbook failed to load (<code>Runsheets::RunbookError</code>).</td>
 </tr>
@@ -1693,17 +1773,17 @@ loopback <code>Host</code>.</p>
 <code>/executions/*</code>, or when the request accepts <code>application/json</code>. Everything
 else gets an HTML error page in the normal frame.</p>
 <h2 id="driving-a-whole-run-from-the-shell">Driving a whole run from the shell<a class="headerlink" href="#driving-a-whole-run-from-the-shell" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">B</span><span class="o">=</span>http://127.0.0.1:4567
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'s/.*rs-token" content="\([a-f0-9]*\)".*/\1/p'</span><span class="k">)</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"inputs[NAME]=cli"</span><span class="w"> </span><span class="nv">$B</span>/run
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="nv">ID</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/blocks/010-say-hello-1/execute<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.id<span class="k">)</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/<span class="nv">$ID</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.state<span class="k">)</span><span class="s2">"</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span>running<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">0</span>.5<span class="p">;</span><span class="w"> </span><span class="k">done</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/<span class="nv">$ID</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.output
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"status=done"</span><span class="w"> </span><span class="nv">$B</span>/steps/010-say-hello/mark
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"status=completed"</span><span class="w"> </span><span class="nv">$B</span>/run/finish
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">B</span><span class="o">=</span>http://127.0.0.1:4567
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'s/.*rs-token" content="\([a-f0-9]*\)".*/\1/p'</span><span class="k">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"inputs[NAME]=cli"</span><span class="w"> </span><span class="nv">$B</span>/run
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nv">ID</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Runsheets-Token: </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="nv">$B</span>/blocks/010-say-hello-1/execute<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.id<span class="k">)</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/<span class="nv">$ID</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.state<span class="k">)</span><span class="s2">"</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span>running<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">0</span>.5<span class="p">;</span><span class="w"> </span><span class="k">done</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/executions/<span class="nv">$ID</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.output
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"status=done"</span><span class="w"> </span><span class="nv">$B</span>/steps/010-say-hello/mark
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"_token=</span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"status=completed"</span><span class="w"> </span><span class="nv">$B</span>/run/finish
 </span></code></pre></div>
 
 

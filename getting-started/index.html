@@ -604,10 +604,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-see-a-failure-and-a-timeout" class="md-nav__link">
+  <a href="#5-keep-something-running" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. See a failure and a timeout
+        5. Keep something running
       
     </span>
   </a>
@@ -615,10 +615,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-finish-the-run" class="md-nav__link">
+  <a href="#6-see-a-failure-and-a-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Finish the run
+        6. See a failure and a timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-finish-the-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Finish the run
       
     </span>
   </a>
@@ -1436,10 +1447,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-see-a-failure-and-a-timeout" class="md-nav__link">
+  <a href="#5-keep-something-running" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. See a failure and a timeout
+        5. Keep something running
       
     </span>
   </a>
@@ -1447,10 +1458,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-finish-the-run" class="md-nav__link">
+  <a href="#6-see-a-failure-and-a-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Finish the run
+        6. See a failure and a timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-finish-the-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Finish the run
       
     </span>
   </a>
@@ -1613,8 +1635,15 @@ duration, finish time, and the name of the log file in the run directory.</p>
 <p>Click <strong>Run</strong> again if you like. Both executions are recorded, with separate
 <code>.cmd</code> and <code>.out</code> files.</p>
 <p>The second block on that page is marked <code>expect</code>. It shows what the output
-should look like and is never executed. The third has no flag at all: it is
-the same command, display only.</p>
+should look like and is never executed. Once the first block has run, the
+expected text appears in a pane beside the real output and the footer says
+whether they match. Here they never do, because the run id in the expected
+text is made up; that is the point of the example. The third block has no
+flag at all: it is the same command, display only.</p>
+<p>Step 2, <em>Inspect the Ruby that will run things</em>, ends with a <code>terminal</code>
+block, for things that need a real terminal. Run it in your own shell, then
+click <strong>I ran this</strong>. The confirmation, with a note if you add one, goes
+into the record the same way a step mark does.</p>
 <h3 id="4-mark-the-step-done">4. Mark the step done<a class="headerlink" href="#4-mark-the-step-done" title="Permanent link">&para;</a></h3>
 <p>At the bottom of every numbered step is a <strong>Step status</strong> panel. Type a note
 if there is something worth recording ("saw the greeting, moved on"), then
@@ -1623,15 +1652,23 @@ with a timestamp and you land on the next step. <strong>Skip</strong> records a 
 instead.</p>
 <p>The sidebar marks each step: <code>✓</code> done, <code>↷</code> skipped, <code>•</code> ran with no
 failures, <code>✗</code> a block failed, <code>·</code> untouched.</p>
-<h3 id="5-see-a-failure-and-a-timeout">5. See a failure and a timeout<a class="headerlink" href="#5-see-a-failure-and-a-timeout" title="Permanent link">&para;</a></h3>
-<p>Step 4, <em>Exercise a failure</em>, is marked destructive in its front matter even
+<h3 id="5-keep-something-running">5. Keep something running<a class="headerlink" href="#5-keep-something-running" title="Permanent link">&para;</a></h3>
+<p>Step 4, <em>Keep a clock running</em>, has a <code>background</code> block with <strong>Start</strong> and
+<strong>Stop</strong> buttons instead of Run. Start it: a timestamp appears every second,
+the block has no timeout, and the sidebar grows a <strong>Running</strong> panel that
+follows you to every page with its own Stop button. Stop it from either
+place, or leave it; finishing the run stops it for you. Either way it is
+recorded as <code>stopped</code>, which is not a failure.</p>
+<h3 id="6-see-a-failure-and-a-timeout">6. See a failure and a timeout<a class="headerlink" href="#6-see-a-failure-and-a-timeout" title="Permanent link">&para;</a></h3>
+<p>Step 5, <em>Exercise a failure</em>, is marked destructive in its front matter even
 though it is harmless, so you can see the confirmation flow. Clicking <strong>Run
-(destructive)</strong> asks you to type a short random word first.</p>
+(destructive)</strong> asks the server to run the block; the server answers with a
+four-character code instead, and the block runs only once you type it back.</p>
 <p>The first block exits 3 on purpose. The second sleeps longer than the step's
 five second timeout; runsheets sends <code>TERM</code> to the whole process group,
 waits two seconds, sends <code>KILL</code>, and records the execution as <code>timed_out</code>.
 Nothing is left running.</p>
-<h3 id="6-finish-the-run">6. Finish the run<a class="headerlink" href="#6-finish-the-run" title="Permanent link">&para;</a></h3>
+<h3 id="7-finish-the-run">7. Finish the run<a class="headerlink" href="#7-finish-the-run" title="Permanent link">&para;</a></h3>
 <p>Back on the landing page, the <strong>Active run</strong> panel shows how many executions
 ran and how many steps are done. <strong>Finish run</strong> marks the record
 <code>completed</code>; <strong>Abandon run</strong> marks it <code>abandoned</code>. Either way the run is

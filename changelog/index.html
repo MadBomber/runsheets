@@ -1172,10 +1172,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added-milestone-2-the-full-block-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Added
+        Added (milestone 2: the full block set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-milestone-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 1)
       
     </span>
   </a>
@@ -1236,10 +1247,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added-milestone-2-the-full-block-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Added
+        Added (milestone 2: the full block set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-milestone-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (milestone 1)
       
     </span>
   </a>
@@ -1294,7 +1316,32 @@
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added-milestone-2-the-full-block-set">Added (milestone 2: the full block set)<a class="headerlink" href="#added-milestone-2-the-full-block-set" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>background</code> blocks execute: Start and Stop buttons, no timeout, output
+  streamed, a Running panel in the sidebar on every page, and everything
+  still running is stopped when the run finishes. A new execution state
+  <code>stopped</code>, which is not a failure.</li>
+<li><code>terminal</code> blocks have an "I ran this" button. The confirmation and an
+  optional note are recorded as an <code>ack</code> event and in <code>run.json</code>'s <code>acks</code>.</li>
+<li>Destructive confirmation is checked server-side: <code>POST /blocks/:id/execute</code>
+  answers 428 with a per-block code, and runs the block only when the code
+  comes back in <code>confirm</code>. The <code>execute</code> event carries <code>confirmed: true</code>.</li>
+<li><code>expect</code> blocks are linked to the executable block above them and shown
+  beside its real output with a matches/differs hint.</li>
+<li>Secret input values are redacted from captured output before it is
+  written, including secrets split across two writes (<code>Runsheets::Redactor</code>).</li>
+<li>Output is captured through a pipe and a reader thread instead of a file
+  handle passed to the child.</li>
+<li><code>POST /executions/:id/stop</code> and <code>POST /blocks/:id/acknowledge</code>.</li>
+<li>Execution JSON gains <code>background</code> and <code>output_truncated</code>; the page marks
+  output shown from its tail.</li>
+<li>Manual steps get acknowledgement wording in the step panel; the active
+  run panel shows secret inputs as set without their values.</li>
+<li><code>examples/hello</code> gains a background step and a redaction check in
+  <code>verify.md</code>.</li>
+</ul>
+<h3 id="added-milestone-1">Added (milestone 1)<a class="headerlink" href="#added-milestone-1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>runsheet RUNBOOK_DIR</code> serves a runbook directory on loopback; <code>--check</code>
   loads it and reports authoring warnings.</li>
