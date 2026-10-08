@@ -1,0 +1,54 @@
+/* ==========================================================================
+   runsheets documentation — custom styles
+   Material handles the heavy lifting; this file adds targeted polish.
+   ========================================================================== */
+
+/* SVG diagrams are drawn for a dark background with a transparent canvas.
+   Wrap them in a dark panel so they read the same in both palettes. */
+.md-typeset .diagram {
+  background: #0e1117;
+  border: 1px solid #273040;
+  border-radius: 10px;
+  padding: 1rem;
+  margin: 1rem 0 1.5rem;
+  overflow-x: auto;
+}
+
+.md-typeset .diagram img,
+.md-typeset .diagram svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Block-kind badges used in the executable-blocks reference. */
+.md-typeset .kind {
+  display: inline-block;
+  padding: 0 0.5em;
+  border-radius: 999px;
+  font-family: var(--md-code-font-family);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(139, 149, 168, 0.18);
+}
+.md-typeset .kind.run         { color: #3b8fe0; background: rgba(90, 176, 255, 0.16); }
+.md-typeset .kind.destructive { color: #e05555; background: rgba(255, 107, 107, 0.16); }
+.md-typeset .kind.terminal    { color: #d9912a; background: rgba(255, 180, 84, 0.16); }
+.md-typeset .kind.expect      { color: #8b6fe0; background: rgba(167, 139, 250, 0.18); }
+.md-typeset .kind.background  { color: #2bb37a; background: rgba(61, 220, 151, 0.16); }
+
+/* Keep tables with long code cells readable. */
+.md-typeset table:not([class]) td {
+  vertical-align: top;
+}
+
+.md-typeset pre code {
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.md-nav__link--active {
+  font-weight: 600;
+}

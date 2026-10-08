@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 300" width="980" height="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b95a8"/>
+    </marker>
+  </defs>
+
+  <!-- Row 1: the document pipeline -->
+  <g>
+    <rect x="20" y="40" width="150" height="70" rx="10" fill="#1b2130" stroke="#ffb454" stroke-width="1.5"/>
+    <text x="95" y="68" text-anchor="middle" fill="#ffb454" font-weight="600">runbook/</text>
+    <text x="95" y="90" text-anchor="middle" fill="#8b95a8" font-size="12">runbook.md, steps/*.md</text>
+
+    <rect x="220" y="40" width="150" height="70" rx="10" fill="#1b2130" stroke="#5ab0ff" stroke-width="1.5"/>
+    <text x="295" y="68" text-anchor="middle" fill="#5ab0ff" font-weight="600">Fences</text>
+    <text x="295" y="90" text-anchor="middle" fill="#8b95a8" font-size="12">bash run → bash?rs=N</text>
+
+    <rect x="420" y="40" width="150" height="70" rx="10" fill="#1b2130" stroke="#5ab0ff" stroke-width="1.5"/>
+    <text x="495" y="68" text-anchor="middle" fill="#5ab0ff" font-weight="600">Renderer</text>
+    <text x="495" y="90" text-anchor="middle" fill="#8b95a8" font-size="12">kramdown GFM + rouge</text>
+
+    <rect x="620" y="40" width="150" height="70" rx="10" fill="#1b2130" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="695" y="68" text-anchor="middle" fill="#a78bfa" font-weight="600">Step page</text>
+    <text x="695" y="90" text-anchor="middle" fill="#8b95a8" font-size="12">Run buttons, output</text>
+
+    <rect x="820" y="40" width="140" height="70" rx="10" fill="#1b2130" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="890" y="68" text-anchor="middle" fill="#a78bfa" font-weight="600">Browser</text>
+    <text x="890" y="90" text-anchor="middle" fill="#8b95a8" font-size="12">loopback only</text>
+
+    <line x1="170" y1="75" x2="218" y2="75" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="370" y1="75" x2="418" y2="75" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="570" y1="75" x2="618" y2="75" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="770" y1="75" x2="818" y2="75" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Row 2: the execution pipeline -->
+  <g>
+    <rect x="820" y="190" width="140" height="70" rx="10" fill="#1b2130" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="890" y="218" text-anchor="middle" fill="#a78bfa" font-weight="600">POST /blocks/:id</text>
+    <text x="890" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">with session token</text>
+
+    <rect x="620" y="190" width="150" height="70" rx="10" fill="#1b2130" stroke="#3ddc97" stroke-width="1.5"/>
+    <text x="695" y="218" text-anchor="middle" fill="#3ddc97" font-weight="600">Session</text>
+    <text x="695" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">inputs, active run</text>
+
+    <rect x="420" y="190" width="150" height="70" rx="10" fill="#1b2130" stroke="#3ddc97" stroke-width="1.5"/>
+    <text x="495" y="218" text-anchor="middle" fill="#3ddc97" font-weight="600">Executor</text>
+    <text x="495" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">process group, timeout</text>
+
+    <rect x="220" y="190" width="150" height="70" rx="10" fill="#1b2130" stroke="#3ddc97" stroke-width="1.5"/>
+    <text x="295" y="218" text-anchor="middle" fill="#3ddc97" font-weight="600">Child process</text>
+    <text x="295" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">bash / ruby + env</text>
+
+    <rect x="20" y="190" width="150" height="70" rx="10" fill="#1b2130" stroke="#ffb454" stroke-width="1.5"/>
+    <text x="95" y="218" text-anchor="middle" fill="#ffb454" font-weight="600">RunRecord</text>
+    <text x="95" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">run.json, run.md, blocks/</text>
+
+    <line x1="890" y1="110" x2="890" y2="188" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="818" y1="225" x2="772" y2="225" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="618" y1="225" x2="572" y2="225" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="418" y1="225" x2="372" y2="225" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="218" y1="225" x2="172" y2="225" stroke="#8b95a8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="195" y="212" text-anchor="middle" fill="#8b95a8" font-size="11">stdout+stderr</text>
+    <text x="195" y="248" text-anchor="middle" fill="#8b95a8" font-size="11">to .out file</text>
+  </g>
+
+  <!-- Poll loop back to the page -->
+  <path d="M 95 190 C 95 150, 300 150, 695 150 C 760 150, 695 110, 695 110" fill="none" stroke="#5ab0ff" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="400" y="145" text-anchor="middle" fill="#5ab0ff" font-size="11">GET /executions/:id polls the log tail every 500 ms</text>
+
+  <text x="20" y="22" fill="#d9dee8" font-size="12" font-weight="600">Rendering</text>
+  <text x="20" y="285" fill="#d9dee8" font-size="12" font-weight="600">Executing and recording</text>
+</svg>
