@@ -27,7 +27,7 @@ Repo: `~/sandbox/git_repos/madbomber/runsheets`. Origin copy of this plan: `~/sc
 Operational runbooks are prose with commands in them. An operator reads a step, copies
 the command into a terminal, eyeballs the output, and moves on. Nothing records what
 was run, what came back, or who confirmed the manual steps. The authoring guidance in
-the project that prompted this (VBR, see the log) asks operators to "test the runbook
+the project that prompted this (xyzzy, see the log) asks operators to "test the runbook
 by following it" and to "date the last verification" by hand, and neither happens
 reliably.
 
@@ -46,14 +46,14 @@ The rendering is the vehicle. The run record is the point.
 | Decision | Choice | Why |
 | --- | --- | --- |
 | Name | `runsheets` gem, `runsheet` command | `runbook` and `rb` are taken on RubyGems; `myrb` and `mrb` are taken and `mrb` is the mruby ecosystem's own abbreviation; `livedoc` already means living documentation in BDD circles and is taken on npm and PyPI. `runsheets` was free on RubyGems, npm, PyPI, Homebrew and PATH on 2026-10-07. A runsheet is the theatre and broadcast term for the timed, ordered list of what happens, which matches "the run record is the point". |
-| Project home | Standalone open-source project, not part of VBR | Generic tool; VBR's gates (95% per-file coverage, Trunk) would be a tax on a shell-heavy tool. VBR's runbooks are inspiration only. |
+| Project home | Standalone open-source project, not part of xyzzy | Generic tool; xyzzy's gates (95% per-file coverage, Trunk) would be a tax on a shell-heavy tool. xyzzy's runbooks are inspiration only. |
 | GUI or CLI | Browser GUI served from a local Sinatra process | Markdown renders properly; the page is a natural home for the run log. Terminal markdown is possible but not pleasant. |
 | Attached or detached | Detached (runs on the operator's machine or devcontainer) | The blocks are shell against the operator's environment: SSO sessions, tunnels, local DBs, `gh`. None of that exists inside a deployed app process, and executing markdown blocks in a web app is a security hole. |
 | Executability | Opt-in per block via the info string | Real runbooks mix runnable shell, expected-output samples, config to copy, SQL for a separate client, and destructive commands. Default must be "display only". |
-| Document shape | A directory per runbook with one file per step | Better suited to runsheets than VBR's single-file H2 layout. Single-file runbooks may be supported later as a convenience. |
+| Document shape | A directory per runbook with one file per step | Better suited to runsheets than xyzzy's single-file H2 layout. Single-file runbooks may be supported later as a convenience. |
 | Process model | Fresh process per block, own process group | Blocks stay copy-pasteable and reproducible; timeouts can kill the whole group. A `capture` flag to pass one block's stdout to later blocks is deferred until a runbook needs it. |
 | Output | Every execution writes to a log file; the page polls | One spawn path for `run` and the future `background`; a ten-minute `--wait` shows its output as it arrives instead of looking hung. |
-| Interpreters | `interpreters:` in runbook.md front matter maps a language to a command | VBR's Ruby snippets need `bin/rails runner -`; the same mechanism will route `sql` through `psql` when needed. |
+| Interpreters | `interpreters:` in runbook.md front matter maps a language to a command | xyzzy's Ruby snippets need `bin/rails runner -`; the same mechanism will route `sql` through `psql` when needed. |
 | Browser security | Per-process token in a meta tag, required on every non-GET request, plus loopback-only Host authorization | A page on another origin can neither read the token nor send the custom header without a preflight the app never answers; the Host check defeats DNS rebinding. |
 | Lineage | Builds on `~/scripts/tdv.rb` | Sinatra + kramdown GFM + rouge, directory index, breadcrumbs, search, sidebar outline. Reuse the layout and rendering; add execution and recording. |
 | Scripting language | Ruby, standard library plus the few gems tdv.rb already uses | Matches the author's tooling. |
@@ -89,7 +89,7 @@ when_to_use: >
   The deployed stacks cannot be updated in place and an in-place deploy
   fails deterministically.
 prerequisites:
-  - AWSAdministratorAccess in account 455626925658
+  - AWSAdministratorAccess in account 123456789012
   - The staging branch is ready to fast-forward
 blast_radius: >
   Destroys the staging database, container images, and DNS. Irreversible
@@ -100,10 +100,10 @@ tags: [aws, staging, destructive]
 inputs:
   - name: AWS_PROFILE
     prompt: AWS profile with admin access
-    default: ds-biorepository-sandbox-admin
+    default: xyzzy-sandbox-admin
   - name: SNAPSHOT_ID
     prompt: Identifier for the pre-teardown snapshot
-    default: vbr-staging-final-preteardown
+    default: xyzzy-staging-final-preteardown
 ---
 ```
 
@@ -282,7 +282,7 @@ recording and rendering are tested without spawning processes.
   actually needs it.
 - **Output size.** Cap captured output per block and truncate with a marker, or stream
   everything to disk and show the tail? Likely the latter.
-- **Whether VBR adopts it.** VBR's DSVBR-180 currently describes a `bin/rails runbook`
+- **Whether xyzzy adopts it.** xyzzy's XYZZY-180 currently describes a `bin/rails runbook`
   CLI. If `runsheets` works, that ticket shrinks to restructuring `docs/runbooks/` into the
   directory shape and adding a launcher. Not decided; the ticket is left as written
   until runsheets exists.
@@ -291,14 +291,14 @@ recording and rendering are tested without spawning processes.
 
 ### 2026-10-07
 
-**Origin.** The idea came out of the VBR project (linda-crnic/vbr). Its eight runbooks
+**Origin.** The idea came out of the xyzzy project (the xyzzy repository). Its eight runbooks
 under `docs/runbooks/` are prose with copy-paste commands: four Ruby scripts and four
-SQL queries in one of them alone. Jira DSVBR-180 was opened for a `bin/rails runbook`
+SQL queries in one of them alone. Jira XYZZY-180 was opened for a `bin/rails runbook`
 CLI with a step model (automated, manual, verify), per-runbook step classes, and a
 single PR to `main`. Dewayne had already prototyped the executable parts outside the
 repo as asgard tasks (`staging.loki`, `slims.loki`, `runbook.loki`).
 
-**Shift to a GUI.** Dewayne commented on DSVBR-180 that a GUI makes more sense because
+**Shift to a GUI.** Dewayne commented on XYZZY-180 that a GUI makes more sense because
 rendering markdown as HTML is far easier than rendering it in a terminal, and raised two
 options: a detached stand-alone app for an admin, or an attached admin-only page inside
 the Rails app.
@@ -320,7 +320,7 @@ Blocks must opt in to execution through the info string; the default is display 
 
 **Generic and open source.** Dewayne's direction: `rb.rb` is a generic tool driven by a
 directory and sub-directories of markdown files describing the steps of a task, and it
-is his own open-source project rather than a VBR deliverable. VBR's runbooks are
+is his own open-source project rather than a xyzzy deliverable. xyzzy's runbooks are
 inspiration, but the document structure should be designed for `rb.rb`'s needs rather
 than inherited. This file records the plan.
 
@@ -340,7 +340,7 @@ than inherited. This file records the plan.
   Proposed: every execution writes to a log file and the page tails it, so `run`
   and `background` share one spawn path and differ only in Stop button and whether
   run end kills the process.
-- *Interpreter mapping.* VBR's Ruby snippets need `bin/rails runner`, not bare
+- *Interpreter mapping.* xyzzy's Ruby snippets need `bin/rails runner`, not bare
   `ruby`. Proposed: `runbook.md` front matter maps a language to a command
   (`ruby: bin/rails runner -`, `sql: psql "$DATABASE_URL"`). Also answers the SQL
   open question.
@@ -355,7 +355,7 @@ than inherited. This file records the plan.
   replacement, not a YAML dump. Use basic ISO-8601 (`20261007T153000`) for run
   directory names, colons are awkward on macOS and in zips.
 - *Single-file runbooks.* Argued for supporting them from milestone 1, since every
-  existing runbook (including the VBR fixtures) is one file with H2 steps. Make the
+  existing runbook (including the xyzzy fixtures) is one file with H2 steps. Make the
   `Runbook` model independent of source shape. Directory layout stays primary.
 
 **Named.** `runsheets` chosen after `rb`, `runbook`, `myrb`, `mrb` and `livedoc`

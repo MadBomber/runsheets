@@ -1,0 +1,138 @@
+# MkDocs configuration for the runsheets documentation
+site_name: runsheets
+site_description: Executable runbooks. Markdown steps rendered in the browser, run and recorded.
+site_author: Dewayne VanHoozer
+site_url: https://madbomber.github.io/runsheets
+copyright: Copyright &copy; 2026 Dewayne VanHoozer
+
+repo_name: madbomber/runsheets
+repo_url: https://github.com/MadBomber/runsheets
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+
+  palette:
+    - scheme: slate
+      primary: blue
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+    - scheme: default
+      primary: blue
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/clipboard-play-outline
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - content.action.edit
+    - content.action.view
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - tags
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: madbomber
+      repo: runsheets
+      normalize_issue_symbols: true
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_css:
+  - assets/css/custom.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/MadBomber/runsheets
+      name: runsheets on GitHub
+    - icon: fontawesome/solid/gem
+      link: https://rubygems.org/gems/runsheets
+      name: runsheets on RubyGems
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Writing Runbooks:
+      - runbooks/index.md
+      - Directory Structure: runbooks/structure.md
+      - Front Matter Reference: runbooks/front-matter.md
+      - Executable Blocks: runbooks/blocks.md
+      - Inputs and Secrets: runbooks/inputs.md
+      - Authoring Guide: runbooks/authoring.md
+  - Running:
+      - running/index.md
+      - Command Line: running/cli.md
+      - The Web Page: running/web-ui.md
+      - Execution Model: running/execution.md
+      - The Run Record: running/run-record.md
+  - Reference:
+      - Security Posture: reference/security.md
+      - Architecture: reference/architecture.md
+      - Ruby API: reference/ruby-api.md
+      - HTTP Endpoints: reference/http-api.md
+  - Roadmap: roadmap.md
+  - Changelog: changelog.md
