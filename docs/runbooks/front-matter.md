@@ -41,7 +41,7 @@ interpreters:
 | `prerequisites` | list of strings | `[]` | Landing page metadata table. |
 | `blast_radius` | string | none | Landing page table, and the red banner on every destructive step. Its presence marks the whole runbook destructive. |
 | `escalation` | string | none | Landing page table and the destructive banner. |
-| `last_verified` | date | none | Landing page. A YAML date (`2026-09-12`) parses as a `Date`. |
+| `last_verified` | date | none | Landing page and Checks page. A YAML date (`2026-09-12`) parses as a `Date`. The only key runsheets ever writes: after a run that verified the runbook, the landing page offers to stamp the run's date here. |
 | `tags` | list of strings | `[]` | Badges on the landing page. |
 | `inputs` | list of mappings | `[]` | The start-run form. See [Inputs and Secrets](inputs.md). |
 | `interpreters` | mapping of language to command | see below | How executable blocks of each language are run. See [Executable Blocks](blocks.md#interpreters). |
@@ -107,9 +107,10 @@ cwd: .                   # working directory, relative to the runbook
 - **`manual`**: no executable blocks are expected. The body is an
   instruction. The step is complete when the operator marks it done,
   optionally with a note.
-- **`verify`**: a read-only check. Runs during the procedure and is also
-  meaningful standalone. Today it behaves like `automated`; later milestones
-  will let verify steps run from the landing page outside a run.
+- **`verify`**: a read-only check. Runs in its place during the procedure
+  and also standalone: a verification run started from the landing page
+  executes only verify steps and `verify.md`, and the **Checks** page shows
+  them all together with a **Run all** button.
 
 `verify.md` and `rollback.md` take the same keys. `verify.md` is usually
 `kind: verify`.

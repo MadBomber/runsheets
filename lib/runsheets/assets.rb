@@ -202,6 +202,24 @@ module Runsheets
       .rs-sidebar .running li button { grid-column: 2; grid-row: 1 / span 2; }
       .rs-sidebar .running li.ended { opacity: .55; }
       .meta code.secret { color: var(--warn); }
+      .history li { grid-template-columns: auto auto auto auto auto 1fr; }
+      .history li .verdict { font-weight: 700; }
+      .history li.verified .verdict { color: var(--ok); } .history li.abandoned .verdict { color: var(--warn); } .history li.running .verdict { color: var(--accent); }
+      .badge.run { color: var(--accent); background: rgba(90,176,255,.12); }
+      .panel.stamp { border-color: rgba(61,220,151,.5); background: rgba(61,220,151,.05); }
+      .panel.stamp h2 { color: var(--ok); display: flex; align-items: center; gap: 6px; }
+      .panel.drift { border-color: rgba(255,180,84,.5); max-width: none; }
+      .panel.drift h2 { color: var(--warn); display: flex; align-items: center; gap: 6px; }
+      .panel.drift ul { list-style: none; margin: 0; padding: 0; }
+      .panel.drift li + li { margin-top: 14px; }
+      pre.diff { margin: 6px 0 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: #0b0e14; font: 12.5px/1.5 var(--mono); overflow: auto; white-space: pre; }
+      pre.diff .add { color: var(--ok); display: block; background: rgba(61,220,151,.08); }
+      pre.diff .del { color: var(--danger); display: block; background: rgba(255,107,107,.08); }
+      pre.diff .ctx { color: var(--muted); display: block; }
+      .verify-toolbar { margin: 0 0 24px; }
+      .verify-toolbar .meta.ok { color: var(--ok); } .verify-toolbar .meta.failed { color: var(--danger); }
+      .check-doc { margin: 0 0 32px; padding: 0 0 8px; border-bottom: 1px solid var(--border); }
+      .check-doc > h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
       @media (max-width: 700px) { .rs-panes.has-expected { grid-template-columns: 1fr; } .rs-expected { border-left: 0; border-top: 1px solid var(--border); } }
 
       @media (max-width: 900px) {
@@ -341,18 +359,26 @@ module Runsheets
           block.querySelectorAll('[data-action="execute"], [data-action="acknowledge"]').forEach(b => b.disabled = false);
         };
 
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Poll until the execution ends. Resolves with its final state, or null if polling failed.
         const poll = async (block, id) => {
           try {
-            const res  = await fetch('/executions/' + encodeURIComponent(id), { headers });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || res.statusText);
-            if (show(block, data)) setTimeout(() => poll(block, id), 500);
+            for (;;) {
+              const res  = await fetch('/executions/' + encodeURIComponent(id), { headers });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || res.statusText);
+              if (!show(block, data)) return data;
+              await sleep(500);
+            }
           } catch (err) {
             fail(block, 'poll failed', err);
+            return null;
           }
         };
 
         // Run the block; a destructive one needs the server's confirmation code typed back.
+        // Resolves with the final execution state, or null if it did not run.
         const execute = async (block, id, button) => {
           button.disabled = true;
           const status = block.querySelector('[data-role="status"]');
@@ -361,15 +387,36 @@ module Runsheets
             let { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute');
             if (res.status === 428 && data.challenge) {
               const typed = prompt('This block is destructive. Type the code ' + data.challenge + ' to run it.');
-              if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; button.disabled = false; return; }
+              if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; button.disabled = false; return null; }
               ({ res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { confirm: typed.trim() }));
             }
             if (!res.ok) throw new Error(data.error || res.statusText);
-            if (show(block, data)) poll(block, data.id);
+            return show(block, data) ? poll(block, data.id) : data;
           } catch (err) {
             fail(block, 'not run', err);
+            return null;
           }
         };
+
+        // Checks page: run every plain `run` block on the page, in order, one at a time.
+        const runAll = document.querySelector('[data-action="run-all"]');
+        if (runAll) runAll.addEventListener('click', async () => {
+          const status = document.querySelector('[data-role="run-all-status"]');
+          const blocks = [...document.querySelectorAll('.rs-block.rs-executable[data-kind="run"]')];
+          runAll.disabled = true;
+          let ok = 0, failed = 0, skipped = 0;
+          for (const [i, block] of blocks.entries()) {
+            const button = block.querySelector('[data-action="execute"]');
+            if (!button) { skipped++; continue; }
+            status.textContent = 'running check ' + (i + 1) + ' of ' + blocks.length + '…';
+            block.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            const data = await execute(block, block.dataset.block, button);
+            if (data && data.state === 'finished' && data.exit_status === 0) ok++; else failed++;
+          }
+          status.textContent = blocks.length + ' check' + (blocks.length === 1 ? '' : 's') + ': ' + ok + ' ok, ' + failed + ' failed' + (skipped ? ', ' + skipped + ' skipped' : '');
+          status.className = 'meta ' + (failed ? 'failed' : 'ok');
+          runAll.disabled = false;
+        });
 
         const stopExecution = async (executionId, button) => {
           button.disabled = true;

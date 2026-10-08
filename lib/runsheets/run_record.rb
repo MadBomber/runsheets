@@ -17,25 +17,31 @@ module Runsheets
   class RunRecord
     TIMESTAMP       = "%Y%m%dT%H%M%S"
     STATUSES        = %w[running completed abandoned].freeze
+    KINDS           = %w[run verify].freeze
     TRANSCRIPT_TAIL = 64 * 1024
 
-    attr_reader :dir, :runbook_slug, :runbook_title, :started_at, :finished_at, :status,
+    attr_reader :dir, :runbook_slug, :runbook_title, :kind, :started_at, :finished_at, :status,
                 :inputs, :events, :executions, :step_status, :acks
 
     # Create the run directory and write the initial record. Secret inputs are
-    # never stored.
-    def self.start(runs_root, runbook, inputs: {}, now: Time.now)
-      dir = unique_dir(File.join(runs_root, runbook.slug, now.strftime(TIMESTAMP)))
+    # never stored. +kind+ is "run" (the whole procedure) or "verify" (only
+    # the verify documents).
+    def self.start(runs_root, runbook, inputs: {}, kind: "run", now: Time.now)
+      raise ArgumentError, "unknown run kind #{kind}" unless KINDS.include?(kind)
+
+      name = now.strftime(TIMESTAMP)
+      name += "-verify" if kind == "verify"
+      dir = unique_dir(File.join(runs_root, runbook.slug, name))
       FileUtils.mkdir_p(File.join(dir, "blocks"))
       visible = inputs.reject { |name, _| runbook.input(name)&.secret? }.transform_keys(&:to_s)
-      new(dir:, runbook_slug: runbook.slug, runbook_title: runbook.title, started_at: now, inputs: visible).write!
+      new(dir:, runbook_slug: runbook.slug, runbook_title: runbook.title, kind:, started_at: now, inputs: visible).write!
     end
 
     # Read a record back from its run.json.
     def self.load(dir)
       data = JSON.parse(File.read(File.join(dir, "run.json")))
       new(
-        dir:, runbook_slug: data["runbook"], runbook_title: data["title"],
+        dir:, runbook_slug: data["runbook"], runbook_title: data["title"], kind: data["kind"] || "run",
         started_at: Time.iso8601(data["started_at"]),
         finished_at: data["finished_at"] && Time.iso8601(data["finished_at"]),
         status: data["status"], inputs: data["inputs"] || {},
@@ -73,11 +79,12 @@ module Runsheets
       end
     end
 
-    def initialize(dir:, runbook_slug:, runbook_title:, started_at:, inputs: {}, status: "running",
+    def initialize(dir:, runbook_slug:, runbook_title:, started_at:, kind: "run", inputs: {}, status: "running",
                    finished_at: nil, events: [], executions: [], step_status: {}, acks: {})
       @dir           = dir
       @runbook_slug  = runbook_slug
       @runbook_title = runbook_title
+      @kind          = kind
       @started_at    = started_at
       @finished_at   = finished_at
       @status        = status
@@ -91,6 +98,8 @@ module Runsheets
 
     def id         = File.basename(dir)
     def active?    = status == "running"
+    def completed? = status == "completed"
+    def verify?    = kind == "verify"
     def blocks_dir = File.join(dir, "blocks")
     def duration   = (finished_at || Time.now) - started_at
 
@@ -134,8 +143,51 @@ module Runsheets
       write!
     end
 
+    # Record that runbook.md was stamped with this run's date. The run is
+    # already finished; the record is rewritten with the extra event.
+    def stamp!(date, at: Time.now)
+      events << { type: "stamp", at: at.iso8601(3), last_verified: date.to_s }
+      write!
+    end
+
+    def stamped? = events.any? { it[:type] == "stamp" }
+
     def failed_executions = executions.select { RunRecord.failure?(it) }
     def steps_done        = step_status.count { |_, s| s == "done" }
+
+    # The most recent execution of each block, keyed by block id.
+    def latest_executions = executions.each_with_object({}) { |hash, latest| latest[hash[:block_id]] = hash }
+
+    # Blocks whose most recent execution failed. A failure that was re-run
+    # successfully does not count.
+    def unresolved_failures = latest_executions.values.select { RunRecord.failure?(it) }
+
+    # The step the run was last working on: the step of the latest event.
+    def last_step = events.reverse_each.find { it[:step] }&.[](:step)
+
+    # Does this run show the runbook works? A completed procedure with every
+    # one of +steps+ marked done, or a completed verification that ran at
+    # least one check, with no block left in a failed state.
+    def verified?(steps:)
+      return false unless completed? && unresolved_failures.empty?
+
+      verify? ? executions.any? : steps_done >= steps
+    end
+
+    # How the runbook has drifted since this run: for the latest execution
+    # of each block, whether the block's code is still what ran. Returns
+    # entries only for blocks that changed or disappeared.
+    def drift(runbook)
+      latest_executions.filter_map do |block_id, hash|
+        recorded = read_block_file(hash[:cmd])
+        _, block = runbook.find_block(block_id)
+        if block.nil?
+          { block_id:, status: :missing, recorded: }
+        elsif Diff.changed?(recorded, block.code)
+          { block_id:, status: :changed, recorded:, current: block.code, diff: Diff.lines(recorded, block.code) }
+        end
+      end
+    end
 
     def execution(id) = @live[id] || executions.find { it[:id] == id }
 
@@ -157,21 +209,23 @@ module Runsheets
 
     def to_h
       {
-        runbook: runbook_slug, title: runbook_title, id:, status:,
+        runbook: runbook_slug, title: runbook_title, id:, kind:, status:,
         started_at: started_at.iso8601(3), finished_at: finished_at&.iso8601(3),
         duration: duration.round(3), inputs:, steps: step_status, acks:, events:, executions:
       }
     end
 
     def summary
-      { id:, started_at:, finished_at:, status:, duration:, executions: executions.size,
-        failures: failed_executions.size, steps_done: }
+      { id:, kind:, started_at:, finished_at:, status:, duration:, executions: executions.size,
+        failures: failed_executions.size, unresolved: unresolved_failures.size, steps_done:,
+        last_step:, stamped: stamped? }
     end
 
     # The human-readable run.md.
     def transcript
-      lines = ["# #{runbook_title} — run #{id}", "",
+      lines = ["# #{runbook_title} — #{verify? ? 'verification' : 'run'} #{id}", "",
                "- Runbook: `#{runbook_slug}`",
+               "- Kind: #{verify? ? 'verification (verify documents only)' : 'full run'}",
                "- Started: #{started_at.iso8601}",
                "- Finished: #{finished_at&.iso8601 || 'in progress'}",
                "- Status: #{status}"]
@@ -186,6 +240,7 @@ module Runsheets
         when "execute" then lines.concat(execution_transcript(event))
         when "step"    then lines << "- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{" — #{event[:note]}" if event[:note]}" << ""
         when "ack"     then lines << "- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{" — #{event[:note]}" if event[:note]}" << ""
+        when "stamp"   then lines << "- #{event[:at]} runbook.md stamped `last_verified: #{event[:last_verified]}`" << ""
         end
       end
       "#{lines.join("\n")}\n"

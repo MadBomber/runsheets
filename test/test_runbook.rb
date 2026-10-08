@@ -9,8 +9,8 @@ class TestRunbook < Minitest::Test
     rb = example_runbook
     assert_equal "hello", rb.slug
     assert_equal "Hello, runsheets", rb.title
-    assert_equal %w[010-say-hello 020-inspect-ruby 030-take-a-breath 035-keep-a-clock-running 040-exercise-failure], rb.steps.map(&:slug)
-    assert_equal [1, 2, 3, 4, 5], rb.steps.map(&:position)
+    assert_equal %w[010-say-hello 020-inspect-ruby 030-take-a-breath 035-keep-a-clock-running 040-exercise-failure 045-check-the-greeting], rb.steps.map(&:slug)
+    assert_equal [1, 2, 3, 4, 5, 6], rb.steps.map(&:position)
     assert_equal %w[verify rollback], rb.extras.keys
     assert_equal %w[example safe], rb.tags
     assert_equal Date.new(2026, 10, 7), rb.last_verified
@@ -80,6 +80,52 @@ class TestRunbook < Minitest::Test
       assert_includes rb.warnings, "input name 'bad-name' is not a valid environment variable name"
       assert_includes rb.warnings, "010-a: automated step has no executable block"
       assert_includes rb.warnings, "020-b: block 020-b-1: unknown flag: nope"
+    end
+  end
+
+  def test_verify_documents_are_verify_steps_then_verify_md
+    rb = example_runbook
+    assert_equal %w[045-check-the-greeting verify], rb.verify_documents.map(&:slug)
+    assert rb.verify_document?(rb.step("verify"))
+    refute rb.verify_document?(rb.step("010-say-hello"))
+    assert_equal %w[045-check-the-greeting-1 verify-1 verify-2], rb.verify_blocks.map(&:id)
+  end
+
+  def test_stamp_last_verified_replaces_the_one_line
+    files = { "runbook.md" => "---\ntitle: T\nlast_verified: 2020-01-01\ntags: [a]\n---\n\n# T\n\nlast_verified: not this one\n", "steps/010-a.md" => "a" }
+    with_runbook(files) do |rb|
+      assert_equal "2020-01-01", rb.last_verified.to_s
+      text = rb.stamp_last_verified(Date.new(2026, 10, 8))
+      assert_equal "---\ntitle: T\nlast_verified: 2026-10-08\ntags: [a]\n---\n\n# T\n\nlast_verified: not this one\n", text
+      assert_equal "2026-10-08", Runsheets::Runbook.load(rb.dir).last_verified.to_s
+    end
+  end
+
+  def test_stamp_last_verified_adds_the_line_when_missing
+    files = { "runbook.md" => "---\r\ntitle: T\r\n---\r\nbody\r\n", "steps/010-a.md" => "a" }
+    with_runbook(files) do |rb|
+      text = rb.stamp_last_verified("2026-10-08")
+      assert_equal "---\r\ntitle: T\r\nlast_verified: 2026-10-08\r\n---\r\nbody\r\n", text
+    end
+  end
+
+  def test_stamp_last_verified_needs_front_matter
+    with_runbook("runbook.md" => "# No front matter\n", "steps/010-a.md" => "a") do |rb|
+      assert_raises(Runsheets::RunbookError) { rb.stamp_last_verified("2026-10-08") }
+      assert_equal "# No front matter\n", File.read(File.join(rb.dir, "runbook.md"))
+    end
+  end
+
+  def test_stale_when_a_source_file_changes_or_appears
+    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a") do |rb|
+      refute rb.stale?
+      sleep 0.01
+      File.write(File.join(rb.dir, "steps", "010-a.md"), "b")
+      assert rb.stale?
+      fresh = Runsheets::Runbook.load(rb.dir)
+      refute fresh.stale?
+      File.write(File.join(rb.dir, "verify.md"), "v")
+      assert fresh.stale?, "a new source file counts"
     end
   end
 

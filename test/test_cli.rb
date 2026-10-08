@@ -12,7 +12,7 @@ class TestCLI < Minitest::Test
     options = CLI.parse([RunsheetsTest::EXAMPLE_DIR])
     assert_equal 4567, options[:port]
     assert_equal "127.0.0.1", options[:bind]
-    assert_equal RunsheetsTest::EXAMPLE_DIR, options[:dir]
+    assert_equal RunsheetsTest::EXAMPLE_DIR, options[:runbook]
   end
 
   def test_parse_options
@@ -39,11 +39,55 @@ class TestCLI < Minitest::Test
     assert_includes out.string, Runsheets::VERSION
   end
 
+  def test_init_scaffolds_a_directory_runbook_that_checks_clean
+    Dir.mktmpdir("runsheets-init") do |dir|
+      target = File.join(dir, "new-runbook")
+      out = StringIO.new
+      assert_equal 0, CLI.run(["--init", target], out:, err: StringIO.new)
+      assert_includes out.string, "created #{File.join(target, 'runbook.md')}"
+      assert File.file?(File.join(target, "steps", "010-first-step.md"))
+      assert File.file?(File.join(target, "verify.md"))
+      assert File.file?(File.join(target, "rollback.md"))
+      err = StringIO.new
+      assert_equal 0, CLI.run(["--check", target], out: StringIO.new, err:), err.string
+      assert_equal "New runbook", Runsheets::Runbook.load(target).title
+
+      err = StringIO.new
+      assert_equal 1, CLI.run(["--init", target], out: StringIO.new, err:)
+      assert_match(/not empty/, err.string)
+    end
+  end
+
+  def test_init_scaffolds_a_single_file_runbook_that_checks_clean
+    Dir.mktmpdir("runsheets-init") do |dir|
+      target = File.join(dir, "db-refresh.md")
+      assert_equal 0, CLI.run(["--init", target], out: StringIO.new, err: StringIO.new)
+      assert File.file?(target)
+      err = StringIO.new
+      assert_equal 0, CLI.run(["--check", target], out: StringIO.new, err:), err.string
+      rb = Runsheets::Runbook.load(target)
+      assert rb.single_file?
+      assert_equal "Db refresh", rb.title
+      assert_equal 2, rb.steps.size
+      assert rb.verify
+      assert rb.rollback
+      err = StringIO.new
+      assert_equal 1, CLI.run(["--init", target], out: StringIO.new, err:)
+      assert_match(/already exists/, err.string)
+    end
+  end
+
+  def test_check_accepts_a_single_file
+    out = StringIO.new
+    assert_equal 0, CLI.run(["--check", File.expand_path("../examples/db-maintenance.md", __dir__)], out:, err: StringIO.new)
+    assert_includes out.string, "0 warnings"
+  end
+
   def test_check_mode
     out = StringIO.new
     err = StringIO.new
     assert_equal 0, CLI.run(["--check", RunsheetsTest::EXAMPLE_DIR], out:, err:)
-    assert_includes out.string, "5 steps, 0 warnings"
+    assert_includes out.string, "6 steps, 0 warnings"
     assert_empty err.string
   end
 
@@ -60,6 +104,6 @@ class TestCLI < Minitest::Test
   def test_missing_runbook_is_an_error
     err = StringIO.new
     assert_equal 1, CLI.run(["--check", "/nonexistent/dir"], out: StringIO.new, err:)
-    assert_includes err.string, "not a directory"
+    assert_includes err.string, "no such runbook"
   end
 end

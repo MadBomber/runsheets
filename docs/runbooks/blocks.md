@@ -51,33 +51,44 @@ background process that exits on its own is recorded like a `run` block:
 
 Only languages with an interpreter can execute. The defaults are `bash`,
 `sh`, `zsh` and `ruby`. A block in any other language that asks for `run`
-renders with the warning "sql blocks cannot execute; displayed only" and no
-Run button, so a mistake is visible rather than silent.
+renders with the warning "sql blocks cannot execute; displayed only (map it
+under interpreters in the runbook front matter)" and no Run button, so a
+mistake is visible rather than silent.
 
 ### Interpreters
 
-The runbook's front matter can add or override entries:
+The runbook's front matter can add or override entries, and a language it
+maps executes like any other:
 
 ```yaml
 interpreters:
   ruby: bin/rails runner -
-  sql: psql "$DATABASE_URL" -f
+  sql: psql -X -v ON_ERROR_STOP=1 -f
   python: python3
 ```
 
-When a block executes, its code is written to a temporary file in the run
-directory and the interpreter command is run with that path appended. With
-the map above a `ruby run` block becomes:
+When a block executes, its code is written to a file in the run directory
+and the interpreter command is run with that path appended. With the map
+above a `ruby run` block becomes:
 
 ```text
 bin/rails runner - <run-dir>/blocks/020-x-1.1.cmd
 ```
 
+and a `sql run` block becomes `psql -X -v ON_ERROR_STOP=1 -f <path>`, with
+`psql` taking its connection from the `PGHOST`, `PGUSER`, `PGPASSWORD` and
+`PGDATABASE` inputs in the environment. `examples/db-maintenance.md` is a
+complete runbook built this way.
+
 The command is split with `Shellwords`, so quoting works as it would in a
-shell, but there is no shell: `$DATABASE_URL` in the example above is passed
-literally to `psql`, which is fine because `psql` reads it from the
-environment itself. If you need shell expansion in the interpreter command,
-go through `bash -c`.
+shell, but there is no shell: a `$VARIABLE` in the interpreter command is
+passed literally. If you need expansion there, go through `bash -c` and
+take the file as `$0`:
+
+```yaml
+interpreters:
+  sql: bash -c 'psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$0"'
+```
 
 Because every block is a fresh process, a mapping like `bin/rails runner -`
 boots Rails for every Ruby block. That is the right trade for correctness in

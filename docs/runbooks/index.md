@@ -1,7 +1,8 @@
 # Writing Runbooks
 
-A runbook is a directory of markdown files. runsheets adds three things to
-ordinary markdown:
+A runbook is a directory of markdown files, or a single markdown file
+whose `##` headings are the steps. runsheets adds three things to ordinary
+markdown:
 
 1. **Front matter** on `runbook.md` and on each step, carrying the metadata
    an operator needs before touching anything.

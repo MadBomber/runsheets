@@ -32,7 +32,8 @@ TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 | --- | --- |
 | `GET /` | The landing page. |
 | `GET /steps/:slug` | A step page. `verify` and `rollback` are slugs too. 404 for an unknown slug. |
-| `GET /run` | The active run's transcript, or the most recent run's. 404 if there has never been a run. |
+| `GET /verify` | The Checks page: every verify step and `verify.md`. 404 if the runbook has none. |
+| `GET /run` | The active run's transcript, or the most recent run's, with the drift panel for a finished run. 404 if there has never been a run. |
 | `GET /runs/:id` | A previous run's transcript. The id must match `[\w.-]+`. |
 | `GET /files/*path` | A regular, non-hidden file inside the runbook directory, with its content type. 404 otherwise. |
 
@@ -40,10 +41,14 @@ TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 
 ### `POST /run`
 
-Starts a run. Form fields: `_token`, and `inputs[NAME]` for each input.
-Missing inputs resolve from the environment and defaults.
+Starts a run. Form fields: `_token`, `inputs[NAME]` for each input, and
+`kind` (`run`, the default, or `verify` for a verification run that may
+only execute verify steps and `verify.md`). Missing inputs resolve from the
+environment and defaults.
 
-Responds **303** to the first step, or **409** if a run is already active.
+Responds **303** to the first step (or to `/verify` for a verification),
+or **409** if a run is already active or `kind=verify` is asked of a
+runbook with no verify documents.
 
 ```bash
 curl -X POST --data-urlencode "_token=$TOKEN" \
@@ -55,6 +60,19 @@ curl -X POST --data-urlencode "_token=$TOKEN" \
 Form fields: `_token`, `status` (`completed`, default, or `abandoned`).
 Anything still running is stopped first. Responds **303** to the landing
 page, or **409** with no active run.
+
+### `POST /run/stamp`
+
+Writes `last_verified` into `runbook.md` with the last run's start date,
+when that run qualifies (completed; every step done for a full run, or
+every check run for a verification; no block left failing; the runbook's
+current `last_verified` is older). Form field: `_token`. Responds **303**
+to the landing page, or **409** when the last run cannot stamp.
+
+### `POST /run/stamp/dismiss`
+
+Hides the stamp offer for the last run. Form field: `_token`. Responds
+**303** to the landing page.
 
 ### `POST /steps/:slug/mark`
 
@@ -120,6 +138,7 @@ Errors are **409** with `{"error": "..."}`:
 - `start a run before executing blocks`
 - `unknown block <id>`
 - `block <id> is not executable (<kind>)`
+- `a verification run only executes verify steps and verify.md; <id> is in <step>`
 - `blank input referenced by block: NAME`
 
 ### `POST /blocks/:id/acknowledge`

@@ -12,11 +12,14 @@ lib/runsheets/
   block.rb                    a fenced block and the kind its flags ask for
   renderer.rb                 kramdown + rouge, wraps executable blocks
   step.rb                     one markdown file: front matter, body, html, blocks
-  runbook.rb                  the directory: runbook.md, steps/, verify, rollback
+  single_file.rb              splits a one-file runbook into preamble and ## sections
+  runbook.rb                  a directory or a single file: steps, verify, rollback; last_verified stamp
+  diff.rb                     line diff for drift between a record and the runbook
+  redactor.rb                 replaces secret values in captured output
   execution.rb                one execution: state, pid, files, timing
-  executor.rb                 spawns, captures, reaps, times out
-  run_record.rb               run.json, run.md, blocks/; list and load
-  session.rb                  the active run, inputs, live executions
+  executor.rb                 spawns, pumps output through the redactor, reaps, times out, stops
+  run_record.rb               run.json, run.md, blocks/; list, load, verdicts, drift
+  session.rb                  the active run, inputs, live executions, confirmation codes, stamp offer
   web.rb                      Sinatra routes and the security checks
   pages.rb                    pure functions that build the HTML
   assets.rb                   inline CSS and JavaScript
@@ -99,7 +102,14 @@ state into the hashes before any write. `write!` produces both `run.json`
 and the `run.md` transcript from the same data.
 
 `RunRecord.load` and `RunRecord.list` read records back for the history
-panel and the `/runs/:id` page.
+panel and the `/runs/:id` page. A record also knows how to judge itself:
+`verified?` says whether a completed run exercised the whole runbook with
+nothing left failing, and `drift` compares each block's recorded `.cmd`
+with the runbook as it reads now, using the small LCS diff in `diff.rb`.
+
+The session reloads the runbook whenever one of its markdown files changes
+on disk (checked on every GET), so a runbook can be edited while the
+server is up and the drift view compares against what is there now.
 
 ## The session
 

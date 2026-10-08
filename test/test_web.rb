@@ -206,6 +206,110 @@ class TestWeb < Minitest::Test
     refute_includes last_response.body, "swordfish"
   end
 
+  def test_checks_page_and_verification_run
+    get "/verify"
+    assert last_response.ok?
+    assert_includes last_response.body, "No active run"
+    assert_includes last_response.body, 'data-block="045-check-the-greeting-1"'
+    assert_includes last_response.body, 'data-block="verify-2"'
+    refute_includes last_response.body, '<button type="button" class="btn primary" data-action="run-all"'
+
+    get "/"
+    assert_includes last_response.body, 'name="kind" value="verify"'
+
+    post "/run", { "_token" => "tok", "kind" => "verify" }
+    assert_equal 302, last_response.status
+    assert_match %r{/verify\z}, last_response.location
+    assert @session.verifying?
+
+    get "/verify"
+    assert_includes last_response.body, '<button type="button" class="btn primary" data-action="run-all"'
+    assert_includes last_response.body, "Run all 3 checks"
+    get "/"
+    assert_includes last_response.body, "Active verification"
+    get "/steps/010-say-hello"
+    assert_includes last_response.body, "This is a verification run"
+
+    with_token
+    post "/blocks/010-say-hello-1/execute"
+    assert_equal 409, last_response.status
+    post "/blocks/verify-1/execute"
+    assert_equal 202, last_response.status
+    id = JSON.parse(last_response.body)["id"]
+    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+
+    get "/verify"
+    assert_includes last_response.body, '"executions":{"verify-1"'
+
+    post "/run/finish", { "_token" => "tok" }
+    get "/"
+    assert_includes last_response.body, "Record the verification"
+    assert_includes last_response.body, 'action="/run/stamp"'
+    assert_includes last_response.body, "<span class=\"badge verify\">verify</span>"
+    assert_includes last_response.body, "verified"
+  end
+
+  def test_stamp_writes_runbook_md_and_dismiss_hides_the_offer
+    Dir.mktmpdir("runsheets-stamp") do |dir|
+      FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
+      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
+      Runsheets::Web.configure_for(@session)
+
+      post "/run/stamp", { "_token" => "tok" }
+      assert_equal 409, last_response.status
+
+      post "/run", { "_token" => "tok", "kind" => "verify" }
+      with_token
+      post "/blocks/verify-1/execute"
+      id = JSON.parse(last_response.body)["id"]
+      wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+      post "/run/finish", { "_token" => "tok" }
+
+      post "/run/stamp/dismiss", { "_token" => "tok" }
+      assert_equal 302, last_response.status
+      get "/"
+      refute_includes last_response.body, "Record the verification"
+      assert_includes File.read(File.join(dir, "runbook.md")), "last_verified: 2026-10-07"
+
+      @session.instance_variable_set(:@stamp_dismissed, false)
+      post "/run/stamp", { "_token" => "tok" }
+      assert_equal 302, last_response.status
+      assert_includes File.read(File.join(dir, "runbook.md")), "last_verified: #{Date.today}"
+      get "/"
+      assert_includes last_response.body, "last verified #{Date.today}"
+      assert_includes last_response.body, "stamped"
+      get "/runs/#{@session.run.id}"
+      assert_includes last_response.body, "stamped"
+    end
+  end
+
+  def test_run_page_shows_drift_when_the_runbook_changed
+    Dir.mktmpdir("runsheets-drift") do |dir|
+      FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
+      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
+      Runsheets::Web.configure_for(@session)
+      post "/run", { "_token" => "tok" }
+      with_token
+      post "/blocks/010-say-hello-1/execute"
+      id = JSON.parse(last_response.body)["id"]
+      wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+      post "/run/finish", { "_token" => "tok", "status" => "abandoned" }
+
+      get "/runs/#{@session.run.id}"
+      refute_includes last_response.body, "Runbook changed since this run"
+
+      path = File.join(dir, "steps", "010-say-hello.md")
+      File.write(path, File.read(path).sub('echo "Hello, $NAME!"', 'echo "Howdy, $NAME!"'))
+      assert @session.runbook.stale?
+      get "/runs/#{@session.run.id}"
+      assert_includes last_response.body, "Runbook changed since this run"
+      assert_includes last_response.body, "-echo &quot;Hello, $NAME!&quot;"
+      assert_includes last_response.body, "+echo &quot;Howdy, $NAME!&quot;"
+      get "/"
+      assert_includes last_response.body, "stopped at 010-say-hello"
+    end
+  end
+
   def test_unknown_execution_is_404_json
     with_token
     get "/executions/nope"

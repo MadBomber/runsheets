@@ -15,8 +15,9 @@ outside the runbook:
 ```
 
 The directory name is the start time in basic ISO 8601 form, which sorts
-correctly and contains no colons (awkward on macOS and in archives). Two
-runs started in the same second get `-2`, `-3` suffixes.
+correctly and contains no colons (awkward on macOS and in archives). A
+verification run adds `-verify`. Two runs started in the same second get
+`-2`, `-3` suffixes.
 
 ## Location
 
@@ -77,11 +78,13 @@ Hello, smoke!
 - 2026-10-07T17:33:55.120-05:00 `020-inspect-ruby-3` (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter
 
 - 2026-10-07T17:33:58.448-05:00 step **010-say-hello** marked done — smoke ok
+
+- 2026-10-07T17:34:10.001-05:00 runbook.md stamped `last_verified: 2026-10-07`
 ```
 
 Events appear in the order they happened: executions, terminal
-confirmations and step marks interleaved, so jumping around is visible
-rather than hidden. Output longer than 64 KB is trimmed to its tail in the
+confirmations, step marks and the stamp interleaved, so jumping around is
+visible rather than hidden. Output longer than 64 KB is trimmed to its tail in the
 transcript with a marker; the `.out` file is complete.
 
 The verdict after the block id is one of `ok`, `exit N`, `timed out`,
@@ -96,6 +99,7 @@ mark a `background` execution and a destructive one that was `confirmed`.
   "runbook": "hello",
   "title": "Hello, runsheets",
   "id": "20261007T173348",
+  "kind": "run",
   "status": "completed",
   "started_at": "2026-10-07T17:33:48.859-05:00",
   "finished_at": "2026-10-07T17:33:58.515-05:00",
@@ -144,6 +148,7 @@ mark a `background` execution and a destructive one that was `confirmed`.
 | `runbook` | The runbook slug. |
 | `title` | The runbook title at the time of the run. |
 | `id` | The run id, equal to the directory name. |
+| `kind` | `run` for the whole procedure, `verify` for a verification run that executed only the verify documents. |
 | `status` | `running`, `completed` or `abandoned`. |
 | `started_at`, `finished_at` | ISO 8601 with milliseconds. `finished_at` is `null` while running. |
 | `duration` | Seconds, to the millisecond. For a running run, time elapsed so far at the last write. |
@@ -155,7 +160,7 @@ mark a `background` execution and a destructive one that was `confirmed`.
 
 ### Events
 
-Three types:
+Four types:
 
 - `execute`: `at`, `step`, `block`, and the `execution` id to look up in
   `executions`. `confirmed: true` when the block was destructive and the
@@ -164,6 +169,18 @@ Three types:
   confirmed they ran a `terminal` block themselves.
 - `step`: `at`, `step`, `status` (`done` or `skipped`), and `note` when one
   was given.
+- `stamp`: `at` and `last_verified`, the date written into `runbook.md`.
+  Added after the run finished, which is why a stamped record is written
+  once more.
+
+### Verdict
+
+A record is **verified** when its status is `completed`, no block's most
+recent execution is a failure (an earlier failure that was re-run
+successfully does not count), and either every step of the runbook is
+marked done (kind `run`) or at least one check ran (kind `verify`). The
+history list shows `verified` in place of `completed` for such runs, and
+only such runs are offered the `last_verified` stamp.
 
 ### Executions
 

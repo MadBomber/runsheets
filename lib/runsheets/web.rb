@@ -92,7 +92,10 @@ module Runsheets
 
     before do
       fail_with("runsheets has no runbook loaded", 503) unless rs
-      next if request.get? || request.head?
+      if request.get? || request.head?
+        rs.refresh_runbook!
+        next
+      end
 
       fail_with("missing or invalid session token", 403) unless token_ok?
     end
@@ -132,6 +135,11 @@ module Runsheets
       send_file path
     end
 
+    get "/verify" do
+      fail_with("this runbook has no verify steps or verify.md", 404) if runbook.verify_documents.empty?
+      html Pages.verify(rs)
+    end
+
     get "/run" do
       record = rs.run || rs.history.first or fail_with("no run has been started", 404)
       html Pages.run(rs, record)
@@ -149,13 +157,26 @@ module Runsheets
 
     post "/run" do
       inputs = params["inputs"].is_a?(Hash) ? params["inputs"] : {}
-      rs.start_run(inputs:)
+      kind   = params["kind"] == "verify" ? "verify" : "run"
+      rs.start_run(inputs:, kind:)
       first = runbook.steps.first
-      redirect(first ? Pages.step_href(first) : "/")
+      redirect(kind == "verify" ? "/verify" : (first ? Pages.step_href(first) : "/"))
     end
 
     post "/run/finish" do
       rs.finish_run(status: params["status"] || "completed")
+      redirect "/"
+    end
+
+    # last_verified write-back: the one write inside the runbook directory,
+    # only on request, only after a run that verified the runbook.
+    post "/run/stamp" do
+      rs.stamp!
+      redirect "/"
+    end
+
+    post "/run/stamp/dismiss" do
+      rs.dismiss_stamp!
       redirect "/"
     end
 

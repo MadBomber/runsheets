@@ -32,25 +32,29 @@ module Runsheets
       "ruby" => %w[ruby]
     }.freeze
 
-    attr_reader :id, :index, :lang, :flags, :code, :line, :kind, :warnings
+    attr_reader :id, :index, :lang, :flags, :code, :line, :kind, :warnings, :interpreters
 
     # For an :expect block, the id of the executable block it illustrates
     # (the nearest one above it). Set by Renderer once every block is known.
     attr_accessor :expect_for
 
-    def initialize(id:, index:, info:, code:, line: nil)
-      @id    = id
-      @index = index
-      @code  = code
-      @line  = line
+    # +interpreters+ is the language => command map in force for the
+    # runbook (the defaults plus its front matter); a language outside it
+    # cannot execute whatever its flags say.
+    def initialize(id:, index:, info:, code:, line: nil, interpreters: INTERPRETERS)
+      @id           = id
+      @index        = index
+      @code         = code
+      @line         = line
+      @interpreters = interpreters
       @lang, *@flags = info.to_s.split
       @lang = @lang.to_s
       @flags.freeze
-      @kind, @warnings = Block.classify(@flags, @lang)
+      @kind, @warnings = Block.classify(@flags, @lang, interpreters)
     end
 
     # The kind a set of flags asks for, plus any authoring warnings.
-    def self.classify(flags, lang)
+    def self.classify(flags, lang, interpreters = INTERPRETERS)
       warnings = []
       unknown  = flags.reject { FLAG_KINDS.key?(it) }
       warnings << "unknown flag#{'s' if unknown.size > 1}: #{unknown.join(', ')}" if unknown.any?
@@ -64,14 +68,14 @@ module Runsheets
       extra = kinds - [:run, kind]
       warnings << "conflicting flags: #{kinds.join(', ')}; using #{kind}" if extra.any?
 
-      if EXECUTABLE_KINDS.include?(kind) && !INTERPRETERS.key?(lang)
-        warnings << (lang.empty? ? "a block without a language cannot execute" : "#{lang} blocks cannot execute; displayed only")
+      if EXECUTABLE_KINDS.include?(kind) && !interpreters.key?(lang)
+        warnings << (lang.empty? ? "a block without a language cannot execute" : "#{lang} blocks cannot execute; displayed only (map it under interpreters in the runbook front matter)")
       end
 
       [kind, warnings.freeze]
     end
 
-    def executable?  = EXECUTABLE_KINDS.include?(kind) && INTERPRETERS.key?(lang)
+    def executable?  = EXECUTABLE_KINDS.include?(kind) && interpreters.key?(lang)
     def destructive? = kind == :destructive
     def background?  = kind == :background
     def terminal?    = kind == :terminal

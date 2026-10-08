@@ -15,8 +15,11 @@ never loads Sinatra.
 ## Loading a runbook
 
 ```ruby
-runbook = Runsheets::Runbook.load("ops/runbooks/staging-teardown")
+runbook = Runsheets::Runbook.load("ops/runbooks/staging-teardown")      # a directory
+runbook = Runsheets::Runbook.load("ops/runbooks/db-maintenance.md")     # or a single file
 
+runbook.single_file?    # true for the second form
+runbook.main_path       # runbook.md, or the single file
 runbook.slug            # => "staging-teardown"
 runbook.title           # => "Staging Infrastructure Teardown and Rebuild"
 runbook.when_to_use     # String or nil
@@ -40,9 +43,12 @@ runbook.find_block("020-stop-the-pipeline-1")   # => [step, block] or nil
 runbook.neighbors(step)                          # => [previous, next]
 ```
 
-`Runbook.load` raises `Runsheets::RunbookError` when the directory or
-`runbook.md` is missing or front matter is invalid. Authoring problems that
-do not prevent loading are collected in `warnings`.
+`Runbook.load` raises `Runsheets::RunbookError` when the path does not
+exist, a directory has no `runbook.md`, or front matter is invalid.
+Authoring problems that do not prevent loading are collected in
+`warnings`. `Runsheets::SingleFile.split(markdown)` is the parser behind
+the single-file shape, returning the preamble and the sections with their
+attribute comments decoded.
 
 ### Steps
 
@@ -73,7 +79,8 @@ block.id           # "010-confirm-nothing-to-preserve-1"
 block.lang         # "bash"
 block.flags        # ["run"]
 block.kind         # :display, :run, :destructive, :terminal, :expect, :background
-block.executable?  # true for :run, :destructive and :background in a language with an interpreter
+block.executable?  # true for :run, :destructive and :background in a language the runbook's interpreters map
+block.interpreters # that map: the defaults plus the front matter's entries
 block.destructive?
 block.background?
 block.terminal?
@@ -86,6 +93,20 @@ block.warnings
 block.referenced_variables   # ["AWS_PROFILE", "CLUSTER"]
 block.to_h
 ```
+
+### Stamping `last_verified`
+
+```ruby
+Runsheets::Runbook.stamp_last_verified("ops/runbooks/staging-teardown/runbook.md", Date.today)
+runbook.stamp_last_verified(Date.today)   # the same, for a loaded runbook
+runbook.verify_documents                  # verify-kind steps, then verify.md
+runbook.verify_blocks                     # their executable blocks
+runbook.stale?                            # a source file changed since load
+```
+
+The stamp replaces the `last_verified:` line of the front matter, or adds
+one before the closing `---`, and leaves every other byte alone. It raises
+`RunbookError` when the file has no front matter.
 
 ## Validating in CI
 
@@ -153,6 +174,16 @@ session.secret_inputs_set       # names of secret inputs that have a value
 session.step_status(slug)       # "done", "skipped" or nil
 session.history                 # previous RunRecords, newest first
 session.token                   # the session token the web layer requires
+
+session.start_verification(inputs:)   # start_run(kind: "verify"): only verify documents execute
+session.verifying?
+session.stamp_candidate         # the finished run that could stamp last_verified, or nil
+session.stampable?
+session.stamp_date              # the date a stamp would write: the run's start date
+session.stamp!                  # write last_verified, note it in the record, reload the runbook
+session.dismiss_stamp!
+session.reload_runbook!         # re-read the runbook directory
+session.refresh_runbook!        # reload only if a source file changed on disk
 ```
 
 Executing a destructive block without the right `confirm` raises
@@ -244,6 +275,14 @@ run.events          # Array of Hash with symbol keys
 run.executions      # Array of Hash with symbol keys
 run.step_status     # { "010-..." => "done" }
 run.acks            # { "020-...-3" => { at:, step:, note: } } terminal confirmations
+run.kind            # "run" or "verify"
+run.verify?
+run.verified?(steps: runbook.steps.size)   # completed, nothing left failing, all steps done or checks ran
+run.latest_executions      # block id => its most recent execution Hash
+run.unresolved_failures    # latest executions that are failures
+run.last_step              # the step of the latest event, or nil
+run.stamped?
+run.drift(runbook)         # [{ block_id:, status: :changed, diff: [Diff::Line...] }, { status: :missing, ... }]
 run.steps_done
 run.failed_executions
 run.summary         # { id:, started_at:, finished_at:, status:, duration:, executions:, failures:, steps_done: }

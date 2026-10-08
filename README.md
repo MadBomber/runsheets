@@ -8,9 +8,11 @@ operator's acknowledgements of the manual steps.
 
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
-Status: early. Milestones 1 and 2 of the [plan](PLAN.md) work end to end:
-every block kind in the convention below is live. The convention may still
-change once it has met a few real runbooks.
+Status: all four milestones of the [plan](PLAN.md) are built. Every block
+kind in the convention below is live, verify steps run on their own, a
+verified run can stamp `last_verified` into the runbook, and a runbook can
+be a directory or a single markdown file. Vocabulary: the document is the
+*runbook*; the record of one run is the *runsheet*.
 
 ## Install
 
@@ -23,15 +25,19 @@ Requires Ruby 3.4 or newer.
 ## Run
 
 ```bash
-runsheet path/to/runbook        # serve on http://127.0.0.1:4567/
-runsheet --open path/to/runbook # and open the browser
+runsheet path/to/runbook         # serve on http://127.0.0.1:4567/
+runsheet --open path/to/runbook  # and open the browser
 runsheet --check path/to/runbook # load it, print authoring warnings, exit
+runsheet --init path/to/new      # scaffold a runbook (a .md path makes a single file)
 ```
 
-Try the bundled example:
+`path/to/runbook` is a directory, or a single markdown file whose `##`
+headings are the steps. Try the bundled examples:
 
 ```bash
-runsheet --open examples/hello
+runsheet --open examples/hello                # safe to run: every block kind
+runsheet --check examples/staging-teardown    # a realistic AWS teardown
+runsheet --check examples/db-maintenance.md   # single file, sql blocks via psql
 ```
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
@@ -92,7 +98,16 @@ the form and never written to the run record.
 
 `interpreters` maps a language to the command that runs a file of it. The
 defaults are `bash`, `sh`, `zsh` and `ruby`; a Rails project would map
-`ruby` to `bin/rails runner -`.
+`ruby` to `bin/rails runner -`, and `sql: psql -X -v ON_ERROR_STOP=1 -f`
+makes `sql run` blocks execute through `psql`.
+
+### Single-file runbooks
+
+One markdown file works too: the front matter is the runbook's, every
+`##` heading is a step, attributes go in an HTML comment after the
+heading (`<!-- kind: verify, timeout: 30 -->`), and sections headed
+**Verify** and **Rollback** stand in for the extra files. See
+`examples/db-maintenance.md`.
 
 ### Step files
 
@@ -157,7 +172,9 @@ docs in a repository. The landing page lists previous runs.
 - Secret inputs reach the child process but never the run record. Captured
   output is redacted before it is written; plain string replacement, so an
   encoded secret is not caught.
-- The tool writes nothing inside the runbook directory.
+- The tool writes nothing inside the runbook directory, except the
+  `last_verified` line of `runbook.md`, offered after a run that verified
+  the runbook and written only when asked.
 
 ## Development
 

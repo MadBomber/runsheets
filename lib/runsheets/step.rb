@@ -11,19 +11,22 @@ module Runsheets
 
     # Load a markdown file. +root+ is the runbook directory, used to resolve
     # relative links; +position+ is the 1-based order among the steps.
-    def self.load(path, root:, position: nil)
-      new(slug: File.basename(path, ".*"), text: File.read(path, encoding: "UTF-8"), path:, root:, position:)
+    def self.load(path, root:, position: nil, interpreters: Block::INTERPRETERS)
+      new(slug: File.basename(path, ".*"), text: File.read(path, encoding: "UTF-8"), path:, root:, position:, interpreters:)
     end
 
-    def initialize(slug:, text:, path: nil, root: nil, position: nil)
+    # +data+ is merged over the front matter parsed from +text+; a
+    # single-file runbook supplies each section's title and attributes
+    # this way. +interpreters+ decides which block languages can execute.
+    def initialize(slug:, text:, path: nil, root: nil, position: nil, data: nil, interpreters: Block::INTERPRETERS)
       @slug     = slug
       @path     = path
       @position = position
 
       parsed  = FrontMatter.parse(text)
-      @data   = parsed.data
+      @data   = parsed.data.merge((data || {}).transform_keys(&:to_s))
       @body   = parsed.body
-      result  = Renderer.render(@body, id_prefix: slug)
+      result  = Renderer.render(@body, id_prefix: slug, interpreters:)
       @blocks = result.blocks
       @html   = Renderer.rewrite_relative_urls(result.html, relative_dir(path, root))
       @warnings = validate.freeze

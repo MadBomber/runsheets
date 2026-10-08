@@ -52,12 +52,43 @@ In order:
    markdown; the page updates on reload.
 3. **Metadata table**: when to use, prerequisites, blast radius,
    escalation, last verified.
-4. **Start a run** form, or the **Active run** panel.
-5. **Step list** with kind badges, destructive badges, the number of
+4. **Record the verification** offer, after a run that verified the
+   runbook (see below).
+5. **Start a run** form, or the **Active run** panel.
+6. **Step list** with kind badges, destructive badges, the number of
    executable blocks, and status marks.
-6. **Previous runs**, newest first, with status, execution and failure
-   counts, and steps done. Each links to the rendered transcript.
-7. The **preamble** from `runbook.md`.
+7. **Previous runs**, newest first. Each row shows the run id (linking to
+   the transcript), a `run` or `verify` badge, the verdict (`verified`,
+   `completed`, `abandoned` or `running`, plus `stamped` if the run stamped
+   the runbook), start time and duration, execution and failure counts,
+   and either steps done with the step it stopped at, or checks run and how
+   many are still failing.
+8. The **preamble** from `runbook.md`.
+
+### Verification runs
+
+Next to **Start run** is **Verify only**, shown when the runbook has verify
+steps or a `verify.md`. It starts a run of kind `verify` with the same
+inputs and goes to the **Checks** page, which gathers every verify
+document in order. **Run all** executes each `run` block on the page one
+after another and reports how many passed. During a verification run,
+blocks outside the verify documents refuse to execute and their step pages
+say so. The record is written like any other run and gets a `-verify`
+suffix in its id.
+
+The Checks page is also reachable from the sidebar at any time; without an
+active run it is read-only.
+
+### Record the verification
+
+After **Finish** on a full run with every step marked done, or on a
+verification that ran at least one check, with no block left in a failed
+state (a failure that was re-run successfully does not count), the landing
+page offers to stamp the run's date into `runbook.md` as `last_verified`.
+**Stamp runbook.md** rewrites that one front-matter line, notes a `stamp`
+event in the run record, and reloads the runbook. **Not now** hides the
+offer for that run. The offer is not made when the runbook's
+`last_verified` is already that date or later.
 
 ### Starting a run
 
@@ -148,12 +179,21 @@ Nothing re-runs on reload. The page restores the last execution of each
 block from the run record, including output, resumes polling if one is
 still running, and restores terminal confirmations.
 
-## Run record page
+## Runsheet page
+
+The record of a run is the *runsheet*; the page, the sidebar and the run
+pill call it that. On disk it is still `run.json` and `run.md`.
 
 `/run` shows the active run's transcript, rendered. After the run is
 finished the same URL shows the most recent run. `/runs/<id>` shows any
 previous run. The transcript is `run.md` from the run directory; see
 [The Run Record](run-record.md).
+
+Above the transcript of a finished run, a **Runbook changed since this
+run** panel appears when any block that ran now reads differently in the
+runbook, with a line diff from what ran to what is there now, or when a
+block is gone. The record itself is never changed; this is the runbook
+drifting away from it.
 
 ## Keyboard shortcuts
 

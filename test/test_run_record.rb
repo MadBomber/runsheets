@@ -130,6 +130,96 @@ class TestRunRecord < Minitest::Test
     end
   end
 
+  def test_verify_kind_gets_its_own_directory_suffix_and_transcript_header
+    with_runs_dir do |root|
+      run = RunRecord.start(root, example_runbook, kind: "verify", now: Time.new(2026, 10, 8, 9, 0, 0))
+      assert_equal "20261008T090000-verify", run.id
+      assert run.verify?
+      assert_includes run.transcript, "verification (verify documents only)"
+      assert_equal "verify", JSON.parse(File.read(File.join(run.dir, "run.json")))["kind"]
+      assert RunRecord.load(run.dir).verify?
+      assert_raises(ArgumentError) { RunRecord.start(root, example_runbook, kind: "weird") }
+    end
+  end
+
+  def test_verified_needs_completion_all_steps_and_no_unresolved_failure
+    with_runs_dir do |root|
+      rb  = example_runbook
+      run = RunRecord.start(root, rb)
+      step  = rb.step("010-say-hello")
+      block = step.blocks.first
+      run.mark_step(step, status: "done")
+      refute run.verified?(steps: 1), "still running"
+
+      cmd, log = run.paths_for(block)
+      first = Runsheets::Execution.new(id: "a", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
+      run.record_execution(first, step:)
+      Runsheets::Executor.new.run(first, code: "exit 1\n")
+      cmd, log = run.paths_for(block)
+      second = Runsheets::Execution.new(id: "b", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
+      run.record_execution(second, step:)
+      Runsheets::Executor.new.run(second, code: "exit 0\n")
+      run.finish!
+
+      assert_equal 1, run.failed_executions.size
+      assert_empty run.unresolved_failures, "the re-run cleared the failure"
+      assert run.verified?(steps: 1)
+      refute run.verified?(steps: 2), "not every step done"
+      assert_equal "010-say-hello", run.last_step
+    end
+  end
+
+  def test_verification_run_is_verified_when_checks_ran_clean
+    with_runs_dir do |root|
+      rb  = example_runbook
+      run = RunRecord.start(root, rb, kind: "verify")
+      run.finish!
+      refute run.verified?(steps: 6), "no checks ran"
+      run2 = RunRecord.start(root, rb, kind: "verify")
+      step = rb.step("verify")
+      block = step.blocks.first
+      cmd, log = run2.paths_for(block)
+      ex = Runsheets::Execution.new(id: "v", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
+      run2.record_execution(ex, step:)
+      Runsheets::Executor.new.run(ex, code: "true\n")
+      run2.finish!
+      assert run2.verified?(steps: 6)
+      run2.finish!(status: "abandoned")
+      refute run2.verified?(steps: 6)
+    end
+  end
+
+  def test_stamp_event_and_drift
+    with_runs_dir do |root|
+      rb    = example_runbook
+      run   = RunRecord.start(root, rb)
+      step  = rb.step("010-say-hello")
+      block = step.blocks.first
+      cmd, log = run.paths_for(block)
+      ex = Runsheets::Execution.new(id: "x", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
+      run.record_execution(ex, step:)
+      Runsheets::Executor.new.run(ex, code: block.code)
+      File.write(cmd, "echo something else\n")   # pretend the runbook moved on
+      gone_cmd, gone_log = run.paths_for(Struct.new(:id).new("old-step-1"))
+      gone = Runsheets::Execution.new(id: "g", block_id: "old-step-1", step_slug: "old-step", command: %w[bash], cmd_path: gone_cmd, log_path: gone_log)
+      run.record_execution(gone, step: step)
+      Runsheets::Executor.new.run(gone, code: "echo gone\n")
+      run.finish!
+
+      drift = run.drift(rb)
+      assert_equal [[block.id, :changed], ["old-step-1", :missing]], drift.map { [it[:block_id], it[:status]] }
+      assert_includes drift.first[:diff].map(&:to_s), "-echo something else"
+      assert_equal "echo gone\n", drift.last[:recorded]
+
+      refute run.stamped?
+      run.stamp!(Date.new(2026, 10, 8))
+      assert run.stamped?
+      assert run.summary[:stamped]
+      assert_includes File.read(File.join(run.dir, "run.md")), "stamped `last_verified: 2026-10-08`"
+      assert RunRecord.load(run.dir).stamped?
+    end
+  end
+
   def test_finish_rejects_unknown_status
     with_runs_dir { |root| assert_raises(ArgumentError) { RunRecord.start(root, example_runbook).finish!(status: "weird") } }
   end

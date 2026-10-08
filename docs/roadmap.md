@@ -40,29 +40,54 @@ and a real runbook to prove it; see the plan's open questions.
 
 ## Milestone 3: verification and history
 
-- `verify` steps and `verify.md` runnable standalone from the landing page,
-  outside a run.
-- **`last_verified` write-back**: finishing a run with every step done
-  offers to stamp the date into `runbook.md`. The only file the tool will
-  ever modify in a runbook, by targeted line replacement, only on request.
-- Richer run history on the landing page: duration, which step it stopped
-  at, diffs of the `.cmd` files against the current runbook.
+Done.
+
+- **Verification runs**: the landing page's **Verify only** button starts a
+  run of kind `verify` that may execute only verify-kind steps and
+  `verify.md`. A **Checks** page gathers those documents with a **Run all**
+  button that runs every check in order. The record is written like any
+  other run and listed in history with a `verify` badge.
+- **`last_verified` write-back**: after a completed run with every step
+  done, or a completed verification with every check run and nothing left
+  failing, the landing page offers to stamp the run's date into
+  `runbook.md`. Targeted replacement of that one front-matter line, only on
+  request, noted in the run record as a `stamp` event. The only write the
+  tool ever makes inside a runbook directory.
+- **Richer history**: each previous run shows its kind, verdict
+  (`verified`, `completed`, `abandoned`), start time, duration, executions
+  and failures, steps done or checks run, and which step it stopped at.
+- **Drift**: a run record page shows, for every block that ran, whether
+  its code in the runbook has changed since, with a line diff, or whether
+  the block is gone.
 
 ## Milestone 4: packaging
 
-- A README-sized sample beyond `hello`, converted from a real runbook.
-- Single-file runbooks: one markdown file whose `##` headings are the steps,
-  so existing docs can be used without restructuring. The model is already
-  independent of the source shape.
-- SQL blocks through a configured client, which the `interpreters` map can
-  already express; needs a real runbook to prove the convention.
+Done.
+
+- **Single-file runbooks**: `runsheet path/to/runbook.md` reads one file
+  whose `##` headings are the steps, with step attributes in an HTML
+  comment after the heading and Verify and Rollback sections standing in
+  for the extra files. Everything downstream sees the same `Runbook`.
+- **SQL through the interpreters map**: a language the front matter maps
+  now executes. Before this, `sql run` warned and stayed inert even with a
+  mapping, because block classification only knew the built-in languages.
+- **Two realistic samples**: `examples/staging-teardown`, a directory
+  runbook with the shape of a real AWS teardown (manual, automated,
+  terminal, background, destructive and verify steps, blast radius,
+  rollback), and `examples/db-maintenance.md`, a single-file PostgreSQL
+  runbook whose blocks are `sql run` through `psql`. Neither can run
+  against this machine; both load clean under `--check` and are test
+  fixtures for the loader.
+- **`runsheet --init`** scaffolds a starter runbook, directory or single
+  file, that passes `--check`.
+- **Vocabulary settled**: the document is the *runbook*; the record of a
+  run is the *runsheet*. The page, sidebar and buttons now say so.
 
 ## Open questions
 
-- **Vocabulary.** Whether the document is a "runbook" and only the recorded
-  run is the "runsheet" (closer to the theatre meaning, and it keeps the
-  record in the name), or whether "runsheet" is used throughout. The split
-  is leaning.
+- **`capture`.** A flag that stores a block's stdout as a named input for
+  later blocks, the one escape hatch from "nothing carries over". Still
+  waiting for a runbook that needs it and a syntax for the name.
 - **Persistent shell per run.** Rejected for milestone 1 in favour of a
   fresh process per block. If `capture` turns out not to be enough, this
   comes back.

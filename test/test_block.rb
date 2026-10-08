@@ -71,6 +71,14 @@ class TestBlock < Minitest::Test
     assert_match(/sql blocks cannot execute/, b.warnings.first)
   end
 
+  def test_a_mapped_language_can_execute
+    interpreters = Runsheets::Block::INTERPRETERS.merge("sql" => %w[psql -f])
+    b = Runsheets::Block.new(id: "s-1", index: 0, info: "sql run", code: "select 1;\n", interpreters:)
+    assert b.executable?
+    assert_empty b.warnings
+    assert_equal %w[psql -f], b.interpreters["sql"]
+  end
+
   def test_no_language
     b = block("")
     assert_equal "", b.lang

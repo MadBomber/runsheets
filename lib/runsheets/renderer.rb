@@ -67,10 +67,11 @@ module Runsheets
     end
 
     # Render markdown. Blocks get ids "#{id_prefix}-1", "#{id_prefix}-2", ...
-    def self.render(markdown, id_prefix:)
+    # +interpreters+ decides which languages can execute.
+    def self.render(markdown, id_prefix:, interpreters: Block::INTERPRETERS)
       rewritten, fences = Fences.extract(markdown)
       blocks = fences.each_with_index.map do |fence, i|
-        Block.new(id: "#{id_prefix}-#{i + 1}", index: i, info: fence.info, code: fence.code, line: fence.line)
+        Block.new(id: "#{id_prefix}-#{i + 1}", index: i, info: fence.info, code: fence.code, line: fence.line, interpreters:)
       end
       link_expectations(blocks)
 

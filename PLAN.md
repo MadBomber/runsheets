@@ -3,7 +3,7 @@
 Plan and discussion log for `runsheets`, an open-source tool that turns a directory of
 markdown files into an executable, recorded runbook served in the browser.
 
-Status: milestones 1 and 2 built and passing (see the 2026-10-07 and 2026-10-08 log). Milestones 3 and 4 open.
+Status: all four milestones built and passing (see the 2026-10-07 and 2026-10-08 log). What remains is use against real runbooks.
 Started: 2026-10-07.
 Repo: `~/sandbox/git_repos/madbomber/runsheets`. Origin copy of this plan: `~/scripts/runbook_plan.md`.
 
@@ -50,7 +50,8 @@ The rendering is the vehicle. The run record is the point.
 | GUI or CLI | Browser GUI served from a local Sinatra process | Markdown renders properly; the page is a natural home for the run log. Terminal markdown is possible but not pleasant. |
 | Attached or detached | Detached (runs on the operator's machine or devcontainer) | The blocks are shell against the operator's environment: SSO sessions, tunnels, local DBs, `gh`. None of that exists inside a deployed app process, and executing markdown blocks in a web app is a security hole. |
 | Executability | Opt-in per block via the info string | Real runbooks mix runnable shell, expected-output samples, config to copy, SQL for a separate client, and destructive commands. Default must be "display only". |
-| Document shape | A directory per runbook with one file per step | Better suited to runsheets than xyzzy's single-file H2 layout. Single-file runbooks may be supported later as a convenience. |
+| Document shape | A directory per runbook with one file per step; a single file with `##` steps is also read (milestone 4) | The directory suits authoring; the single file is how every existing runbook already looks, so it is read directly. Step attributes in a single file go in an HTML comment after the heading, invisible to every other renderer. |
+| Vocabulary | The document is the *runbook*; the record of one run is the *runsheet* | Closer to the theatre meaning, keeps the record in the product name, and the page already distinguished the two. Settled in milestone 4. |
 | Process model | Fresh process per block, own process group | Blocks stay copy-pasteable and reproducible; timeouts can kill the whole group. A `capture` flag to pass one block's stdout to later blocks is deferred until a runbook needs it. |
 | Output | Every execution writes to a log file; the page polls | One spawn path for `run` and the future `background`; a ten-minute `--wait` shows its output as it arrives instead of looking hung. |
 | Interpreters | `interpreters:` in runbook.md front matter maps a language to a command | xyzzy's Ruby snippets need `bin/rails runner -`; the same mechanism will route `sql` through `psql` when needed. |
@@ -58,6 +59,9 @@ The rendering is the vehicle. The run record is the point.
 | Destructive confirmation | Server issues a random four-character code per block (HTTP 428), runs the block only when it comes back, retires it once used | The review's point: a typed slug becomes muscle memory. Checking server-side means a script driving the API cannot skip it either. The record notes the execution was confirmed. |
 | Redaction | Child output goes through a pipe and a reader thread that replaces secret values before writing the `.out` file, holding back a tail that could be a partial secret | Letting the child write the file directly made redaction impossible. Plain string replacement; encoded secrets are documented as out of scope. |
 | Stopped is not failed | Operator stops and run-end stops record state `stopped`, distinct from `timed_out` | A background tunnel stopped on purpose must not mark the step failed. |
+| Standalone verification | A run of kind `verify` that may execute only verify documents, with its own record | Keeps "every execution belongs to a record" true; the alternative (executing verify blocks with no run) would have been the one unrecorded path. |
+| What earns the stamp | Completed, nothing left failing (latest execution per block), and all steps done or at least one check run | "Every step done" alone would let a step whose block failed be marked done and stamp anyway; "no failures ever" would block a stamp after a harmless retry. |
+| Live reload | The session re-reads the runbook on a GET when a source file's mtime is newer than the load | Drift must compare against the file on disk, and editing a runbook with the server up is the natural authoring loop inherited from tdv.rb. |
 | Lineage | Builds on `~/scripts/tdv.rb` | Sinatra + kramdown GFM + rouge, directory index, breadcrumbs, search, sidebar outline. Reuse the layout and rendering; add execution and recording. |
 | Scripting language | Ruby, standard library plus the few gems tdv.rb already uses | Matches the author's tooling. |
 
@@ -267,23 +271,24 @@ recording and rendering are tested without spawning processes.
    with recorded confirmation, `destructive` with server-checked typed confirmation,
    `background` with start, stop and streaming, `expect` panels beside the real output.
    Inputs form with secrets and redaction of captured output.
-3. **Verification and history.** `verify` steps and `verify.md` runnable standalone,
-   `last_verified` write-back, run history on the landing page, rollback sidebar.
-4. **Packaging.** Gem with a `bin/` entry point, README with the document structure and
-   block convention, a sample runbook, minitest suite. Pick the name (see open
-   questions).
+3. **Verification and history.** Done 2026-10-08. `verify` steps and `verify.md` runnable
+   standalone as a verification run with a Checks page, `last_verified` write-back offered
+   after a verified run, richer run history with verdicts and the step a run stopped at,
+   drift diffs on the run record page, rollback sidebar (from milestone 1).
+4. **Packaging.** Done 2026-10-08. Gem with an `exe/` entry point, README with the
+   document structure and block convention, minitest suite, two realistic sample
+   runbooks (a directory and a single file), single-file runbooks, SQL through the
+   interpreters map, `runsheet --init`, vocabulary settled. The name was picked on
+   2026-10-07.
 
 ## Open questions
 
-- **Vocabulary.** Whether the document is called a "runbook" and only the recorded
-  run is the "runsheet" (closer to the theatre meaning, and keeps the run record in
-  the name), or whether "runsheet" is used throughout. Leaning toward the split.
-- **Single-file runbooks.** Support a one-file runbook whose H2 headings are the steps,
-  so existing docs can be used without restructuring? Deferred until milestone 4;
-  the directory layout is the primary shape.
-- **SQL blocks.** Routing `sql run` through a configured client (`psql` with a
-  connection string from inputs) would cover a common case. Deferred until a runbook
-  actually needs it.
+- **Vocabulary.** Settled in milestone 4: the document is the runbook, the recorded run
+  is the runsheet (see Decisions).
+- **Single-file runbooks.** Settled in milestone 4: supported, with attributes in an HTML
+  comment after each `##` heading. The directory layout stays the primary shape.
+- **SQL blocks.** Settled in milestone 4: a language mapped under `interpreters` executes;
+  `examples/db-maintenance.md` routes `sql run` through `psql` with `PG*` inputs.
 - **Output size.** Settled: everything streams to disk; the page shows the last 256 KB
   with a marker, the transcript the last 64 KB.
 - **`capture`.** A flag that stores a block's stdout as a named input for later blocks.
@@ -428,3 +433,52 @@ runbooks.
 
 Left out on purpose: `capture` (see open questions). Open for milestone 3: `verify`
 standalone, `last_verified` write-back, richer history, the vocabulary split.
+
+**Milestone 3 built** (same day). Verification and history; 128 minitest tests.
+
+- `RunRecord` gains `kind` ("run" or "verify"; verify runs get a `-verify` id suffix),
+  `verified?(steps:)`, `latest_executions`, `unresolved_failures`, `last_step`,
+  `stamp!` (a `stamp` event appended after finish) and `drift(runbook)`, which
+  compares each block's recorded `.cmd` with the runbook now via the new
+  stdlib-only `Diff` (LCS line diff).
+- `Session#start_run(kind:)`; a verification run refuses blocks outside
+  `Runbook#verify_documents` (verify-kind steps, then verify.md). `stamp_candidate`
+  decides the offer; `stamp!` calls `Runbook.stamp_last_verified`, which replaces (or
+  inserts) that one front-matter line, then notes the event and reloads the runbook.
+  `refresh_runbook!` reloads when a source file is newer than the load; the web layer
+  calls it on every GET, so drift compares against the disk and editing a runbook with
+  the server up just works.
+- Pages: a Checks page (`/verify`) gathering the verify documents with a "Run all"
+  button (the page's `poll` and `execute` now return promises so checks run one at a
+  time), a "Verify only" submit on the start form, a stamp offer panel, a history list
+  with kind badge, verdict, start time, duration, counts and "stopped at", and a drift
+  panel on the run record page.
+- `examples/hello` gains step 045, a verify step.
+
+Open for milestone 4: packaging, single-file runbooks, SQL through the interpreters
+map, a real converted runbook, `capture`, the vocabulary split.
+
+**Milestone 4 built** (same day). Packaging; 145 minitest tests.
+
+- `Runbook.load` takes a directory or a single markdown file. `SingleFile.split`
+  turns the body into a preamble and `##` sections, ignoring headings inside fences,
+  decoding an attribute comment (`<!-- kind: verify, timeout: 30 -->`, a YAML flow
+  mapping) on the line after a heading, and recognising Verify and Rollback sections
+  (or `role:`) as the extras. Steps get `010-slug` style slugs from their position so
+  block ids and record files look the same as a directory runbook's. `Step.new`
+  takes `data:` to merge over front matter.
+- Bug found while proving SQL: `Block#executable?` and `Block.classify` consulted the
+  built-in `INTERPRETERS` only, so a front-matter mapping for `sql` was honoured at
+  spawn time but the block never got a Run button. `Block.new`, `Renderer.render` and
+  `Step.new` now take `interpreters:` and the runbook passes its merged map down.
+- `runsheet --init PATH` writes a starter runbook (directory, or single file when the
+  path ends in `.md`) that passes `--check`; the CLI option became `:runbook`.
+- `examples/staging-teardown` (directory: manual, automated with expect, terminal,
+  background SSM tunnel, verify, destructive with a blast radius, rollback) and
+  `examples/db-maintenance.md` (single file, `sql run` through `psql`, a secret
+  `PGPASSWORD`). Both check clean and are loader fixtures; neither runs here.
+- Vocabulary settled: runbook = document, runsheet = record. Page wording updated.
+
+Not done: `capture` (still no runbook needs it). The gemspec lists files via
+`git ls-files`, so everything added since the last commit is outside the gem until it
+is committed. Next: use it against a real runbook and let the convention take the hits.

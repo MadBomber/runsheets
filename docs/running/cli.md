@@ -1,11 +1,13 @@
 # Command Line
 
 ```text
-Usage: runsheet [options] RUNBOOK_DIR
+Usage: runsheet [options] RUNBOOK
 ```
 
-`RUNBOOK_DIR` is the runbook directory: it must contain `runbook.md`. It is
-the only positional argument.
+`RUNBOOK` is either a runbook directory (it must contain `runbook.md`) or
+a single markdown file whose `##` headings are the steps (see
+[Directory Structure](../runbooks/structure.md#single-file-runbooks)). It
+is the only positional argument.
 
 ## Options
 
@@ -16,15 +18,25 @@ the only positional argument.
 | `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where run records are written. |
 | `-o`, `--open` | off | Open the default browser once the server is listening. |
 | `-c`, `--check` | off | Load the runbook, print authoring warnings, and exit without serving. |
+| `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. |
 | `-v`, `--version` | | Print the version and exit. |
 | `-h`, `--help` | | Print usage and exit. |
 
 ## Examples
 
+Start a new runbook, then serve it:
+
+```bash
+runsheet --init ops/runbooks/db-refresh        # a directory
+runsheet --init ops/runbooks/db-refresh.md     # or a single file
+runsheet --open ops/runbooks/db-refresh
+```
+
 Serve a runbook and open it:
 
 ```bash
 runsheet --open ops/runbooks/staging-teardown
+runsheet --open ops/runbooks/db-maintenance.md
 ```
 
 Serve on another port because something else has 4567:
