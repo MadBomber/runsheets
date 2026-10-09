@@ -7,7 +7,7 @@ module Runsheets
     def self.stylesheet = @stylesheet ||= CSS + Renderer.code_stylesheet
     def self.javascript = JS
 
-    CSS = <<~'CSS'
+    CSS = <<~CSS
       :root {
         --bg: #0e1117; --panel: #151a23; --panel-2: #1b2130; --border: #273040;
         --text: #d9dee8; --muted: #8b95a8; --accent: #5ab0ff; --accent-2: #a78bfa;

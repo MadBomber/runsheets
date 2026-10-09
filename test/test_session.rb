@@ -54,7 +54,7 @@ class TestSession < Minitest::Test
       refute s.active?
       data = JSON.parse(File.read(File.join(s.run.dir, "run.json")))
       assert_equal 2, data["executions"].size
-      assert_equal [0, 3], data["executions"].map { it["exit_status"] }
+      assert_equal([0, 3], data["executions"].map { it["exit_status"] })
       assert_equal 1, s.history.size
     end
   end

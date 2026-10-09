@@ -141,7 +141,10 @@ class TestWeb < Minitest::Test
     post "/blocks/040-exercise-failure-1/execute", { "confirm" => body["challenge"] }
     assert_equal 202, last_response.status
     id = JSON.parse(last_response.body)["id"]
-    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+    wait_for do
+      get "/executions/#{id}"
+      JSON.parse(last_response.body)["state"] != "running"
+    end
     assert_equal 3, JSON.parse(last_response.body)["exit_status"]
   end
 
@@ -165,7 +168,10 @@ class TestWeb < Minitest::Test
 
     post "/executions/#{id}/stop"
     assert_equal 202, last_response.status
-    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+    wait_for do
+      get "/executions/#{id}"
+      JSON.parse(last_response.body)["state"] != "running"
+    end
     assert_equal "stopped", JSON.parse(last_response.body)["state"]
 
     get "/"
@@ -236,7 +242,10 @@ class TestWeb < Minitest::Test
     post "/blocks/verify-1/execute"
     assert_equal 202, last_response.status
     id = JSON.parse(last_response.body)["id"]
-    wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+    wait_for do
+      get "/executions/#{id}"
+      JSON.parse(last_response.body)["state"] != "running"
+    end
 
     get "/verify"
     assert_includes last_response.body, '"executions":{"verify-1"'
@@ -262,7 +271,10 @@ class TestWeb < Minitest::Test
       with_token
       post "/blocks/verify-1/execute"
       id = JSON.parse(last_response.body)["id"]
-      wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+      wait_for do
+        get "/executions/#{id}"
+        JSON.parse(last_response.body)["state"] != "running"
+      end
       post "/run/finish", { "_token" => "tok" }
 
       post "/run/stamp/dismiss", { "_token" => "tok" }
@@ -292,7 +304,10 @@ class TestWeb < Minitest::Test
       with_token
       post "/blocks/010-say-hello-1/execute"
       id = JSON.parse(last_response.body)["id"]
-      wait_for { get "/executions/#{id}"; JSON.parse(last_response.body)["state"] != "running" }
+      wait_for do
+        get "/executions/#{id}"
+        JSON.parse(last_response.body)["state"] != "running"
+      end
       post "/run/finish", { "_token" => "tok", "status" => "abandoned" }
 
       get "/runs/#{@session.run.id}"

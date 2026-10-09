@@ -21,10 +21,10 @@ module Runsheets
       def initialize(opts = {})
         super()
         @css_class = opts[:css_class] || "highlight"
-        @wrap      = opts.fetch(:wrap, true)
+        @wrap      = opts[:wrap] != false
       end
 
-      def stream(tokens, &block)
+      def stream(tokens, &)
         return super unless @wrap
 
         yield %(<div class="#{@css_class}"><pre class="#{@css_class}"><code>)
@@ -70,7 +70,7 @@ module Runsheets
     # +interpreters+ decides which languages can execute.
     def self.render(markdown, id_prefix:, interpreters: Block::INTERPRETERS)
       rewritten, fences = Fences.extract(markdown)
-      blocks = fences.each_with_index.map do |fence, i|
+      blocks = fences.map.with_index do |fence, i|
         Block.new(id: "#{id_prefix}-#{i + 1}", index: i, info: fence.info, code: fence.code, line: fence.line, interpreters:)
       end
       link_expectations(blocks)

@@ -36,7 +36,8 @@ module Runsheets
         elsif (match = line.match(OPEN))
           open = { char: match[2][0], len: match[2].size, indent: match[1].size,
                    info: (match[3] unless match[3].empty?), line: number }
-          lines << (open[:info] ? "#{match[1]}#{match[2]}#{lang_of(open[:info])}#{MARKER}#{fences.size}" : line)
+          info = open[:info]
+          lines << (info ? "#{match[1]}#{match[2]}#{lang_of(info)}#{MARKER}#{fences.size}" : line)
         else
           lines << line
         end

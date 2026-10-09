@@ -85,7 +85,7 @@ module Runsheets
     def self.slug_for(title, position)
       words = title.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
       words = "step" if words.empty?
-      format("%03d-%s", position * 10, words)
+      format("%<number>03d-%<words>s", number: position * 10, words:)
     end
   end
 end

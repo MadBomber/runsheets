@@ -107,46 +107,58 @@ module Runsheets
     # Sidebar: the step list with run status marks, extra documents, the
     # rollback panel, and an outline for the current page.
     def self.sidebar(session, step:, kind:)
-      runbook = session.runbook
-      items = runbook.steps.map do |s|
+      extras = also_items(session, step, kind)
+      <<~HTML
+        <aside class="rs-sidebar">
+          #{running_panel(session)}
+          <section>
+            <h2>Steps</h2>
+            <ol class="steps">#{step_items(session, step).join}</ol>
+          </section>
+          #{"<section><h2>Also</h2><ul>#{extras.join}</ul></section>" unless extras.empty?}
+          #{rollback_panel(session.runbook, kind)}
+          <section class="outline"><h2>On this page</h2><ol id="outline"></ol></section>
+        </aside>
+      HTML
+    end
+
+    # One sidebar entry per numbered step, with its status mark.
+    def self.step_items(session, current)
+      session.runbook.steps.map do |s|
         status = step_mark(session, s)
-        active = s == step ? ' class="active"' : ""
         <<~LI
-          <li#{active}><a href="#{h step_href(s)}" title="#{h s.title}">
+          <li#{' class="active"' if s == current}><a href="#{h step_href(s)}" title="#{h s.title}">
             <span class="num">#{h(s.number || s.position)}</span>
             <span class="name">#{h s.title}</span>
             <span class="mark #{status}" title="#{status}">#{STATUS_MARKS[status]}</span>
           </a></li>
         LI
       end
+    end
 
-      extras = runbook.extras.values.map do |s|
-        active = s == step ? ' class="active"' : ""
-        "<li#{active}><a href=\"#{h step_href(s)}\"><span class=\"num\">#{ICONS[:book]}</span><span class=\"name\">#{h s.title}</span><span></span></a></li>"
-      end
-      extras.unshift("<li#{kind == :verify ? ' class="active"' : ''}><a href=\"/verify\"><span class=\"num\">#{ICONS[:check]}</span><span class=\"name\">Checks</span><span></span></a></li>") if runbook.verify_documents.any?
-      extras << "<li><a href=\"/run\"><span class=\"num\">#{ICONS[:log]}</span><span class=\"name\">Runsheet</span><span></span></a></li>" if session.active?
+    # The "Also" entries: checks, extra documents, the active runsheet.
+    def self.also_items(session, current, kind)
+      runbook = session.runbook
+      items = runbook.extras.values.map { also_item(step_href(it), ICONS[:book], it.title, active: it == current) }
+      items.unshift(also_item("/verify", ICONS[:check], "Checks", active: kind == :verify)) if runbook.verify_documents.any?
+      items << also_item("/run", ICONS[:log], "Runsheet") if session.active?
+      items
+    end
 
-      rollback = runbook.rollback && kind == :step ? <<~HTML : ""
+    def self.also_item(href, icon, name, active: false)
+      "<li#{' class="active"' if active}><a href=\"#{h href}\"><span class=\"num\">#{icon}</span><span class=\"name\">#{h name}</span><span></span></a></li>"
+    end
+
+    def self.rollback_panel(runbook, kind)
+      return "" unless runbook.rollback && kind == :step
+
+      <<~HTML
         <section>
           <details>
             <summary>Rollback</summary>
             <div class="rollback-body markdown-body">#{runbook.rollback.html}</div>
           </details>
         </section>
-      HTML
-
-      <<~HTML
-        <aside class="rs-sidebar">
-          #{running_panel(session)}
-          <section>
-            <h2>Steps</h2>
-            <ol class="steps">#{items.join}</ol>
-          </section>
-          #{extras.empty? ? '' : "<section><h2>Also</h2><ul>#{extras.join}</ul></section>"}
-          #{rollback}
-          <section class="outline"><h2>On this page</h2><ol id="outline"></ol></section>
-        </aside>
       HTML
     end
 
@@ -209,7 +221,7 @@ module Runsheets
         <div class="page-head">
           <h1>#{ICONS[:book]} #{h runbook.title}</h1>
           <p class="sub">#{runbook.steps.size} step#{'s' unless runbook.steps.size == 1}#{" · last verified #{h runbook.last_verified}" if runbook.last_verified}</p>
-          #{badges.empty? ? '' : "<div class=\"badges\">#{badges.join}</div>"}
+          #{"<div class=\"badges\">#{badges.join}</div>" unless badges.empty?}
         </div>
       HTML
     end
@@ -236,37 +248,45 @@ module Runsheets
 
     # Start-run form, or the active run's controls.
     def self.run_panel(session)
-      runbook = session.runbook
-      if session.active?
-        run = session.run
-        progress = if run.verify?
-                     checks = runbook.verify_blocks.size
-                     "#{run.executions.size} of #{checks} check#{'s' unless checks == 1} run · #{run.unresolved_failures.size} failing"
-                   else
-                     "#{run.executions.size} execution#{'s' unless run.executions.size == 1} · #{run.steps_done} of #{runbook.steps.size} steps done"
-                   end
-        go = if run.verify?
-               '<a class="btn primary" href="/verify">Go to checks</a>'
-             elsif runbook.steps.first
-               "<a class=\"btn primary\" href=\"#{h step_href(runbook.steps.first)}\">Go to first step</a>"
-             else
-               ""
-             end
-        <<~HTML
-          <section class="panel">
-            <h2>Active #{run.verify? ? 'verification' : 'run'}</h2>
-            <p><strong>#{h run.id}</strong> started #{h run.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{progress} · <a href="/run">view runsheet</a></p>
-            #{inputs_line(run.inputs, session.secret_inputs_set)}
-            <div class="btn-row">
-              #{go}
-              <form method="post" action="/run/finish"><input type="hidden" name="_token" value="#{h session.token}"><input type="hidden" name="status" value="completed"><button class="btn ok" type="submit">Finish #{run.verify? ? 'verification' : 'run'}</button></form>
-              <form method="post" action="/run/finish"><input type="hidden" name="_token" value="#{h session.token}"><input type="hidden" name="status" value="abandoned"><button class="btn danger" type="submit">Abandon</button></form>
-            </div>
-          </section>
-        HTML
+      session.active? ? active_run_panel(session) : stamp_panel(session) + start_panel(session)
+    end
+
+    def self.active_run_panel(session)
+      run  = session.run
+      noun = run.verify? ? "verification" : "run"
+      <<~HTML
+        <section class="panel">
+          <h2>Active #{noun}</h2>
+          <p><strong>#{h run.id}</strong> started #{h run.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{run_progress(run, session.runbook)} · <a href="/run">view runsheet</a></p>
+          #{inputs_line(run.inputs, session.secret_inputs_set)}
+          <div class="btn-row">
+            #{go_button(run, session.runbook)}
+            #{finish_form(session.token, 'completed', "Finish #{noun}", 'ok')}
+            #{finish_form(session.token, 'abandoned', 'Abandon', 'danger')}
+          </div>
+        </section>
+      HTML
+    end
+
+    def self.run_progress(run, runbook)
+      if run.verify?
+        checks = runbook.verify_blocks.size
+        "#{run.executions.size} of #{checks} check#{'s' unless checks == 1} run · #{run.unresolved_failures.size} failing"
       else
-        stamp_panel(session) + start_panel(session)
+        "#{run.executions.size} execution#{'s' unless run.executions.size == 1} · #{run.steps_done} of #{runbook.steps.size} steps done"
       end
+    end
+
+    def self.go_button(run, runbook)
+      return '<a class="btn primary" href="/verify">Go to checks</a>' if run.verify?
+
+      first = runbook.steps.first
+      first ? "<a class=\"btn primary\" href=\"#{h step_href(first)}\">Go to first step</a>" : ""
+    end
+
+    def self.finish_form(token, status, label, style)
+      "<form method=\"post\" action=\"/run/finish\"><input type=\"hidden\" name=\"_token\" value=\"#{h token}\">" \
+        "<input type=\"hidden\" name=\"status\" value=\"#{status}\"><button class=\"btn #{style}\" type=\"submit\">#{h label}</button></form>"
     end
 
     # Offer to write last_verified after a run that verified the runbook.
@@ -279,7 +299,7 @@ module Runsheets
       <<~HTML
         <section class="panel stamp">
           <h2>#{ICONS[:stamp]} Record the verification</h2>
-          <p>#{what}. Stamp <code>last_verified: #{h session.stamp_date}</code> into <code>runbook.md</code>?#{runbook.last_verified ? " It currently says <code>#{h runbook.last_verified}</code>." : ''} This is the only change runsheets ever makes to a runbook, and only when you ask.</p>
+          <p>#{what}. Stamp <code>last_verified: #{h session.stamp_date}</code> into <code>runbook.md</code>?#{" It currently says <code>#{h runbook.last_verified}</code>." if runbook.last_verified} This is the only change runsheets ever makes to a runbook, and only when you ask.</p>
           <div class="btn-row">
             <form method="post" action="/run/stamp"><input type="hidden" name="_token" value="#{h session.token}"><button class="btn ok" type="submit">Stamp runbook.md</button></form>
             <form method="post" action="/run/stamp/dismiss"><input type="hidden" name="_token" value="#{h session.token}"><button class="btn" type="submit">Not now</button></form>
@@ -291,12 +311,13 @@ module Runsheets
     def self.start_panel(session)
       runbook = session.runbook
       fields = runbook.inputs.map do |input|
+        name  = h input.name
         value = session.resolve_inputs[input.name]
         type  = input.secret? ? "password" : "text"
         <<~FIELD
           <div class="field">
-            <label for="input-#{h input.name}">#{h input.prompt}<code>$#{h input.name}#{' · secret, not recorded' if input.secret?}</code></label>
-            <input type="#{type}" id="input-#{h input.name}" name="inputs[#{h input.name}]" value="#{h value}" autocomplete="off">
+            <label for="input-#{name}">#{h input.prompt}<code>$#{name}#{' · secret, not recorded' if input.secret?}</code></label>
+            <input type="#{type}" id="input-#{name}" name="inputs[#{name}]" value="#{h value}" autocomplete="off">
           </div>
         FIELD
       end
@@ -352,9 +373,9 @@ module Runsheets
       s = seconds.to_f
       return format("%.1fs", s) if s < 10
       return "#{s.round}s" if s < 60
-      return format("%dm %02ds", s / 60, s % 60) if s < 3600
+      return format("%<m>dm %<s>02ds", m: s / 60, s: s % 60) if s < 3600
 
-      format("%dh %02dm", s / 3600, (s % 3600) / 60)
+      format("%<h>dh %<m>02dm", h: s / 3600, m: (s % 3600) / 60)
     end
 
     def self.history_panel(session)
@@ -362,29 +383,39 @@ module Runsheets
       return "" if runs.empty?
 
       total = session.runbook.steps.size
-      rows = runs.first(20).map do |run|
-        s = run.summary
-        progress = if run.verify?
-                     "#{s[:executions]} check#{'s' unless s[:executions] == 1}, #{s[:unresolved]} failing"
-                   else
-                     "#{s[:steps_done]} of #{total} steps done#{", stopped at #{h s[:last_step]}" if s[:last_step] && s[:steps_done] < total}"
-                   end
-        verdict = if s[:status] == "running" then "running"
-                  elsif run.verified?(steps: total) then "verified"
-                  else s[:status]
-                  end
-        <<~LI
-          <li class="#{h verdict}">
-            <a href="/runs/#{h s[:id]}">#{h s[:id]}</a>
-            <span class="badge #{run.verify? ? 'verify' : 'run'}">#{run.verify? ? 'verify' : 'run'}</span>
-            <span class="meta verdict">#{h verdict}#{' · stamped' if s[:stamped]}</span>
-            <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h duration_text(s[:duration])}</span>
-            <span class="meta">#{s[:executions]} exec · #{s[:failures]} failed</span>
-            <span class="meta">#{progress}</span>
-          </li>
-        LI
-      end
+      rows  = runs.first(20).map { history_row(it, total) }
       "<section class=\"panel\"><h2>Previous runs</h2><ul class=\"history\">#{rows.join}</ul></section>"
+    end
+
+    def self.history_row(run, total)
+      s       = run.summary
+      verdict = history_verdict(run, s, total)
+      kind    = run.verify? ? "verify" : "run"
+      <<~LI
+        <li class="#{h verdict}">
+          <a href="/runs/#{h s[:id]}">#{h s[:id]}</a>
+          <span class="badge #{kind}">#{kind}</span>
+          <span class="meta verdict">#{h verdict}#{' · stamped' if s[:stamped]}</span>
+          <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h duration_text(s[:duration])}</span>
+          <span class="meta">#{s[:executions]} exec · #{s[:failures]} failed</span>
+          <span class="meta">#{history_progress(run, s, total)}</span>
+        </li>
+      LI
+    end
+
+    def self.history_verdict(run, summary, total)
+      return "running" if summary[:status] == "running"
+
+      run.verified?(steps: total) ? "verified" : summary[:status]
+    end
+
+    def self.history_progress(run, summary, total)
+      checks = summary[:executions]
+      return "#{checks} check#{'s' unless checks == 1}, #{summary[:unresolved]} failing" if run.verify?
+
+      done    = summary[:steps_done]
+      stopped = summary[:last_step] && done < total ? ", stopped at #{h summary[:last_step]}" : ""
+      "#{done} of #{total} steps done#{stopped}"
     end
 
     # ------------------------------------------------------------------
@@ -392,36 +423,56 @@ module Runsheets
     # ------------------------------------------------------------------
 
     def self.step(session, step)
-      runbook = session.runbook
-      badges  = ["<span class=\"badge #{step.kind}\">#{step.kind}</span>"]
-      badges << '<span class="badge destructive">destructive</span>' if step.destructive?
-      badges << "<span class=\"badge\">timeout #{step.timeout}s</span>" if step.executable_blocks.any?
-
-      confirm = " Running a destructive block asks you to type a confirmation code first."
-      banner = if step.destructive? && runbook.blast_radius
-                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>Blast radius</strong><br>#{h runbook.blast_radius}#{runbook.escalation ? "<br><strong>Escalation</strong><br>#{h runbook.escalation}" : ''}<br>#{confirm}</div></div>"
-               elsif step.destructive?
-                 "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>This step is destructive.</strong> Read it fully before running anything.#{confirm}</div></div>"
-               else
-                 ""
-               end
-      banner += "<div class=\"banner info\">#{ICONS[:alert]}<div>No active run. Blocks can be read and copied but not executed. <a href=\"/\">Start a run</a> first.</div></div>" if step.executable_blocks.any? && !session.active?
-      banner += "<div class=\"banner info\">#{ICONS[:alert]}<div>This is a verification run: only verify steps and verify.md execute. <a href=\"/verify\">Go to the checks</a>, or finish the verification on the <a href=\"/\">home page</a> to start a full run.</div></div>" if step.executable_blocks.any? && session.verifying? && !runbook.verify_document?(step)
-
       body = <<~HTML
         <div class="page-head">
-          <h1>#{step.position ? "<span class=\"num\">#{h(step.number || step.position)}</span>" : ''} #{h step.title}</h1>
-          <div class="badges">#{badges.join}</div>
+          <h1>#{"<span class=\"num\">#{h(step.number || step.position)}</span>" if step.position} #{h step.title}</h1>
+          <div class="badges">#{step_badges(step).join}</div>
         </div>
         #{warnings_banner(step.warnings)}
-        #{banner}
+        #{step_banners(session, step)}
         <article class="markdown-body">#{step.html}</article>
         #{mark_panel(session, step)}
-        #{step_nav(runbook, step)}
+        #{step_nav(session.runbook, step)}
         <script type="application/json" id="rs-prior">#{prior_executions_json(session, step)}</script>
       HTML
       layout(session, title: step.title, body:, kind: :step, step:)
     end
+
+    def self.step_badges(step)
+      badges = ["<span class=\"badge #{step.kind}\">#{step.kind}</span>"]
+      badges << '<span class="badge destructive">destructive</span>' if step.destructive?
+      badges << "<span class=\"badge\">timeout #{step.timeout}s</span>" if step.executable_blocks.any?
+      badges
+    end
+
+    # The blast-radius banner for a destructive step, then any banner about
+    # why its blocks cannot run right now.
+    def self.step_banners(session, step)
+      banners = [destructive_banner(session.runbook, step)]
+      if step.executable_blocks.any?
+        banners << info_banner('No active run. Blocks can be read and copied but not executed. <a href="/">Start a run</a> first.') unless session.active?
+        if session.verifying? && !session.runbook.verify_document?(step)
+          banners << info_banner('This is a verification run: only verify steps and verify.md execute. <a href="/verify">Go to the checks</a>, ' \
+                                 'or finish the verification on the <a href="/">home page</a> to start a full run.')
+        end
+      end
+      banners.join
+    end
+
+    def self.destructive_banner(runbook, step)
+      return "" unless step.destructive?
+
+      confirm = "Running a destructive block asks you to type a confirmation code first."
+      body = if runbook.blast_radius
+               escalation = runbook.escalation ? "<br><strong>Escalation</strong><br>#{h runbook.escalation}" : ""
+               "<strong>Blast radius</strong><br>#{h runbook.blast_radius}#{escalation}<br>#{confirm}"
+             else
+               "<strong>This step is destructive.</strong> Read it fully before running anything. #{confirm}"
+             end
+      "<div class=\"banner danger\">#{ICONS[:alert]}<div>#{body}</div></div>"
+    end
+
+    def self.info_banner(html) = "<div class=\"banner info\">#{ICONS[:alert]}<div>#{html}</div></div>"
 
     def self.mark_panel(session, step)
       return "" unless session.active? && step.position
@@ -432,8 +483,8 @@ module Runsheets
       hint    = step.manual? ? "A manual step is complete when you say so. The acknowledgement and your note go into the runsheet." : ""
       <<~HTML
         <section class="panel">
-          <h2>#{heading}#{status ? ": #{h status}" : ''}</h2>
-          #{hint.empty? ? '' : "<p class=\"meta\">#{hint}</p>"}
+          <h2>#{heading}#{": #{h status}" if status}</h2>
+          #{"<p class=\"meta\">#{hint}</p>" unless hint.empty?}
           <form method="post" action="#{h step_href(step)}/mark">
             <input type="hidden" name="_token" value="#{h session.token}">
             <div class="field"><label for="note">Note (optional)</label><input type="text" id="note" name="note" placeholder="What you checked, what you saw"></div>
@@ -478,10 +529,10 @@ module Runsheets
       runbook = session.runbook
       docs    = runbook.verify_documents
       checks  = runbook.verify_blocks.size
-      banner = if !session.active?
-                 "<div class=\"banner info\">#{ICONS[:alert]}<div>No active run. <a href=\"/\">Start a verification</a> from the home page to run these checks on their own, or start a full run.</div></div>"
-               else
+      banner = if session.active?
                  ""
+               else
+                 "<div class=\"banner info\">#{ICONS[:alert]}<div>No active run. <a href=\"/\">Start a verification</a> from the home page to run these checks on their own, or start a full run.</div></div>"
                end
       toolbar = if session.active? && checks.positive?
                   "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\">#{ICONS[:check]} Run all #{checks} check#{'s' unless checks == 1}</button><span class=\"meta\" data-role=\"run-all-status\"></span></div>"

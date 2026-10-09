@@ -31,6 +31,8 @@ module Runsheets
       @redactor   = Redactor.new({})
       @executions = {}
       @challenges = {}
+      @persisted  = Set.new
+      @stamp_dismissed = false
       @mutex      = Mutex.new
     end
 
@@ -42,7 +44,7 @@ module Runsheets
       given = given.to_h.transform_keys(&:to_s)
       runbook.inputs.to_h do |input|
         value = given[input.name]
-        value = ENV[input.name] if value.nil? || value.empty?
+        value = ENV[input.name]  if value.nil? || value.empty?
         value = input.default   if value.nil? || value.empty?
         [input.name, value.to_s]
       end
@@ -135,7 +137,7 @@ module Runsheets
     end
 
     # Names of secret inputs that have a value, for display as "set".
-    def secret_inputs_set = runbook.inputs.select(&:secret?).map(&:name).select { !@inputs[it].to_s.empty? }
+    def secret_inputs_set = runbook.inputs.select(&:secret?).map(&:name).reject { @inputs[it].to_s.empty? }
 
     # Start executing a block. Returns the Execution.
     #
@@ -144,30 +146,44 @@ module Runsheets
     # the challenge.
     def execute(block_id, confirm: nil)
       @mutex.synchronize do
-        raise RunError, "start a run before executing blocks" unless active?
-
-        step, block = runbook.find_block(block_id)
-        raise RunError, "unknown block #{block_id}" unless block
-        raise RunError, "block #{block_id} is not executable (#{block.kind})" unless block.executable?
-        raise RunError, "a verification run only executes verify steps and verify.md; #{block_id} is in #{step.slug}" if run.verify? && !runbook.verify_document?(step)
-
-        blank = blank_inputs(block)
-        raise RunError, "blank input#{'s' if blank.size > 1} referenced by block: #{blank.join(', ')}" if blank.any?
-
+        step, block = executable_block!(block_id)
         check_confirmation!(block, confirm) if block.destructive?
 
-        cmd_path, log_path = run.paths_for(block)
-        execution = Execution.new(
-          id: SecureRandom.hex(6), block_id: block.id, step_slug: step.slug,
-          command: runbook.interpreter_for(block.lang), cmd_path:, log_path:,
-          timeout: block.background? ? nil : step.timeout, background: block.background?
-        )
+        execution = build_execution(step, block)
         run.record_execution(execution, step:, confirmed: block.destructive?)
         @executions[execution.id] = execution
         executor.start(execution, code: block.code, env: environment_for(execution), cwd: working_directory(step), redactor: @redactor)
         run.write!
         execution
       end
+    end
+
+    # The step and block for an id, or a RunError saying why it cannot run
+    # right now.
+    def executable_block!(block_id)
+      raise RunError, "start a run before executing blocks" unless active?
+
+      step, block = runbook.find_block(block_id)
+      raise RunError, "unknown block #{block_id}" unless block
+      raise RunError, "block #{block_id} is not executable (#{block.kind})" unless block.executable?
+      if run.verify? && !runbook.verify_document?(step)
+        raise RunError, "a verification run only executes verify steps and verify.md; #{block_id} is in #{step.slug}"
+      end
+
+      blank = blank_inputs(block)
+      raise RunError, "blank input#{'s' if blank.size > 1} referenced by block: #{blank.join(', ')}" if blank.any?
+
+      [step, block]
+    end
+
+    # A pending Execution for a block, with its files allocated in the run.
+    def build_execution(step, block)
+      cmd_path, log_path = run.paths_for(block)
+      Execution.new(
+        id: SecureRandom.hex(6), block_id: block.id, step_slug: step.slug,
+        command: runbook.interpreter_for(block.lang), cmd_path:, log_path:,
+        timeout: block.background? ? nil : step.timeout, background: block.background?
+      )
     end
 
     # The confirmation code currently expected for a destructive block,
@@ -206,9 +222,9 @@ module Runsheets
       execution = @executions[id]
       return nil unless execution
 
-      if execution.finished? && !@persisted&.include?(id)
+      if execution.finished? && !@persisted.include?(id)
         @mutex.synchronize do
-          (@persisted ||= Set.new) << id
+          @persisted << id
           run&.write!
         end
       end

@@ -49,7 +49,7 @@ class TestRunRecord < Minitest::Test
       assert_equal "completed", data["status"]
       assert_equal "finished", data["executions"].first["state"]
       assert_equal 0, data["executions"].first["exit_status"]
-      assert_equal %w[execute step], data["events"].map { it["type"] }
+      assert_equal(%w[execute step], data["events"].map { it["type"] })
       assert_equal({ "010-say-hello" => "done" }, data["steps"])
 
       md = File.read(File.join(run.dir, "run.md"))
@@ -93,7 +93,7 @@ class TestRunRecord < Minitest::Test
       run.finish!
 
       data = JSON.parse(File.read(File.join(run.dir, "run.json")))
-      assert_equal %w[ack execute], data["events"].map { it["type"] }
+      assert_equal(%w[ack execute], data["events"].map { it["type"] })
       assert_equal true, data["events"].last["confirmed"]
       assert_equal "pressed enter", data["acks"][term.id]["note"]
 
@@ -207,7 +207,7 @@ class TestRunRecord < Minitest::Test
       run.finish!
 
       drift = run.drift(rb)
-      assert_equal [[block.id, :changed], ["old-step-1", :missing]], drift.map { [it[:block_id], it[:status]] }
+      assert_equal([[block.id, :changed], ["old-step-1", :missing]], drift.map { [it[:block_id], it[:status]] })
       assert_includes drift.first[:diff].map(&:to_s), "-echo something else"
       assert_equal "echo gone\n", drift.last[:recorded]
 

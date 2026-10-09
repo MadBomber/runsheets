@@ -69,7 +69,11 @@ module Runsheets
       warnings << "conflicting flags: #{kinds.join(', ')}; using #{kind}" if extra.any?
 
       if EXECUTABLE_KINDS.include?(kind) && !interpreters.key?(lang)
-        warnings << (lang.empty? ? "a block without a language cannot execute" : "#{lang} blocks cannot execute; displayed only (map it under interpreters in the runbook front matter)")
+        warnings << if lang.empty?
+                      "a block without a language cannot execute"
+                    else
+                      "#{lang} blocks cannot execute; displayed only (map it under interpreters in the runbook front matter)"
+                    end
       end
 
       [kind, warnings.freeze]

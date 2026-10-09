@@ -101,7 +101,8 @@ class TestExecutor < Minitest::Test
 
   def test_background_flag_is_carried
     Dir.mktmpdir do |dir|
-      ex = Runsheets::Execution.new(id: "e", block_id: "b", step_slug: "s", command: %w[bash], cmd_path: File.join(dir, "c"), log_path: File.join(dir, "o"), background: true)
+      ex = Runsheets::Execution.new(id: "e", block_id: "b", step_slug: "s", command: %w[bash], cmd_path: File.join(dir, "c"), log_path: File.join(dir, "o"),
+                                    background: true)
       assert ex.background?
       assert ex.to_h[:background]
     end

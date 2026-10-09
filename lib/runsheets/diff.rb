@@ -21,40 +21,44 @@ module Runsheets
     end
 
     # Unified-style text, one tagged line per row.
-    def self.unified(before, after) = lines(before, after).map(&:to_s).join("\n")
+    def self.unified(before, after) = lines(before, after).join("\n")
 
     def self.changed?(before, after) = before.to_s != after.to_s
 
-    def self.lcs_table(a, b)
-      table = Array.new(a.size + 1) { Array.new(b.size + 1, 0) }
-      a.each_index.reverse_each do |i|
-        b.each_index.reverse_each do |j|
-          table[i][j] = a[i] == b[j] ? table[i + 1][j + 1] + 1 : [table[i + 1][j], table[i][j + 1]].max
+    def self.lcs_table(before, after)
+      table = Array.new(before.size + 1) { Array.new(after.size + 1, 0) }
+      before.each_index.reverse_each do |i|
+        after.each_index.reverse_each do |j|
+          table[i][j] = before[i] == after[j] ? table[i + 1][j + 1] + 1 : [table[i + 1][j], table[i][j + 1]].max
         end
       end
       table
     end
     private_class_method :lcs_table
 
-    def self.walk(a, b, table)
+    def self.walk(before, after, table)
       out = []
       i = j = 0
-      while i < a.size && j < b.size
-        if a[i] == b[j]
-          out << Line.new(" ", a[i])
-          i += 1
-          j += 1
-        elsif table[i + 1][j] >= table[i][j + 1]
-          out << Line.new("-", a[i])
-          i += 1
-        else
-          out << Line.new("+", b[j])
-          j += 1
-        end
+      while i < before.size && j < after.size
+        tag, text, di, dj = choose(before, after, table, i, j)
+        out << Line.new(tag, text)
+        i += di
+        j += dj
       end
-      out.concat(a[i..].map { Line.new("-", it) })
-      out.concat(b[j..].map { Line.new("+", it) })
+      out.concat(tail(before, i, "-")).concat(tail(after, j, "+"))
     end
     private_class_method :walk
+
+    # Which line to emit at (i, j): [tag, text, advance before, advance after].
+    def self.choose(before, after, table, i, j)
+      return [" ", before[i], 1, 1] if before[i] == after[j]
+      return ["-", before[i], 1, 0] if table[i + 1][j] >= table[i][j + 1]
+
+      ["+", after[j], 0, 1]
+    end
+    private_class_method :choose
+
+    def self.tail(lines, from, tag) = lines[from..].map { Line.new(tag, it) }
+    private_class_method :tail
   end
 end

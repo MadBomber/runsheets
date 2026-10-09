@@ -165,8 +165,8 @@ class TestSingleFile < Minitest::Test
     with_single_file(text) do |rb, _|
       assert_equal "Checks", rb.verify.title
       assert_equal %w[010-real-step], rb.steps.map(&:slug)
-      assert rb.warnings.any? { it.include?("a second verify section") }
-      assert rb.warnings.any? { it.include?("unknown role 'undo'") }
+      assert(rb.warnings.any? { it.include?("a second verify section") })
+      assert(rb.warnings.any? { it.include?("unknown role 'undo'") })
     end
   end
 

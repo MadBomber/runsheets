@@ -22,6 +22,10 @@
 
 ### Changed
 
+- Development: `.loki` task file for asgard, `.rubocop.yml`, `.reek.yml` and a
+  Reek baseline under `.quality/`; the quality tools are in the Gemfile and
+  `asgard quality` passes every gate. Ten methods were split to get under the
+  Flog threshold; behaviour is unchanged.
 - `Runbook.load` raises "no such runbook" for a missing path; `Runbook`
   gains `main_path`, `single_file?`; `Step.new` takes `data:` and
   `interpreters:`; `Renderer.render` and `Block.new` take `interpreters:`.

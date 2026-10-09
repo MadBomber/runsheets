@@ -103,7 +103,7 @@ module Runsheets
                 when /mswin|mingw/ then ["cmd", "/c", "start", url]
                 else ["xdg-open", url]
                 end
-      Process.spawn(*command, [:out, :err] => File::NULL)
+      Process.spawn(*command, %i[out err] => File::NULL)
     rescue SystemCallError
       nil
     end
@@ -137,7 +137,7 @@ module Runsheets
         { path => single_file_template(title) }
       else
         {
-          "runbook.md"           => runbook_template(title),
+          "runbook.md" => runbook_template(title),
           "steps/010-first-step.md" => <<~MD,
             ---
             title: First step

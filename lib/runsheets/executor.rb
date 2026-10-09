@@ -23,7 +23,7 @@ module Runsheets
     # execution, now running (or failed if it could not start).
     def start(execution, code:, env: {}, cwd: nil, redactor: nil)
       File.write(execution.cmd_path, code)
-      log            = File.open(execution.log_path, "wb")
+      log            = File.open(execution.log_path, "wb") # rubocop:disable Style/FileOpen -- closed by the pump thread
       reader, writer = IO.pipe
       pid = Process.spawn(
         env.transform_keys(&:to_s).transform_values(&:to_s),
@@ -59,7 +59,7 @@ module Runsheets
         log.write(redactor.feed(chunk))
         log.flush
       end
-    rescue EOFError, IOError
+    rescue IOError
       nil
     ensure
       log.write(redactor.flush)
@@ -70,32 +70,28 @@ module Runsheets
     private
 
     def reap(execution, pid, pump)
-      deadline = execution.timeout && monotonic + execution.timeout
+      deadline = execution.timeout && (monotonic + execution.timeout)
 
       loop do
         _, status = Process.wait2(pid, Process::WNOHANG)
-        if status
-          pump.join(DRAIN)
-          return execution.finished!(status, at: clock.now)
-        end
-
-        if execution.stop_requested?
-          status = kill_group(pid) || Process.wait2(pid).last
-          pump.join(DRAIN)
-          return execution.finished!(status, at: clock.now, stopped: true)
-        end
-
-        if deadline && monotonic > deadline
-          status = kill_group(pid) || Process.wait2(pid).last
-          pump.join(DRAIN)
-          return execution.finished!(status, at: clock.now, timed_out: true)
-        end
+        return finish(execution, pump, status) if status
+        return finish(execution, pump, end_group(pid), stopped: true) if execution.stop_requested?
+        return finish(execution, pump, end_group(pid), timed_out: true) if deadline && monotonic > deadline
 
         sleep POLL
       end
     rescue SystemCallError => e
       execution.failed!("#{e.class}: #{e.message}", at: clock.now)
     end
+
+    # Let the pump drain, then record how the process ended.
+    def finish(execution, pump, status, **how)
+      pump.join(DRAIN)
+      execution.finished!(status, at: clock.now, **how)
+    end
+
+    # Kill the group and return the child's status however it was reaped.
+    def end_group(pid) = kill_group(pid) || Process.wait2(pid).last
 
     # TERM the whole process group, then KILL whatever is still there.
     # Returns the child's status if it was reaped here, else nil.

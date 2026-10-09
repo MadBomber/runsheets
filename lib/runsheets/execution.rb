@@ -96,7 +96,7 @@ module Runsheets
     def finished!(status, at:, timed_out: false, stopped: false)
       @mutex.synchronize do
         @finished_at = at
-        @exit_status = status&.exitstatus || (status&.termsig && 128 + status.termsig)
+        @exit_status = status&.exitstatus || (status&.termsig && (128 + status.termsig))
         @signal      = status&.termsig
         @state       = if timed_out then :timed_out
                        elsif stopped then :stopped

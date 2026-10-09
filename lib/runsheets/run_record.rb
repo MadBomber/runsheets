@@ -156,7 +156,7 @@ module Runsheets
     def steps_done        = step_status.count { |_, s| s == "done" }
 
     # The most recent execution of each block, keyed by block id.
-    def latest_executions = executions.each_with_object({}) { |hash, latest| latest[hash[:block_id]] = hash }
+    def latest_executions = executions.to_h { [it[:block_id], it] }
 
     # Blocks whose most recent execution failed. A failure that was re-run
     # successfully does not count.
@@ -223,50 +223,72 @@ module Runsheets
 
     # The human-readable run.md.
     def transcript
+      lines = transcript_header
+      lines << "" << "## Timeline" << ""
+      events.each { lines.concat(event_lines(it)) }
+      "#{lines.join("\n")}\n"
+    end
+
+    private
+
+    def transcript_header
       lines = ["# #{runbook_title} — #{verify? ? 'verification' : 'run'} #{id}", "",
                "- Runbook: `#{runbook_slug}`",
                "- Kind: #{verify? ? 'verification (verify documents only)' : 'full run'}",
                "- Started: #{started_at.iso8601}",
                "- Finished: #{finished_at&.iso8601 || 'in progress'}",
                "- Status: #{status}"]
-      if inputs.any?
-        lines << "- Inputs:"
-        inputs.each { |k, v| lines << "  - `#{k}` = `#{v}`" }
-      end
-      lines << "" << "## Timeline" << ""
+      return lines if inputs.empty?
 
-      events.each do |event|
-        case event[:type]
-        when "execute" then lines.concat(execution_transcript(event))
-        when "step"    then lines << "- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{" — #{event[:note]}" if event[:note]}" << ""
-        when "ack"     then lines << "- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{" — #{event[:note]}" if event[:note]}" << ""
-        when "stamp"   then lines << "- #{event[:at]} runbook.md stamped `last_verified: #{event[:last_verified]}`" << ""
-        end
-      end
-      "#{lines.join("\n")}\n"
+      lines << "- Inputs:"
+      inputs.each { |k, v| lines << "  - `#{k}` = `#{v}`" }
+      lines
     end
 
-    private
+    # The transcript lines for one event, ending with a blank line.
+    def event_lines(event)
+      case event[:type]
+      when "execute" then execution_transcript(event)
+      when "step"    then ["- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{note_suffix(event)}", ""]
+      when "ack"     then ["- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{note_suffix(event)}", ""]
+      when "stamp"   then ["- #{event[:at]} runbook.md stamped `last_verified: #{event[:last_verified]}`", ""]
+      else []
+      end
+    end
+
+    def note_suffix(event) = event[:note] ? " — #{event[:note]}" : ""
 
     def execution_transcript(event)
-      hash = executions.find { it[:id] == event[:execution] } || {}
-      verdict = case hash[:state]
-                when "finished"  then hash[:exit_status] == 0 ? "ok" : "exit #{hash[:exit_status]}"
-                when "timed_out" then "timed out"
-                when "stopped"   then "stopped"
-                when "failed"    then "failed to start: #{hash[:error]}"
-                else hash[:state].to_s
-                end
-      tags = []
-      tags << "background" if hash[:background]
-      tags << "confirmed" if event[:confirmed]
-      title = "### #{event[:at]} `#{event[:block]}` (#{event[:step]}) — #{verdict}#{" in #{hash[:duration]}s" if hash[:duration]}"
-      title += " [#{tags.join(', ')}]" if tags.any?
-      lines = [title, ""]
+      hash  = executions.find { it[:id] == event[:execution] } || {}
+      lines = [execution_title(event, hash), ""]
       lines << "```#{command_lang(hash)}" << read_block_file(hash[:cmd]).chomp << "```" << ""
       output = read_block_file(hash[:log], tail: TRANSCRIPT_TAIL)
       lines << "Output:" << "" << "```text" << output.chomp << "```" << "" unless output.empty?
       lines
+    end
+
+    def execution_title(event, hash)
+      title = "### #{event[:at]} `#{event[:block]}` (#{event[:step]}) — #{verdict_for(hash)}"
+      title += " in #{hash[:duration]}s" if hash[:duration]
+      tags = execution_tags(event, hash)
+      tags.empty? ? title : "#{title} [#{tags.join(', ')}]"
+    end
+
+    def verdict_for(hash)
+      case hash[:state]
+      when "finished"  then hash[:exit_status] == 0 ? "ok" : "exit #{hash[:exit_status]}"
+      when "timed_out" then "timed out"
+      when "stopped"   then "stopped"
+      when "failed"    then "failed to start: #{hash[:error]}"
+      else hash[:state].to_s
+      end
+    end
+
+    def execution_tags(event, hash)
+      tags = []
+      tags << "background" if hash[:background]
+      tags << "confirmed" if event[:confirmed]
+      tags
     end
 
     def command_lang(hash) = File.basename(Array(hash[:command]).first.to_s)

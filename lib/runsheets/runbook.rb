@@ -96,7 +96,7 @@ module Runsheets
     # the new text.
     def self.stamp_last_verified(path, date)
       text  = File.read(path, encoding: "UTF-8")
-      value = date.respond_to?(:strftime) ? date.strftime("%Y-%m-%d") : date.to_s
+      value = (date.is_a?(String) ? Date.parse(date) : date.to_date).iso8601
       match = text.match(/\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?$/m)
       raise RunbookError, "#{path} has no front matter to stamp" unless match
 
@@ -132,7 +132,7 @@ module Runsheets
     end
 
     # Every document that can be shown as a page, keyed by slug.
-    def documents = @documents ||= ([landing, *steps, *extras.values]).to_h { [it.slug, it] }
+    def documents = @documents ||= [landing, *steps, *extras.values].to_h { [it.slug, it] }
 
     def step(slug) = documents[slug]
 
@@ -179,7 +179,7 @@ module Runsheets
       return [] unless File.directory?(steps_dir)
 
       names = Dir.glob("*.md", base: steps_dir).sort_by { [it[/\A\d+/].to_i, it] }
-      names.each_with_index.map { |name, i| Step.load(File.join(steps_dir, name), root: dir, position: i + 1, interpreters:) }
+      names.map.with_index(1) { |name, position| Step.load(File.join(steps_dir, name), root: dir, position:, interpreters:) }
     end
 
     def load_extras
@@ -196,23 +196,35 @@ module Runsheets
       @landing = Step.new(slug: "runbook", text: preamble, path: main_path, root: dir, interpreters:)
       @steps   = []
       @extras  = {}
-      sections.each do |section|
-        section.warnings.each { @section_warnings << "section '#{section.title}' (line #{section.line}): #{it}" }
-        data = { "title" => section.title }.merge(section.data)
-        if section.extra?
-          role = section.role
-          if EXTRAS.include?(role)
-            @section_warnings << "section '#{section.title}' (line #{section.line}): a second #{role} section; the first one is used" if @extras.key?(role)
-            @extras[role] ||= Step.new(slug: role, text: section.body, path: main_path, root: dir, data:, interpreters:)
-          else
-            @section_warnings << "section '#{section.title}' (line #{section.line}): unknown role '#{role}'; expected verify or rollback"
-          end
-        else
-          position = @steps.size + 1
-          @steps << Step.new(slug: SingleFile.slug_for(section.title, position), text: section.body, path: main_path, root: dir, position:, data:, interpreters:)
-        end
-      end
+      sections.each { add_section(it) }
       @extras = EXTRAS.filter_map { [it, @extras[it]] if @extras[it] }.to_h
+    end
+
+    def add_section(section)
+      section.warnings.each { section_warning(section, it) }
+      section.extra? ? add_extra(section) : add_step(section)
+    end
+
+    def add_step(section)
+      position = @steps.size + 1
+      @steps << section_step(section, slug: SingleFile.slug_for(section.title, position), position:)
+    end
+
+    def add_extra(section)
+      role = section.role
+      return section_warning(section, "unknown role '#{role}'; expected verify or rollback") unless EXTRAS.include?(role)
+      return section_warning(section, "a second #{role} section; the first one is used") if @extras.key?(role)
+
+      @extras[role] = section_step(section, slug: role)
+    end
+
+    def section_step(section, slug:, position: nil)
+      data = { "title" => section.title }.merge(section.data)
+      Step.new(slug:, text: section.body, path: main_path, root: dir, position:, data:, interpreters:)
+    end
+
+    def section_warning(section, message)
+      @section_warnings << "section '#{section.title}' (line #{section.line}): #{message}"
     end
 
     def validate
