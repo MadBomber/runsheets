@@ -908,6 +908,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-from-a-checkout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1346,6 +1357,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-from-a-checkout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1578,7 +1600,15 @@ want a clean record.</p>
 is the whole multi-user story: there is none. Binding to another address
 exposes shell execution on your machine to whoever can reach that address,
 protected only by the session token embedded in the pages. Do not do it on
-a network you do not control.</p>
+a network you do not control. The command prints a warning whenever the
+bind address is not loopback. A wildcard address (<code>0.0.0.0</code> or <code>::</code>)
+answers on every interface, so the <code>Host</code> check is turned off for it; a
+specific address accepts requests for itself and the loopback names.</p>
+<h2 id="stopping">Stopping<a class="headerlink" href="#stopping" title="Permanent link">&para;</a></h2>
+<p>Ctrl-C stops the server. If a run is active it is ended as <code>abandoned</code>,
+anything it left running (a <code>background</code> block, a block that was still
+going) is stopped, and the run record is written, so nothing outlives the
+tool and no record is left saying <code>running</code>.</p>
 <h2 id="running-from-a-checkout">Running from a checkout<a class="headerlink" href="#running-from-a-checkout" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>exe/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
 </span></code></pre></div>

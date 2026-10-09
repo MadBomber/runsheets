@@ -1651,7 +1651,11 @@ the server starts and embedded in every page:</p>
 Requests without a valid token get <strong>403</strong> with a JSON body on the
 execution endpoints and an HTML error page elsewhere.</p>
 <p>The <code>Host</code> header must be <code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code> or the bind
-address, or the request gets <strong>403</strong> before routing.</p>
+address, or the request gets <strong>403</strong> before routing. (For a wildcard bind
+the check is off; see <a href="../../running/cli/#about---bind">the CLI page</a>.)</p>
+<p>Every HTML page is sent with <code>Cache-Control: no-store</code> and a
+<code>Content-Security-Policy</code> whose script and style sources are a nonce unique
+to that response; the page's own inline script and stylesheet carry it.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">B</span><span class="o">=</span>http://127.0.0.1:4567
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span><span class="nv">$B</span>/<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'s/.*rs-token" content="\([a-f0-9]*\)".*/\1/p'</span><span class="k">)</span>
 </span></code></pre></div>
@@ -1705,7 +1709,8 @@ runbook with no verify documents.</p>
 <h3 id="post-runfinish"><code>POST /run/finish</code><a class="headerlink" href="#post-runfinish" title="Permanent link">&para;</a></h3>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>completed</code>, default, or <code>abandoned</code>).
 Anything still running is stopped first. Responds <strong>303</strong> to the landing
-page, or <strong>409</strong> with no active run.</p>
+page; <strong>422</strong> for another status, checked before anything is stopped;
+<strong>409</strong> with no active run.</p>
 <h3 id="post-runstamp"><code>POST /run/stamp</code><a class="headerlink" href="#post-runstamp" title="Permanent link">&para;</a></h3>
 <p>Writes <code>last_verified</code> into <code>runbook.md</code> with the last run's start date,
 when that run qualifies (completed; every step done for a full run, or
@@ -1718,7 +1723,8 @@ to the landing page, or <strong>409</strong> when the last run cannot stamp.</p>
 <h3 id="post-stepsslugmark"><code>POST /steps/:slug/mark</code><a class="headerlink" href="#post-stepsslugmark" title="Permanent link">&para;</a></h3>
 <p>Form fields: <code>_token</code>, <code>status</code> (<code>done</code> or <code>skipped</code>), <code>note</code> (optional).
 Responds <strong>303</strong> to the next step or the landing page; <strong>422</strong> for another
-status; <strong>409</strong> with no active run.</p>
+status, or for a slug that is not a numbered step (the landing page,
+<code>verify</code> and <code>rollback</code> cannot be marked); <strong>409</strong> with no active run.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <h3 id="post-blocksidexecute"><code>POST /blocks/:id/execute</code><a class="headerlink" href="#post-blocksidexecute" title="Permanent link">&para;</a></h3>
 <p>Starts executing a <code>run</code>, <code>destructive</code> or <code>background</code> block. Responds
@@ -1815,7 +1821,7 @@ no-op. <strong>409</strong> for an unknown id.</p>
 </tr>
 <tr>
 <td>422</td>
-<td>Invalid step status.</td>
+<td>Invalid step or finish status, or a mark on a document that is not a numbered step.</td>
 </tr>
 <tr>
 <td>428</td>
