@@ -83,6 +83,10 @@ module Runsheets
       Result.new(html: converter.convert(doc.root), blocks:)
     end
 
+    # Render markdown as plain HTML: nothing is executable, so no block is
+    # wrapped. For prose outside a runbook, such as a library folder's README.
+    def self.render_plain(markdown) = Kramdown::Document.new(markdown, **KRAMDOWN_OPTIONS).to_html
+
     def self.h(value) = CGI.escapeHTML(value.to_s)
 
     # An expect block illustrates the nearest executable block above it.

@@ -154,3 +154,19 @@ class TestRunbook < Minitest::Test
     end
   end
 end
+
+class TestRunbookSlug < Minitest::Test
+  include RunsheetsTest
+
+  def test_the_slug_is_the_directory_or_file_name_unless_given
+    assert_equal "hello", example_runbook.slug
+    assert_equal "ops/hello", Runsheets::Runbook.load(RunsheetsTest::EXAMPLE_DIR, slug: "ops/hello").slug
+    path = File.expand_path("../examples/db-maintenance.md", __dir__)
+    assert_equal "db-maintenance", Runsheets::Runbook.load(path).slug
+    assert_equal "database/maintenance", Runsheets::Runbook.load(path, slug: "database/maintenance").slug
+  end
+
+  def test_a_runbook_loaded_from_its_main_file_takes_the_directory_name
+    assert_equal "hello", Runsheets::Runbook.load(File.join(RunsheetsTest::EXAMPLE_DIR, "runbook.md")).slug
+  end
+end

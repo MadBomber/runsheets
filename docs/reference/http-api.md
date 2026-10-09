@@ -42,6 +42,21 @@ TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 | `GET /runs/:id` | A previous run's transcript. The id must match `[\w.-]+`. |
 | `GET /files/*path` | A regular, non-hidden file inside the runbook directory, with its content type. 404 otherwise. |
 
+### The library
+
+When the server was started on a directory of runbooks, these routes exist
+too; otherwise they are 404. Until a runbook is open every other page
+redirects to `/library`.
+
+| Method and path | Returns |
+| --- | --- |
+| `GET /library` | The library page: the folder tree, and the root folder in the main pane. |
+| `GET /library/*slug` | The same page with that runbook or folder selected. The slug is the path inside the library (`platform/database/backup`). 404 for an unknown one. |
+| `POST /library/open` | Opens the runbook named by the `slug` field and redirects to `/`. Needs the token. 404 for an unknown slug, 409 while a run is active. |
+
+A `GET` of a library page rescans the directory when anything in it has
+changed, so a runbook added while the server is up shows on the next visit.
+
 ## Run lifecycle
 
 ### `POST /run`

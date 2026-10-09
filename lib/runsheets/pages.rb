@@ -22,7 +22,11 @@ module Runsheets
       alert:  '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
       log:    '<svg class="icon" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
       check:  '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="m8.5 12 2.5 2.5L21 4.5"/></svg>',
-      stamp:  '<svg class="icon" viewBox="0 0 24 24"><path d="M5 20h14"/><path d="M7 16h10v-3H7z"/><path d="M10 13V9a2 2 0 1 1 4 0v4"/></svg>'
+      stamp:  '<svg class="icon" viewBox="0 0 24 24"><path d="M5 20h14"/><path d="M7 16h10v-3H7z"/><path d="M10 13V9a2 2 0 1 1 4 0v4"/></svg>',
+      folder: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+      file:   '<svg class="icon" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>',
+      search: '<svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>',
+      chevron: '<svg class="icon" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>'
     }.freeze
 
     STATUS_MARKS = { "done" => "✓", "skipped" => "↷", "failed" => "✗", "ran" => "•", "pending" => "·" }.freeze
@@ -80,7 +84,8 @@ module Runsheets
     def self.header(session, step:, kind:)
       runbook   = session.runbook
       prev, nxt = step ? runbook.neighbors(step) : [nil, nil]
-      crumbs    = [kind == :landing ? "<span class=\"current\">#{h runbook.title}</span>" : "<a href=\"/\">#{h runbook.title}</a>"]
+      crumbs    = library_crumbs(session)
+      crumbs << (kind == :landing ? "<span class=\"current\">#{h runbook.title}</span>" : "<a href=\"/\">#{h runbook.title}</a>")
       crumbs << "<span class=\"current\">#{h step.title}</span>" if step
       crumbs << '<span class="current">Runsheet</span>' if kind == :run
       crumbs << '<span class="current">Checks</span>' if kind == :verify
@@ -110,6 +115,16 @@ module Runsheets
           </nav>
         </header>
       HTML
+    end
+
+    # When the runbook was opened from a library, the crumbs start with the
+    # library and the folders above the runbook, each a link into the tree.
+    def self.library_crumbs(session)
+      library = session.library
+      return [] unless library
+
+      ['<a href="/library" title="Runbooks [r]">Runbooks</a>',
+       *library.ancestors(session.runbook.slug).map { "<a href=\"#{h Chooser.href(it.slug)}\">#{h it.name}</a>" }]
     end
 
     # Sidebar: the step list with run status marks, extra documents, the
@@ -242,9 +257,11 @@ module Runsheets
       HTML
     end
 
-    def self.meta_table(runbook)
+    # The front-matter facts as a table. The library page shows when_to_use
+    # on its own and leaves it out here.
+    def self.meta_table(runbook, when_to_use: true)
       rows = []
-      rows << ["When to use", h(runbook.when_to_use)] if runbook.when_to_use
+      rows << ["When to use", h(runbook.when_to_use)] if when_to_use && runbook.when_to_use
       rows << ["Prerequisites", "<ul>#{runbook.prerequisites.map { "<li>#{h it}</li>" }.join}</ul>"] if runbook.prerequisites.any?
       rows << ["Blast radius", "<span class=\"badge destructive\">destructive</span> #{h runbook.blast_radius}"] if runbook.blast_radius
       rows << ["Escalation", h(runbook.escalation)] if runbook.escalation
@@ -631,99 +648,8 @@ module Runsheets
       HTML
       layout(session, title: "Error #{status}", body:, kind: :error, nonce:)
     end
-
-    # ------------------------------------------------------------------
-    # Library: choosing a runbook from a directory of them
-    # ------------------------------------------------------------------
-
-    # Standalone page (no runbook to lay out around): one panel per runbook
-    # with an Open button. session is the runbook open now, if any.
-    def self.library(library, session, token, nonce: nil)
-      nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
-      current    = session&.runbook&.slug
-      active     = session&.active?
-      # :current is open now, :broken does not load, :locked waits for the
-      # active run to finish, :ready can be opened.
-      state_of   = lambda do |entry|
-        if entry.slug == current then :current
-        elsif !entry.ok?         then :broken
-        elsif active             then :locked
-        else :ready
-        end
-      end
-      panels     = library.entries.map { library_entry(it, token, state: state_of.call(it)) }
-      <<~HTML
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <meta name="rs-token" content="#{h token}">
-          <title>Runbooks · #{h APP_NAME}</title>
-          <style#{nonce_attr}>#{Assets.stylesheet}</style>
-        </head>
-        <body class="kind-library">
-          <header class="rs-header">
-            <div class="brand">
-              <a class="home" href="/library" title="Runbooks">#{ICONS[:book]}<span class="brand-name">#{h APP_NAME}</span><span class="brand-tag">library</span></a>
-            </div>
-            <nav class="crumbs" aria-label="Breadcrumb"><span class="current">Runbooks</span></nav>
-            <nav class="actions">#{library_pill(session)}</nav>
-          </header>
-          <div class="rs-shell">
-            <main class="rs-main">
-              <div class="page-head">
-                <h1>#{ICONS[:book]} Runbooks</h1>
-                <p class="sub">#{library.size} runbook#{'s' unless library.size == 1} in #{h library.dir}#{' · finish the active run before opening another' if active}</p>
-              </div>
-              #{panels.join("\n")}
-            </main>
-          </div>
-          <footer class="rs-footer"><span>#{h APP_NAME} · #{h APP_FULL} · #{h library.dir}</span></footer>
-        </body>
-        </html>
-      HTML
-    end
-
-    def self.library_pill(session)
-      return '<span class="run-pill"><span class="dot"></span>no runbook open</span>' unless session
-
-      label = session.active? ? "#{session.verifying? ? 'verify' : 'run'} #{h session.run.id}" : "open"
-      "<a class=\"run-pill#{' active' if session.active?}\" href=\"/\" title=\"#{h session.runbook.title}\"><span class=\"dot\"></span>#{h session.runbook.slug} · #{label}</a>"
-    end
-
-    # One runbook's panel; state is one of the four from .library.
-    def self.library_entry(entry, token, state:)
-      badges = ["<span class=\"badge\">#{entry.single_file? ? 'single file' : 'directory'}</span>", *LIBRARY_STATES.dig(state, :badge)]
-      badges.concat(entry.tags.map { "<span class=\"badge tag\">#{h it}</span>" })
-      <<~HTML
-        <section class="panel library-entry" data-slug="#{h entry.slug}">
-          <h2>#{h entry.title}</h2>
-          <div class="badges">#{badges.join}</div>
-          <p class="sub">#{library_detail(entry)} · <code>#{h entry.path}</code></p>
-          #{"<p>#{h entry.when_to_use}</p>" if entry.when_to_use}
-          <div class="btn-row">#{LIBRARY_STATES.fetch(state)[:button].call(entry, token)}</div>
-        </section>
-      HTML
-    end
-
-    def self.library_detail(entry)
-      return h(entry.error) unless entry.ok?
-
-      warnings = entry.warnings.size
-      "#{entry.steps} step#{'s' unless entry.steps == 1}#{" · #{warnings} warning#{'s' unless warnings == 1}" unless warnings.zero?}"
-    end
-
-    # What each state adds to a panel: an extra badge, and the button.
-    LIBRARY_STATES = {
-      current: { badge: '<span class="badge">current</span>',
-                 button: ->(_entry, _token) { "<a class=\"btn primary\" href=\"/\">#{ICONS[:next]} Continue</a>" } },
-      broken:  { badge: '<span class="badge destructive">does not load</span>', button: ->(_entry, _token) { "" } },
-      locked:  { button: ->(_entry, _token) { '<span class="btn disabled" title="Finish the active run first">Open</span>' } },
-      ready:   { button: lambda do |entry, token|
-        "<form method=\"post\" action=\"/library/open\"><input type=\"hidden\" name=\"_token\" value=\"#{h token}\">" \
-          "<input type=\"hidden\" name=\"slug\" value=\"#{h entry.slug}\"><button class=\"btn primary\" type=\"submit\">#{ICONS[:next]} Open</button></form>"
-      end }
-    }.freeze
   end
 end
+
+require_relative "pages/chooser"
+require_relative "pages/tree"

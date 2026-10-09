@@ -46,12 +46,39 @@ the record.
 ## Choosing a runbook
 
 Started on a directory of runbooks (`runsheets ops/runbooks`), the server
-opens on the chooser at `/library`: one panel per runbook with its title,
-whether it is a single file or a directory, its step count, tags, authoring
-warnings, and the `when_to_use` text. **Open** serves that runbook; every
-other page redirects here until one is open. A runbook that does not load
-is listed with the error instead of a button. While a run is active the
-buttons are disabled: finish or abandon the run, then switch.
+opens on the library at `/library`. Every markdown file in the directory
+is a single-file runbook, every directory holding `runbook.md` is a runbook
+directory, and every other directory is a folder, searched the same way to
+any depth. Folders that hold no runbooks are left out, as are hidden
+entries. Every other page redirects to the library until a runbook is open.
+
+The page has two panes:
+
+- **The tree**, on the left. Folders fold and unfold; runbooks show their
+  title and step count. A runbook that does not load is struck through
+  with a red `!`; the runbook open now carries a green dot. The filter box
+  at the top (++slash++ focuses it) narrows the tree to runbooks whose
+  title, file name, path or tags contain the text, opening every folder
+  that still has a match. The tree never descends into a runbook: its
+  `steps/` and other files are not part of the library.
+- **The main pane**, on the right, shows what is selected in the tree.
+  A folder shows its `README.md` (rendered, if it has one) and a card for
+  each folder and runbook it holds directly; the root folder is what
+  `/library` shows. A runbook shows its `when_to_use` text beside the
+  **Open** button, then its prerequisites, blast radius, escalation and
+  last-verified date, its inputs with their defaults, its steps with kind
+  badges, its previous runs, and its preamble. The URL is the runbook's
+  path in the library (`/library/platform/database/backup`), so it can be
+  bookmarked.
+
+**Open** serves that runbook and goes to its landing page; the header
+breadcrumbs there lead back through the folders to the library, and the
+**Runbooks** button (++r++) goes straight to it. A runbook's slug is its
+path inside the library (`platform/database/backup`), so two runbooks named
+alike in different folders keep separate run records. While a run is active
+the Open buttons are disabled and a banner says which runbook holds the run:
+finish or abandon it, then switch. Runbooks added, removed or edited while
+the server is up appear on the next visit to the library.
 
 ## Landing page
 
@@ -212,10 +239,22 @@ drifting away from it.
 | Key | Action |
 | --- | --- |
 | ++h++ | Home |
-| ++r++ | Runbooks (the chooser, when started on a directory of runbooks) |
+| ++r++ | Runbooks (the library, when started on a directory of runbooks) |
 | ++arrow-left++ / ++arrow-right++ | Previous / next step |
 | ++s++ | Toggle the sidebar |
 | ++escape++ | Leave a text field |
+
+On the library page:
+
+| Key | Action |
+| --- | --- |
+| ++slash++ | Focus the filter box; ++escape++ clears it |
+| ++arrow-down++ / ++arrow-up++ (or ++j++ / ++k++) | Move the cursor through the tree |
+| ++arrow-right++ / ++arrow-left++ | Unfold / fold the folder under the cursor |
+| ++enter++ | Select the runbook or folder under the cursor |
+| ++o++ | Open the selected runbook |
+| ++b++ | Back to the runbook open now |
+| ++s++ | Toggle the tree |
 
 Shortcuts are ignored while typing in a field.
 

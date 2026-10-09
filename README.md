@@ -37,7 +37,12 @@ runsheets --init path/to/new      # scaffold a runbook (a .md path makes a singl
 The argument is one of three things: a runbook directory, a single
 all-in-one markdown file whose `##` headings are the steps (see
 [Single-file runbooks](docs/runbooks/structure.md#single-file-runbooks)),
-or a directory holding several of either. Try the bundled examples:
+or a directory holding several of either, in folders nested as deep as
+you like. Started on such a library, the browser opens on a folder tree in
+the left pane; selecting a runbook shows its description, prerequisites,
+inputs, steps and previous runs in the main pane, with an **Open** button.
+A `README.md` in a folder is shown as that folder's description. Try the
+bundled examples:
 
 ```bash
 runsheets --open examples                      # all three, pick one in the browser

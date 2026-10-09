@@ -14,6 +14,7 @@ lib/runsheets/
   step.rb                     one markdown file: front matter, body, html, blocks
   single_file.rb              splits a one-file runbook into preamble and ## sections
   runbook.rb                  a directory or a single file: steps, verify, rollback; last_verified stamp
+  library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
   diff.rb                     line diff for drift between a record and the runbook
   redactor.rb                 replaces secret values in captured output
   execution.rb                one execution: state, pid, files, timing
@@ -22,6 +23,8 @@ lib/runsheets/
   session.rb                  the active run, inputs, live executions, confirmation codes, stamp offer
   web.rb                      Sinatra routes and the security checks
   pages.rb                    pure functions that build the HTML
+  pages/chooser.rb            the library page: header, folder pane, runbook pane
+  pages/tree.rb               the folder tree in the library page's left pane
   assets.rb                   inline CSS and JavaScript
   cli.rb                      option parsing and the exe entry point
 bin/runsheets
@@ -132,7 +135,15 @@ page is one self-contained response and the gem serves no static files.
 
 The JavaScript is small and framework-free: sidebar toggle, outline, copy
 buttons, the execute-and-poll loop, restoring prior executions from a JSON
-blob the step page embeds, and keyboard shortcuts.
+blob the step page embeds, keyboard shortcuts, and on the library page the
+tree filter and cursor.
+
+Started on a directory of runbooks, `Web` holds a `Library` beside the
+session. `Library` scans the tree once (folders to any depth, a runbook
+directory being a leaf), keeps each runbook loaded for the detail pane,
+and rescans when a folder or a runbook file changes. Opening a runbook
+builds a new `Session` around it; the runbook's slug is its path inside the
+library, so run records of `a/backup` and `b/backup` never meet.
 
 ## Testing
 

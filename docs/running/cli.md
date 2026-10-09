@@ -7,8 +7,9 @@ Usage: runsheets [options] [RUNBOOK]
 `RUNBOOK` is one of three things: a runbook directory (it must contain
 `runbook.md`), a single all-in-one markdown file whose `##` headings are the
 steps (see [Single-file runbooks](../runbooks/structure.md#single-file-runbooks)),
-or a directory holding several of either side by side. Given such a directory of
-runbooks, the page opens on a chooser listing them and the operator picks
+or a directory holding several of either, in folders nested to any depth
+(see [Choosing a runbook](web-ui.md#choosing-a-runbook)). Given such a
+directory of runbooks, the page opens on a folder tree and the operator picks
 one; `runsheets examples` shows the three bundled examples that way. It is
 the only positional argument. Leave it out and the bundled `examples/hello`
 is served, which is the quickest way to see the tool;

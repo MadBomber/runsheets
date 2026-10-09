@@ -35,11 +35,18 @@
 ### Added (milestone 4: packaging)
 
 - A directory of runbooks (`Runsheets::Library`): `runsheets DIR` where DIR
-  holds single-file runbooks and runbook directories side by side opens on a
-  chooser page (`/library`) listing them with title, kind, steps, tags and
-  warnings; opening one serves it, and a Runbooks button in the header goes
-  back to choose another. Switching is refused while a run is active.
-  `--check` on such a directory checks every runbook.
+  holds single-file runbooks and runbook directories, in folders nested to
+  any depth, opens on the library page (`/library`): a folder tree in the
+  left pane with a filter box and keyboard cursor, and in the main pane
+  whatever is selected. A folder shows its `README.md` and cards for what it
+  holds; a runbook (`/library/<path>`) shows its description, prerequisites,
+  inputs, steps, previous runs and preamble beside the Open button. The tree
+  never descends into a runbook directory. A runbook's slug is its path
+  inside the library, so run records of `a/backup` and `b/backup` stay
+  apart; the header breadcrumbs of an open runbook lead back through its
+  folders. Runbooks added, removed or edited while serving appear on the
+  next visit. Switching is refused while a run is active. `--check` on such
+  a directory checks every runbook.
 - Layered settings through `myway_config` (`Runsheets::Config`): the command
   line beats `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`,
   `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`, `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`,

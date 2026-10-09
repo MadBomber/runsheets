@@ -338,3 +338,19 @@ class TestSession < Minitest::Test
     end
   end
 end
+
+class TestSessionSlug < Minitest::Test
+  include RunsheetsTest
+
+  def test_reloading_keeps_a_library_slug
+    with_runs_dir do |root|
+      rb = Runsheets::Runbook.load(RunsheetsTest::EXAMPLE_DIR, slug: "ops/hello")
+      s  = Runsheets::Session.new(runbook: rb, runs_root: root)
+      assert_equal "ops/hello", s.reload_runbook!.slug
+      s.start_run
+      assert_equal File.join(root, "ops/hello"), File.dirname(s.run.dir)
+      s.finish_run
+      assert_equal 1, s.history.size
+    end
+  end
+end

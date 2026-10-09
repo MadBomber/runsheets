@@ -171,7 +171,9 @@ module Runsheets
 
     def self.target_line(target)
       if target.is_a?(Library)
-        "Library: #{target.size} runbooks in #{target.dir}: #{target.entries.map(&:slug).join(', ')}"
+        folders = target.folders.size
+        where   = folders.positive? ? " in #{folders} folder#{'s' unless folders == 1}" : ""
+        "Library: #{target.size} runbook#{'s' unless target.size == 1}#{where} under #{target.dir}"
       else
         "Runbook: #{target.title} (#{target.single_file? ? target.main_path : target.dir})"
       end

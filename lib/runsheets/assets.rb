@@ -222,6 +222,94 @@ module Runsheets
       .check-doc > h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
       @media (max-width: 700px) { .rs-panes.has-expected { grid-template-columns: 1fr; } .rs-expected { border-left: 0; border-top: 1px solid var(--border); } }
 
+      /* ---------- library: the tree ---------- */
+      .lib-tree { padding-top: 12px; }
+      .lib-filter { position: relative; display: flex; align-items: center; margin: 0 4px 14px; }
+      .lib-filter > svg { position: absolute; left: 10px; color: var(--muted); pointer-events: none; }
+      .lib-filter > kbd { position: absolute; right: 8px; opacity: .7; }
+      .lib-filter input { width: 100%; padding: 8px 34px 8px 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 13.5px; outline: 0; }
+      .lib-filter input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(90,176,255,.15); }
+      .lib-filter input:focus ~ kbd { display: none; }
+      .lib-filter input::-webkit-search-cancel-button { cursor: pointer; }
+      .tree ul { list-style: none; margin: 0; padding: 0; }
+      .tree ul ul { margin-left: 14px; padding-left: 8px; border-left: 1px solid var(--border); }
+      .tree li { margin: 1px 0; }
+      .tree li[hidden] { display: none; }
+      .tree .node, .tree summary { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; min-height: 30px; padding: 3px 8px; border-radius: 6px; color: var(--text); cursor: pointer; }
+      .tree summary { grid-template-columns: auto auto 1fr auto; gap: 6px; list-style: none; user-select: none; }
+      .tree summary::-webkit-details-marker { display: none; }
+      .tree summary svg, .tree .node svg { color: var(--muted); }
+      .tree summary .name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .tree summary .name:hover { color: var(--accent); text-decoration: none; }
+      .tree .twisty { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; border-radius: 4px; color: var(--muted); transition: transform .15s ease; }
+      .tree .twisty svg { width: .9em; height: .9em; }
+      .tree details[open] > summary .twisty { transform: rotate(90deg); }
+      .tree .node:hover, .tree summary:hover { background: var(--panel-2); text-decoration: none; }
+      .tree .node .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .tree li.active > .node, .tree li.active > details > summary { background: rgba(90,176,255,.14); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
+      .tree li.active > .node svg { color: var(--accent); }
+      .tree li.focus > .node, .tree li.focus > details > summary { outline: 1px solid var(--accent); outline-offset: -1px; }
+      .tree .root > .node { margin-bottom: 6px; font-weight: 600; }
+      .tree-mark { font: 600 11px var(--mono); color: var(--muted); }
+      .tree-mark.count { min-width: 1.6em; text-align: right; }
+      .tree-mark.broken { color: var(--danger); font-weight: 800; }
+      .tree-mark.current { display: inline-flex; color: var(--ok); }
+      .tree-mark.current .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s infinite; }
+      .tree li.current > .node .name { color: var(--ok); }
+      .tree li.broken > .node .name { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(255,107,107,.6); }
+      .tree li.destructive > .node svg { color: var(--danger); }
+      .tree-empty { margin: 12px 8px; color: var(--muted); font-style: italic; }
+      body.filtering .tree details > summary .twisty { visibility: hidden; }
+
+      /* ---------- library: the main pane ---------- */
+      .lib-main .page-head h1 svg { color: var(--accent); }
+      .lib-main .page-head .sub code { font: 12.5px var(--mono); color: var(--muted); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+      .lib-readme { margin: 0 0 28px; padding: 4px 0 16px; border-bottom: 1px solid var(--border); color: var(--text); }
+      .lib-readme > :first-child { margin-top: 0; }
+      .lib-readme h1 { font-size: 1.35em; border-bottom: 0; padding-bottom: 0; }
+      .lib-readme h2 { font-size: 1.15em; border-bottom: 0; }
+      .lib-section { margin: 0 0 28px; max-width: 900px; }
+      .lib-section > h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+      .lib-section > h2 .meta { font: 12px var(--mono); text-transform: none; letter-spacing: 0; }
+      .lib-section .steps-list, .lib-section .meta-table { margin-bottom: 0; }
+      .lib-section > .meta { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+      .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+      .lib-card { display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius); border: 1px solid var(--border); background: var(--panel); color: var(--text); transition: border-color .12s ease, transform .12s ease, box-shadow .12s ease; }
+      .lib-card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+      .lib-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15.5px; line-height: 1.3; }
+      .lib-card h3 svg { color: var(--accent); }
+      .lib-card.folder { padding: 16px 18px; }
+      .lib-card.folder h3 svg { color: var(--warn); }
+      .lib-card .desc { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+      .lib-card .names { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .lib-card .card-link { display: block; flex: 1; padding: 16px 18px 12px; color: inherit; }
+      .lib-card .card-link:hover { text-decoration: none; }
+      .lib-card .card-link .badges { margin: 12px 0 0; }
+      .lib-card .card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+      .lib-card .card-foot .btn { padding: 5px 12px; font-size: 13px; }
+      .lib-card.current { border-color: rgba(61,220,151,.5); }
+      .lib-card.broken { border-color: rgba(255,107,107,.45); }
+      .lib-card.broken h3 svg { color: var(--danger); }
+      .lib-card.broken .desc { color: #ffd3d3; font: 12.5px var(--mono); }
+      .lib-card.locked .card-foot .btn.disabled { opacity: .5; cursor: not-allowed; }
+      .lib-open { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; border-color: rgba(90,176,255,.35); background: linear-gradient(135deg, rgba(90,176,255,.08), rgba(167,139,250,.06)); }
+      .lib-open.current { border-color: rgba(61,220,151,.5); background: linear-gradient(135deg, rgba(61,220,151,.08), rgba(90,176,255,.05)); }
+      .lib-open.broken { border-color: rgba(255,107,107,.45); background: rgba(255,107,107,.05); grid-template-columns: 1fr; }
+      .lib-open .lib-open-text > :last-child { margin-bottom: 0; }
+      .lib-open .lib-open-text p { margin: 0; font-size: 15.5px; line-height: 1.55; }
+      .lib-open .banner { margin: 0; }
+      .lib-open .btn.primary { padding: 10px 22px; font-size: 15px; white-space: nowrap; }
+      .lib-open-form { display: inline; }
+      .lib-hint { max-width: 900px; margin: 0; color: var(--muted); font-size: 13.5px; }
+      .meta-table.inputs { width: 100%; }
+      .meta-table.inputs th { width: auto; white-space: nowrap; font: 600 13px var(--mono); color: var(--text); padding-right: 24px; }
+      .meta-table.inputs td:last-child { width: 30%; }
+      .meta-table.inputs thead th { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-top: 0; padding: 0 24px 8px 0; }
+      .meta-table.inputs td { padding: 8px 24px 8px 0; }
+      .badge.current { color: var(--ok); background: rgba(61,220,151,.14); }
+      .steps-list .title { display: block; }
+      @media (max-width: 700px) { .lib-open { grid-template-columns: 1fr; } }
+
       @media (max-width: 900px) {
         .rs-header { grid-template-columns: auto 1fr; height: auto; padding: 8px 12px; row-gap: 6px; }
         .brand-tag, .nav-btn span { display: none; }
@@ -486,12 +574,86 @@ module Runsheets
           tick();
         });
 
+        // Library tree: filter box, and a keyboard cursor over the visible
+        // nodes. Filtering opens every folder and hides what does not
+        // match; clearing it puts the folders back the way they were.
+        const tree = document.getElementById('lib-tree-nav');
+        const lib  = tree ? (() => {
+          const filter  = document.getElementById('lib-filter');
+          const empty   = document.getElementById('lib-tree-empty');
+          const items   = [...tree.querySelectorAll('li')];
+          const folders = items.filter(li => li.querySelector(':scope > details'));
+          let saved = null, cursor = -1;
+          const visible = () => items.filter(li => !li.hidden && li.offsetParent !== null);
+          const node = li => li.querySelector(':scope > .node, :scope > details > summary');
+          const apply = () => {
+            const q = filter.value.trim().toLowerCase();
+            if (q && !saved) saved = new Map(folders.map(li => [li, li.querySelector(':scope > details').open]));
+            body.classList.toggle('filtering', !!q);
+            let shown = 0;
+            items.filter(li => li.classList.contains('tree-runbook')).forEach(li => {
+              const hit = !q || (li.dataset.search || '').includes(q);
+              li.hidden = !hit; if (hit) shown++;
+            });
+            [...folders].reverse().forEach(li => {
+              const details = li.querySelector(':scope > details');
+              if (q) { details.open = true; li.hidden = !li.querySelector('ul li.tree-runbook:not([hidden])'); }
+              else { li.hidden = false; if (saved) details.open = saved.get(li); }
+            });
+            if (!q) saved = null;
+            if (empty) empty.hidden = !(q && shown === 0);
+            setCursor(-1);
+          };
+          const setCursor = i => {
+            items.forEach(li => li.classList.remove('focus'));
+            const list = visible();
+            cursor = list.length ? Math.max(-1, Math.min(i, list.length - 1)) : -1;
+            if (cursor >= 0) { list[cursor].classList.add('focus'); node(list[cursor])?.scrollIntoView({ block: 'nearest' }); }
+          };
+          const move = delta => {
+            const list = visible();
+            const from = cursor >= 0 ? cursor : list.findIndex(li => li.classList.contains('active'));
+            setCursor(from + delta);
+          };
+          const select = () => {
+            const list = visible();
+            const li = cursor >= 0 ? list[cursor] : null;
+            if (!li) return;
+            const a = li.querySelector(':scope > .node, :scope > details > summary > .name');
+            if (a) location.href = a.href;
+          };
+          const toggle = open => {
+            const li = visible()[cursor];
+            const details = li?.querySelector(':scope > details');
+            if (details) details.open = open;
+          };
+          filter.addEventListener('input', apply);
+          filter.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); filter.blur(); move(1); }
+            if (e.key === 'Escape') { filter.value = ''; apply(); }
+          });
+          return { filter, move, select, toggle };
+        })() : null;
+
         // Keyboard shortcuts.
         const go = key => { const a = document.querySelector(`a[data-key="${key}"]`); if (a) location.href = a.href; };
+        const press = key => { const b = document.querySelector(`button[data-key="${key}"]`); if (b) b.click(); };
         document.addEventListener('keydown', e => {
           if (e.metaKey || e.ctrlKey || e.altKey) return;
           const tag = e.target.tagName;
           if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
+          if (lib) {
+            switch (e.key) {
+              case '/': e.preventDefault(); lib.filter.focus(); lib.filter.select(); return;
+              case 'ArrowDown': case 'j': e.preventDefault(); lib.move(1); return;
+              case 'ArrowUp':   case 'k': e.preventDefault(); lib.move(-1); return;
+              case 'ArrowRight': lib.toggle(true); return;
+              case 'ArrowLeft':  lib.toggle(false); return;
+              case 'Enter': lib.select(); return;
+              case 'o': press('o'); return;
+              case 'b': go('b'); return;
+            }
+          }
           switch (e.key) {
             case 'h': go('h'); break;
             case 'r': go('r'); break;

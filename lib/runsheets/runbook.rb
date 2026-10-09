@@ -29,14 +29,16 @@ module Runsheets
 
     attr_reader :dir, :slug, :main_path, :data, :landing, :steps, :extras, :inputs, :warnings, :loaded_at
 
-    # Load a runbook directory or a single-file runbook.
-    def self.load(path)
+    # Load a runbook directory or a single-file runbook. The slug names the
+    # runbook in run records and URLs: the directory or file name, unless
+    # +slug:+ says otherwise (a Library passes the path inside it).
+    def self.load(path, slug: nil)
       path = File.expand_path(path)
       if File.directory?(path)
-        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: File.basename(path), single_file: false)
+        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: slug || File.basename(path), single_file: false)
       elsif File.file?(path)
-        slug = File.basename(path, ".*")
-        slug = File.basename(File.dirname(path)) if slug == File.basename(MAIN_FILE, ".*")
+        slug ||= File.basename(path, ".*")
+        slug   = File.basename(File.dirname(path)) if slug == File.basename(MAIN_FILE, ".*")
         new(dir: File.dirname(path), main_path: path, slug:, single_file: true)
       else
         raise RunbookError, "no such runbook: #{path}"

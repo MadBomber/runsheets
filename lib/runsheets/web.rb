@@ -196,10 +196,13 @@ module Runsheets
     # -- library: choosing a runbook -----------------------------------
 
     # The library, or a 404 when the server was started on one runbook.
+    # Reading it picks up runbooks added, removed or edited since.
     before "/library*" do
       fail_with("runsheets was started on one runbook, not a directory of them", 404) unless library
+      library.refresh! if request.get? || request.head?
     end
 
+    # The tree with nothing selected: the root folder in the main pane.
     get "/library" do
       page { Pages.library(library, rs, settings.rs_token, nonce: it) }
     end
@@ -209,6 +212,13 @@ module Runsheets
       fail_with("no runbook named #{slug}", 404) unless library.find(slug)
       Web.open_runbook(slug)
       redirect "/"
+    end
+
+    # A runbook or a folder selected in the tree, by its path in the library.
+    get "/library/*" do
+      slug = params["splat"].first.to_s.delete_suffix("/")
+      fail_with("nothing named #{slug} in the library", 404) unless library.node(slug)
+      page { Pages.library(library, rs, settings.rs_token, nonce: it, selected: slug) }
     end
 
     # A destructive block without its typed confirmation: tell the page the

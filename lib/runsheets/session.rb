@@ -132,7 +132,7 @@ module Runsheets
     # Re-read the runbook from disk (its directory, or its one file). Used
     # after a stamp and whenever the files change (see #refresh_runbook!).
     def reload_runbook!
-      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir)
+      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug)
     end
 
     # Reload the runbook if any of its markdown files changed since it was
