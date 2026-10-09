@@ -29,17 +29,17 @@ class Tasks
   option :port, aliases: "-p", type: :numeric, default: 4567, desc: "Port to listen on"
   option :open, type: :boolean, default: true, desc: "Open the browser once the server is up"
   def serve(runbook = "examples/hello")
-    sh "bundle exec exe/runsheet --port #{options[:port]}#{' --open' if options[:open]} #{runbook}", exec: true
+    sh "bundle exec bin/runsheet --port #{options[:port]}#{' --open' if options[:open]} #{runbook}", exec: true
   end
 
   desc "Load every bundled example runbook and report authoring warnings"
   def check
     examples = Dir.glob("examples/*").select { |path| File.directory?(path) || path.end_with?(".md") }
-    examples.each { |path| sh "bundle exec exe/runsheet --check #{path}" }
+    examples.each { |path| sh "bundle exec bin/runsheet --check #{path}" }
   end
 
   desc "Scaffold a new runbook (a path ending in .md makes a single file)"
   def init(path)
-    sh "bundle exec exe/runsheet --init #{path}"
+    sh "bundle exec bin/runsheet --init #{path}"
   end
 end

@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Make the script runnable straight from a checkout (bin/ on PATH, no
+# `bundle exec`): put the sibling lib/ first on the load path. For an
+# installed gem this resolves to the gem's own lib/, which is already there.
+lib = File.expand_path("../lib", __dir__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+
+require "runsheets"
+
+exit Runsheets::CLI.run(ARGV)

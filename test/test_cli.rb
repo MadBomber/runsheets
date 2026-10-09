@@ -25,9 +25,19 @@ class TestCLI < Minitest::Test
   end
 
   def test_parse_errors
-    assert_raises(OptionParser::ParseError) { CLI.parse([]) }
     assert_raises(OptionParser::ParseError) { CLI.parse(%w[a b]) }
     assert_raises(OptionParser::ParseError) { CLI.parse(%w[--bogus a]) }
+    error = assert_raises(OptionParser::ParseError) { CLI.parse(%w[--init]) }
+    assert_match(/--init needs the path/, error.message)
+  end
+
+  def test_no_runbook_means_the_bundled_example
+    assert_equal RunsheetsTest::EXAMPLE_DIR, CLI::DEFAULT_RUNBOOK
+    assert_equal RunsheetsTest::EXAMPLE_DIR, CLI.parse([])[:runbook]
+    assert_equal RunsheetsTest::EXAMPLE_DIR, CLI.parse(%w[--check])[:runbook]
+    out = StringIO.new
+    assert_equal 0, CLI.run(["--check"], out:, err: StringIO.new)
+    assert_includes out.string, "Hello, runsheets: 6 steps, 0 warnings"
   end
 
   def test_help_and_version_return_nil

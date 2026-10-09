@@ -25,7 +25,8 @@ Requires Ruby 3.4 or newer.
 ## Run
 
 ```bash
-runsheet path/to/runbook         # serve on http://127.0.0.1:4567/
+runsheet                         # serve the bundled examples/hello on http://127.0.0.1:4567/
+runsheet path/to/runbook         # serve your own runbook
 runsheet --open path/to/runbook  # and open the browser
 runsheet --check path/to/runbook # load it, print authoring warnings, exit
 runsheet --init path/to/new      # scaffold a runbook (a .md path makes a single file)
@@ -188,7 +189,7 @@ docs in a repository. The landing page lists previous runs.
 ```bash
 bundle install
 bundle exec rake test
-bundle exec exe/runsheet --open examples/hello
+bundle exec bin/runsheet --open examples/hello
 ```
 
 The model (`Runbook`, `Step`, `Block`, `Renderer`, `Executor`,

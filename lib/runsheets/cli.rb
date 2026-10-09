@@ -10,6 +10,11 @@ module Runsheets
     PROGRAM  = "runsheet"
     DEFAULTS = { port: 4567, bind: "127.0.0.1", runs_dir: nil, open: false, check: false, init: false }.freeze
 
+    # The runbook served when none is named: the bundled hello example,
+    # found relative to this file so it works from a checkout and from an
+    # installed gem alike.
+    DEFAULT_RUNBOOK = File.expand_path("../../examples/hello", __dir__)
+
     # Parse argv into an options hash. Raises OptionParser::ParseError on bad
     # input; returns nil after printing help or the version.
     def self.parse(argv, defaults = DEFAULTS, out: $stdout)
@@ -18,11 +23,13 @@ module Runsheets
         opts.banner = <<~BANNER
           #{PROGRAM} #{VERSION} - executable runbooks in your browser
 
-          Usage: #{PROGRAM} [options] RUNBOOK
+          Usage: #{PROGRAM} [options] [RUNBOOK]
 
           RUNBOOK is a directory holding runbook.md and a steps/ directory of
           markdown files, or a single markdown file whose ## headings are the
-          steps. Fenced blocks marked `bash run`, `ruby run`, `bash destructive`
+          steps. Without one, the bundled example is served:
+          #{DEFAULT_RUNBOOK}
+          Fenced blocks marked `bash run`, `ruby run`, `bash destructive`
           or `bash background` get buttons; every execution is recorded under
           #{Runsheets.runs_dir}
 
@@ -47,9 +54,9 @@ module Runsheets
 
       rest = parser.parse(argv)
       raise OptionParser::ParseError, "too many arguments: #{rest.join(' ')}" if rest.size > 1
-      raise OptionParser::ParseError, "RUNBOOK is required" if rest.empty?
+      raise OptionParser::ParseError, "--init needs the path of the runbook to create" if options[:init] && rest.empty?
 
-      options[:runbook] = File.expand_path(rest.first)
+      options[:runbook] = rest.empty? ? DEFAULT_RUNBOOK : File.expand_path(rest.first)
       options
     end
 

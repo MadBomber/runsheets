@@ -52,6 +52,10 @@
 
 ### Changed
 
+- `runsheet` with no RUNBOOK serves the bundled `examples/hello`. `--init`
+  still needs an explicit path.
+- The `runsheet` executable lives in `bin/` (was `exe/`); `bin/console` and
+  `bin/setup` are gone, so `bin/` holds only what the gem installs.
 - Development: `.loki` task file for asgard, `.rubocop.yml`, `.reek.yml` and a
   Reek baseline under `.quality/`; the quality tools are in the Gemfile and
   `asgard quality` passes every gate. Ten methods were split to get under the

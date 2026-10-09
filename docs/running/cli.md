@@ -1,13 +1,15 @@
 # Command Line
 
 ```text
-Usage: runsheet [options] RUNBOOK
+Usage: runsheet [options] [RUNBOOK]
 ```
 
 `RUNBOOK` is either a runbook directory (it must contain `runbook.md`) or
 a single markdown file whose `##` headings are the steps (see
 [Directory Structure](../runbooks/structure.md#single-file-runbooks)). It
-is the only positional argument.
+is the only positional argument. Leave it out and the bundled
+`examples/hello` is served, which is the quickest way to see the tool;
+`--init` is the one mode that always needs a path.
 
 ## Options
 
@@ -114,5 +116,5 @@ tool and no record is left saying `running`.
 ## Running from a checkout
 
 ```bash
-bundle exec exe/runsheet --open examples/hello
+bundle exec bin/runsheet --open examples/hello
 ```

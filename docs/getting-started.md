@@ -25,7 +25,7 @@ runbook of your own.
     git clone https://github.com/MadBomber/runsheets
     cd runsheets
     bundle install
-    bundle exec exe/runsheet --help
+    bundle exec bin/runsheet --help
     ```
 
 Check it is on the path:
