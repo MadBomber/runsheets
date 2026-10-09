@@ -276,4 +276,65 @@ class TestSession < Minitest::Test
       assert_equal s.runbook.dir, s.working_directory(s.runbook.step("010-say-hello"))
     end
   end
+
+  def test_single_file_runbook_reloads_and_stamps_from_its_own_file
+    Dir.mktmpdir("runsheets-single") do |dir|
+      path = File.join(dir, "refresh.md")
+      File.write(path, "---\ntitle: One\nlast_verified: 2020-01-01\n---\n\n## Check\n<!-- kind: verify -->\n\n```bash run\necho ok\n```\n")
+      with_runs_dir do |root|
+        s = Runsheets::Session.new(runbook: Runsheets::Runbook.load(path), runs_root: root)
+        assert s.runbook.single_file?
+
+        sleep 0.01
+        File.write(path, File.read(path).sub("title: One", "title: Two"))
+        assert_equal "Two", s.refresh_runbook!.title, "an edited single file is reloaded"
+        assert s.runbook.single_file?
+
+        s.start_verification
+        s.execute("010-check-1").wait
+        s.finish_run
+        assert_equal Date.today, s.stamp!
+        assert_equal Date.today.to_s, s.runbook.last_verified.to_s, "reloaded after the stamp"
+        assert_includes File.read(path), "last_verified: #{Date.today}"
+      end
+    end
+  end
+
+  def test_finish_run_with_a_bad_status_changes_nothing
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run
+      bg = s.execute("035-keep-a-clock-running-1")
+      wait_for { bg.output.include?("still here") }
+      assert_raises(Runsheets::RunError) { s.finish_run(status: "bogus") }
+      assert s.active?
+      assert bg.running?, "a refused finish stops nothing"
+      s.finish_run(status: "abandoned")
+    end
+  end
+
+  def test_only_numbered_steps_can_be_marked
+    with_runs_dir do |root|
+      s = session(root)
+      s.start_run
+      assert_raises(Runsheets::RunError) { s.mark_step("runbook", status: "done") }
+      assert_raises(Runsheets::RunError) { s.mark_step("verify", status: "done") }
+      assert_raises(Runsheets::RunError) { s.mark_step("rollback", status: "done") }
+      assert_equal 0, s.run.steps_done
+    end
+  end
+
+  def test_abandon_if_active_stops_what_is_running_and_is_a_no_op_otherwise
+    with_runs_dir do |root|
+      s = session(root)
+      assert_same s, s.abandon_if_active
+      s.start_run
+      bg = s.execute("035-keep-a-clock-running-1")
+      wait_for { bg.output.include?("still here") }
+      s.abandon_if_active
+      refute s.active?
+      assert bg.stopped?
+      assert_equal "abandoned", s.run.status
+    end
+  end
 end

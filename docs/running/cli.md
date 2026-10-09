@@ -99,7 +99,17 @@ The default binds to loopback and the server only accepts requests whose
 is the whole multi-user story: there is none. Binding to another address
 exposes shell execution on your machine to whoever can reach that address,
 protected only by the session token embedded in the pages. Do not do it on
-a network you do not control.
+a network you do not control. The command prints a warning whenever the
+bind address is not loopback. A wildcard address (`0.0.0.0` or `::`)
+answers on every interface, so the `Host` check is turned off for it; a
+specific address accepts requests for itself and the loopback names.
+
+## Stopping
+
+Ctrl-C stops the server. If a run is active it is ended as `abandoned`,
+anything it left running (a `background` block, a block that was still
+going) is stopped, and the run record is written, so nothing outlives the
+tool and no record is left saying `running`.
 
 ## Running from a checkout
 

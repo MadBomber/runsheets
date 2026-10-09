@@ -70,14 +70,23 @@ module Runsheets
 
     def verifying? = active? && run.verify?
 
-    # End the run. Anything still running is stopped first.
+    # End the run. Anything still running is stopped first. The status is
+    # checked before anything is stopped, so a bad one changes nothing.
     def finish_run(status: "completed")
       @mutex.synchronize do
         raise RunError, "no active run" unless active?
+        raise RunError, "status must be one of #{RunRecord::FINAL_STATUSES.join(', ')}" unless RunRecord::FINAL_STATUSES.include?(status)
 
         stop_all
         run.finish!(status:)
       end
+    end
+
+    # Abandon the active run, if there is one, stopping whatever it left
+    # running. For shutdown paths; a no-op without an active run.
+    def abandon_if_active
+      finish_run(status: "abandoned") if active?
+      self
     end
 
     # --- last_verified write-back ------------------------------------------
@@ -117,10 +126,10 @@ module Runsheets
       self
     end
 
-    # Re-read the runbook directory. Used after a stamp and whenever the
-    # files change on disk (see #refresh_runbook!).
+    # Re-read the runbook from disk (its directory, or its one file). Used
+    # after a stamp and whenever the files change (see #refresh_runbook!).
     def reload_runbook!
-      @runbook = Runbook.load(runbook.dir)
+      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir)
     end
 
     # Reload the runbook if any of its markdown files changed since it was
@@ -234,11 +243,15 @@ module Runsheets
     def executions         = @executions.values
     def running_executions = executions.select(&:running?)
 
+    # Only numbered steps can be marked: the landing page and the extra
+    # documents are not part of the procedure's progress.
     def mark_step(slug, status:, note: nil)
       @mutex.synchronize do
         raise RunError, "no active run" unless active?
 
         step = runbook.step(slug) or raise RunError, "unknown step #{slug}"
+        raise RunError, "#{slug} is not a numbered step" unless step.position
+
         run.mark_step(step, status:, note: note.to_s.strip.empty? ? nil : note.strip)
         run.write!
       end

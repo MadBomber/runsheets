@@ -346,4 +346,99 @@ class TestWeb < Minitest::Test
     get "/runs/..%2F..%2Fetc"
     assert_equal 404, last_response.status
   end
+
+  def test_pages_carry_a_csp_nonce_and_are_not_cached
+    get "/"
+    csp = last_response.headers["Content-Security-Policy"]
+    nonce = csp[/script-src 'nonce-([^']+)'/, 1]
+    refute_nil nonce
+    assert_includes csp, "style-src 'nonce-#{nonce}'"
+    assert_includes csp, "object-src 'none'"
+    assert_includes last_response.body, "<script nonce=\"#{nonce}\">"
+    assert_includes last_response.body, "<style nonce=\"#{nonce}\">"
+    assert_equal "no-store", last_response.headers["Cache-Control"]
+
+    get "/"
+    refute_equal nonce, last_response.headers["Content-Security-Policy"][/nonce-([^']+)/, 1], "a nonce per response"
+
+    header "Accept", "text/html"
+    get "/steps/nope"
+    assert_equal 404, last_response.status
+    assert_match(/nonce-/, last_response.headers["Content-Security-Policy"], "error pages too")
+  end
+
+  def test_script_in_runbook_markdown_renders_without_the_nonce
+    with_runbook("runbook.md" => "---\ntitle: T\n---\n<script>document.title='x'</script>\n", "steps/010-a.md" => "hi\n") do |rb|
+      @session = Runsheets::Session.new(runbook: rb, runs_root: @runs_root, token: "tok")
+      Runsheets::Web.configure_for(@session)
+      get "/"
+      assert_includes last_response.body, "<script>document.title='x'</script>"
+      assert_equal 1, last_response.body.scan('<script nonce=').size
+    end
+  end
+
+  def test_files_route_does_not_follow_symlinks_out_of_the_runbook
+    Dir.mktmpdir("runsheets-link") do |dir|
+      FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
+      File.symlink("/etc/hosts", File.join(dir, "outside"))
+      File.symlink(File.join(dir, "runbook.md"), File.join(dir, "inside"))
+      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
+      Runsheets::Web.configure_for(@session)
+      get "/files/outside"
+      assert_equal 404, last_response.status
+      get "/files/inside"
+      assert last_response.ok?, "a link that stays inside the runbook is fine"
+      assert_includes last_response.body, "title: Hello, runsheets"
+    end
+  end
+
+  def test_permitted_hosts_follow_the_bind_address
+    assert Runsheets::Web.wildcard?("0.0.0.0")
+    assert Runsheets::Web.wildcard?("::")
+    refute Runsheets::Web.wildcard?("127.0.0.1")
+    assert Runsheets::Web.loopback?("127.0.0.1")
+    assert Runsheets::Web.loopback?("::1")
+    refute Runsheets::Web.loopback?("0.0.0.0")
+    refute Runsheets::Web.loopback?("192.168.1.5")
+
+    Runsheets::Web.configure_for(@session, bind: "0.0.0.0")
+    header "Host", "192.168.1.20"
+    get "/"
+    assert last_response.ok?, "a wildcard bind answers any host"
+
+    Runsheets::Web.configure_for(@session, bind: "192.168.1.5")
+    get "/"
+    assert_equal 403, last_response.status
+    header "Host", "192.168.1.5"
+    get "/"
+    assert last_response.ok?
+    header "Host", "localhost"
+    get "/"
+    assert last_response.ok?, "loopback names always work"
+  ensure
+    Runsheets::Web.configure_for(@session)
+  end
+
+  def test_finish_with_a_bad_status_is_refused_before_anything_stops
+    post "/run", { "_token" => "tok" }
+    with_token
+    post "/blocks/035-keep-a-clock-running-1/execute"
+    id = JSON.parse(last_response.body)["id"]
+    post "/run/finish", { "_token" => "tok", "status" => "bogus" }
+    assert_equal 422, last_response.status
+    assert @session.active?
+    get "/executions/#{id}"
+    assert_equal "running", JSON.parse(last_response.body)["state"]
+    post "/run/finish", { "_token" => "tok", "status" => "abandoned" }
+    assert_equal 302, last_response.status
+  end
+
+  def test_marking_a_document_that_is_not_a_step_is_refused
+    post "/run", { "_token" => "tok" }
+    post "/steps/runbook/mark", { "_token" => "tok", "status" => "done" }
+    assert_equal 422, last_response.status
+    post "/steps/verify/mark", { "_token" => "tok", "status" => "done" }
+    assert_equal 422, last_response.status
+    assert_equal 0, @session.run.steps_done
+  end
 end

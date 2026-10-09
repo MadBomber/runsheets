@@ -106,4 +106,27 @@ class TestCLI < Minitest::Test
     assert_equal 1, CLI.run(["--check", "/nonexistent/dir"], out: StringIO.new, err:)
     assert_includes err.string, "no such runbook"
   end
+
+  def test_shutdown_abandons_the_active_run_and_stops_its_processes
+    with_runs_dir do |root|
+      s = Runsheets::Session.new(runbook: example_runbook, runs_root: root)
+      out = StringIO.new
+      CLI.shutdown(s, out:)
+      assert_empty out.string, "nothing to do without a run"
+
+      s.start_run
+      bg = s.execute("035-keep-a-clock-running-1")
+      wait_for { bg.output.include?("still here") }
+      CLI.shutdown(s, out:)
+      refute s.active?
+      assert bg.stopped?
+      assert_equal "abandoned", JSON.parse(File.read(File.join(s.run.dir, "run.json")))["status"]
+      assert_includes out.string, "abandoned run #{s.run.id}"
+    end
+  end
+
+  def test_bind_warning_mentions_the_host_check
+    assert_includes CLI.bind_warning("0.0.0.0"), "Host header check is off"
+    assert_includes CLI.bind_warning("192.168.1.5"), "Only requests with this address"
+  end
 end

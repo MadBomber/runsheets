@@ -9,14 +9,21 @@ module Runsheets
   #
   # Security posture:
   # - Host header must be a loopback name or the bind address (rack-protection
-  #   HostAuthorization), which defeats DNS rebinding.
+  #   HostAuthorization), which defeats DNS rebinding. A wildcard bind cannot
+  #   enumerate its hosts, so the check is off for one; the CLI warns.
   # - Every non-GET request must carry the session token, either in the
   #   X-Runsheets-Token header (fetch) or the _token form field. A page on
   #   another origin cannot read the token or send the custom header without
   #   a CORS preflight this app never answers.
+  # - Every page carries a Content-Security-Policy whose script and style
+  #   sources are a per-response nonce held only by the page's own inline
+  #   script and stylesheet. Raw HTML in runbook markdown renders, but a
+  #   <script> in it does not run, so a runbook cannot drive the token.
   class Web < Sinatra::Base
-    OUTPUT_TAIL = 256 * 1024
-    RUN_ID      = /\A[\w.-]+\z/
+    OUTPUT_TAIL    = 256 * 1024
+    RUN_ID         = /\A[\w.-]+\z/
+    LOOPBACK_HOSTS = ["localhost", IPAddr.new("127.0.0.1"), IPAddr.new("::1")].freeze
+    WILDCARDS      = %w[0.0.0.0 :: [::]].freeze
 
     set :rs_session, nil
     set :static, false
@@ -25,31 +32,77 @@ module Runsheets
     set :dump_errors, false
     set :logging, false
     set :server, %w[puma webrick]
-    set :host_authorization, { permitted_hosts: ["localhost", IPAddr.new("127.0.0.1"), IPAddr.new("::1")] }
+    set :rs_bind, "127.0.0.1"
+    # The loopback names are always permitted. Anything the bind address
+    # adds is decided per request (see .bind_allows?), because the
+    # middleware stack captures this hash the first time the app is built.
+    set :host_authorization, { permitted_hosts: LOOPBACK_HOSTS.dup, allow_if: ->(env) { Web.bind_allows?(env) } }
 
-    # Wire a Session into the app and restrict permitted hosts to the bind
-    # address. Returns the class for chaining.
+    # Wire a Session into the app and record the bind address the Host
+    # check should honour. Returns the class for chaining.
     def self.configure_for(session, bind: "127.0.0.1", port: 4567)
       set :rs_session, session
       set :bind, bind
       set :port, port
-      hosts = ["localhost", IPAddr.new("127.0.0.1"), IPAddr.new("::1")]
-      hosts << (IPAddr.new(bind) rescue bind) if bind && !hosts.include?(bind)
-      set :host_authorization, { permitted_hosts: hosts.uniq }
+      set :rs_bind, bind
       self
     end
 
-    # Resolve a relative path inside root. Returns nil when it escapes root,
-    # names a hidden entry, or is not a regular file.
+    # Does the bind address let this request's Host through, beyond the
+    # loopback names? A non-loopback bind permits its own address. A
+    # wildcard bind answers on every interface, so no host list can be
+    # right and the check is off; the CLI warns about that.
+    def self.bind_allows?(env)
+      bind = settings.rs_bind
+      return true if wildcard?(bind)
+      return false if loopback?(bind)
+
+      same_host?(Rack::Request.new(env).host, bind)
+    rescue StandardError
+      false
+    end
+
+    def self.same_host?(host, bind)
+      return true if host == bind
+
+      IPAddr.new(host.to_s) == IPAddr.new(bind.to_s)
+    rescue IPAddr::Error
+      false
+    end
+
+    def self.wildcard?(bind) = WILDCARDS.include?(bind.to_s)
+
+    def self.loopback?(bind)
+      return true if bind.nil? || bind == "localhost"
+
+      IPAddr.new(bind.to_s).loopback?
+    rescue IPAddr::Error
+      false
+    end
+
+    # Resolve a relative path inside root. Returns nil when it escapes root
+    # (through ".." or a symlink), names a hidden entry, or is not a
+    # regular file. The returned path is the real path.
     def self.resolve_file(root, relpath)
       parts = relpath.to_s.split("/").reject { it.empty? || it == "." }
       return nil if parts.any? { it.start_with?(".") }
 
-      root = File.expand_path(root)
+      root = File.realpath(root)
       path = File.expand_path(parts.join("/"), root)
       return nil unless path.start_with?("#{root}/") && File.file?(path)
 
-      path
+      real = File.realpath(path)
+      real.start_with?("#{root}/") ? real : nil
+    rescue SystemCallError
+      nil
+    end
+
+    # A fresh CSP nonce for one response.
+    def self.nonce = SecureRandom.base64(16)
+
+    def self.csp(nonce)
+      "default-src 'none'; script-src 'nonce-#{nonce}'; style-src 'nonce-#{nonce}'; style-src-attr 'unsafe-inline'; " \
+        "img-src 'self' data: https: http:; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
     end
 
     helpers do
@@ -69,13 +122,18 @@ module Runsheets
         JSON.generate(data)
       end
 
-      def html(text)
+      # Render a page: yields the nonce the page must put on its inline
+      # script and style, and sets the headers that go with it. Pages carry
+      # the session token, so they are never cached.
+      def page
+        nonce = Web.nonce
+        headers "Content-Security-Policy" => Web.csp(nonce), "Cache-Control" => "no-store"
         content_type :html
-        text
+        yield nonce
       end
 
       def fail_with(message, status)
-        halt status, (wants_json? ? json({ error: message }, status:) : html(Pages.error(rs, message, status)))
+        halt status, (wants_json? ? json({ error: message }, status:) : page { Pages.error(rs, message, status, nonce: it) })
       end
 
       def execution_json(execution)
@@ -122,12 +180,12 @@ module Runsheets
     # -- pages ----------------------------------------------------------
 
     get "/" do
-      html Pages.landing(rs)
+      page { Pages.landing(rs, nonce: it) }
     end
 
     get "/steps/:slug" do
       step = runbook.step(params["slug"]) or fail_with("no step named #{params['slug']}", 404)
-      html Pages.step(rs, step)
+      page { Pages.step(rs, step, nonce: it) }
     end
 
     get "/files/*" do
@@ -137,12 +195,12 @@ module Runsheets
 
     get "/verify" do
       fail_with("this runbook has no verify steps or verify.md", 404) if runbook.verify_documents.empty?
-      html Pages.verify(rs)
+      page { Pages.verify(rs, nonce: it) }
     end
 
     get "/run" do
       record = rs.run || rs.history.first or fail_with("no run has been started", 404)
-      html Pages.run(rs, record)
+      page { Pages.run(rs, record, nonce: it) }
     end
 
     get "/runs/:id" do
@@ -150,7 +208,7 @@ module Runsheets
       fail_with("bad run id", 404) unless id.match?(RUN_ID)
       dir = File.join(rs.runs_root, runbook.slug, id)
       fail_with("no run #{id}", 404) unless File.file?(File.join(dir, "run.json"))
-      html Pages.run(rs, RunRecord.load(dir))
+      page { Pages.run(rs, RunRecord.load(dir), nonce: it) }
     end
 
     # -- run lifecycle --------------------------------------------------
@@ -164,7 +222,9 @@ module Runsheets
     end
 
     post "/run/finish" do
-      rs.finish_run(status: params["status"] || "completed")
+      status = params["status"] || "completed"
+      fail_with("status must be completed or abandoned", 422) unless RunRecord::FINAL_STATUSES.include?(status)
+      rs.finish_run(status:)
       redirect "/"
     end
 
@@ -182,6 +242,7 @@ module Runsheets
 
     post "/steps/:slug/mark" do
       step = runbook.step(params["slug"]) or fail_with("no step named #{params['slug']}", 404)
+      fail_with("#{step.slug} is not a numbered step", 422) unless step.position
       status = params["status"]
       fail_with("status must be done or skipped", 422) unless %w[done skipped].include?(status)
       rs.mark_step(step.slug, status:, note: params["note"])

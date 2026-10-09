@@ -19,7 +19,12 @@ Requests without a valid token get **403** with a JSON body on the
 execution endpoints and an HTML error page elsewhere.
 
 The `Host` header must be `localhost`, `127.0.0.1`, `::1` or the bind
-address, or the request gets **403** before routing.
+address, or the request gets **403** before routing. (For a wildcard bind
+the check is off; see [the CLI page](../running/cli.md#about---bind).)
+
+Every HTML page is sent with `Cache-Control: no-store` and a
+`Content-Security-Policy` whose script and style sources are a nonce unique
+to that response; the page's own inline script and stylesheet carry it.
 
 ```bash
 B=http://127.0.0.1:4567
@@ -59,7 +64,8 @@ curl -X POST --data-urlencode "_token=$TOKEN" \
 
 Form fields: `_token`, `status` (`completed`, default, or `abandoned`).
 Anything still running is stopped first. Responds **303** to the landing
-page, or **409** with no active run.
+page; **422** for another status, checked before anything is stopped;
+**409** with no active run.
 
 ### `POST /run/stamp`
 
@@ -78,7 +84,8 @@ Hides the stamp offer for the last run. Form field: `_token`. Responds
 
 Form fields: `_token`, `status` (`done` or `skipped`), `note` (optional).
 Responds **303** to the next step or the landing page; **422** for another
-status; **409** with no active run.
+status, or for a slug that is not a numbered step (the landing page,
+`verify` and `rollback` cannot be marked); **409** with no active run.
 
 ## Execution
 
@@ -187,7 +194,7 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e/stop
 | 403 | Missing or invalid token on a non-GET request, or a non-loopback `Host`. |
 | 404 | Unknown step, run, execution or file. |
 | 409 | The operation is not allowed in the current run state (`Runsheets::RunError`). |
-| 422 | Invalid step status. |
+| 422 | Invalid step or finish status, or a mark on a document that is not a numbered step. |
 | 428 | A destructive block needs its confirmation code (`Runsheets::Session::ConfirmationRequired`); the body carries `challenge`. |
 | 500 | The runbook failed to load (`Runsheets::RunbookError`). |
 | 503 | The server has no runbook configured. |

@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Single-file runbooks are reloaded from their own file. Before, a session
+  reloaded the containing directory, so edits to a single-file runbook were
+  never picked up, and stamping `last_verified` into one failed with a 500
+  after the file had already been written.
+- Stopping the server (Ctrl-C) ends the active run as `abandoned` and stops
+  everything it left running. Before, background blocks outlived the server
+  and the run record stayed `running` forever.
+- Every page carries a Content-Security-Policy with a per-response nonce on
+  its own inline script and stylesheet, and `Cache-Control: no-store`. Raw
+  HTML in runbook markdown still renders, but a `<script>` in it no longer
+  runs, so a runbook cannot use the page's session token to execute its own
+  blocks or answer its own destructive confirmation.
+- `/files/*` no longer follows a symbolic link out of the runbook directory.
+- `--bind` to a wildcard address (`0.0.0.0`, `::`) works. The Host check is
+  off for a wildcard bind, since no host list can be right, and the CLI warns
+  on any non-loopback bind. A specific non-loopback address permits itself.
+- `POST /run/finish` with a status other than `completed` or `abandoned` is
+  refused with 422 before anything is stopped. Before, every running
+  execution was stopped and then the request failed with 500, leaving the
+  run active.
+- Only numbered steps can be marked done or skipped (422 otherwise). Marking
+  the landing page or the `verify`/`rollback` documents used to count toward
+  "every step done", so a stamp could be offered without doing the steps.
+- A step whose `timeout` is not a positive integer warns and uses the default
+  instead of timing out at once.
+- `Pages` requires `rack/utils` itself, so it works without `Web` loaded;
+  `step.kind` is HTML-escaped in badges.
+
 ### Added (milestone 4: packaging)
 
 - Single-file runbooks: `runsheet path/to/file.md` reads one markdown

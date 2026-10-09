@@ -17,6 +17,7 @@ module Runsheets
   class RunRecord
     TIMESTAMP       = "%Y%m%dT%H%M%S"
     STATUSES        = %w[running completed abandoned].freeze
+    FINAL_STATUSES  = %w[completed abandoned].freeze
     KINDS           = %w[run verify].freeze
     TRANSCRIPT_TAIL = 64 * 1024
 
@@ -136,7 +137,7 @@ module Runsheets
     end
 
     def finish!(status: "completed", at: Time.now)
-      raise ArgumentError, "unknown status #{status}" unless STATUSES.include?(status)
+      raise ArgumentError, "unknown status #{status}" unless FINAL_STATUSES.include?(status)
 
       @status      = status
       @finished_at = at

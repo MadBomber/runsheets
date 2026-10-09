@@ -43,7 +43,15 @@ module Runsheets
     def verify?    = kind == "verify"
 
     def destructive? = data["destructive"] == true || blocks.any?(&:destructive?)
-    def timeout      = (data["timeout"] || DEFAULT_TIMEOUT).to_i
+
+    # The step's timeout in seconds. An invalid value is warned about (see
+    # #validate) and the default used, rather than timing out at once.
+    def timeout
+      value = data["timeout"]
+      value.nil? || !timeout_valid? ? DEFAULT_TIMEOUT : value.to_i
+    end
+
+    def timeout_valid? = data["timeout"].nil? || (data["timeout"].to_s.match?(/\A\d+\z/) && data["timeout"].to_i.positive?)
     def cwd          = data["cwd"]
     def number       = slug[/\A\d+/]
 
@@ -67,7 +75,7 @@ module Runsheets
       warnings = blocks.flat_map { |block| block.warnings.map { "block #{block.id}: #{it}" } }
       warnings << "kind '#{kind}' is not one of #{KINDS.join(', ')}" unless KINDS.include?(kind)
       warnings << "automated step has no executable block" if automated? && executable_blocks.empty?
-      warnings << "timeout must be a positive number of seconds" unless timeout.positive?
+      warnings << "timeout must be a positive number of seconds (using #{DEFAULT_TIMEOUT})" unless timeout_valid?
       warnings
     end
   end

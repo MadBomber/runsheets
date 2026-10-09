@@ -29,6 +29,11 @@ the address given to `--bind`. Anything else is answered with 403. This
 defeats DNS rebinding, where a hostile site points its own domain at
 127.0.0.1 to reach a local server from the browser with a permitted origin.
 
+A wildcard bind (`0.0.0.0` or `::`) answers on every interface, so no host
+list can be right: the check is off for one, and the CLI says so when it
+starts. A specific non-loopback address permits itself as well as the
+loopback names.
+
 ### Session token
 
 When the server starts it generates a random 128-bit token. Every page
@@ -47,6 +52,19 @@ operator happens to have open.
 
 Sinatra's rack-protection middleware is left enabled as well, including its
 `Origin` check on non-GET requests.
+
+### Content Security Policy
+
+The token in the page guards against other origins. It would be no guard
+against the runbook itself: markdown may contain raw HTML, kramdown renders
+it as written, and a runbook cloned from a repository is not necessarily
+trusted. So every page is sent with a `Content-Security-Policy` whose
+script and style sources are a nonce generated for that one response. The
+page's own inline script and stylesheet carry the nonce; nothing else on
+the page can run script, load a frame or plugin, or submit a form
+elsewhere. A `<script>` in a step still renders as text in the HTML, and
+does nothing. Pages are also sent with `Cache-Control: no-store`, since
+they carry the token.
 
 ### Opt-in execution
 
@@ -68,7 +86,9 @@ escalation contact. The server refuses to run one until the request carries
 a four-character code it issued for that block (HTTP 428 carries the code;
 the page prompts for it). The code is random rather than the runbook slug
 so it cannot become muscle memory, it is checked server-side so a script
-driving the API cannot skip it, and it is retired once used. It is a guard
+driving the API from outside the page cannot skip it (script inside the
+page is kept out by the Content Security Policy), and it is retired once
+used. It is a guard
 against a reflexive click, not against a hostile operator, who could run
 the command in a terminal anyway. The record marks the execution as
 confirmed.
@@ -92,14 +112,18 @@ transformed forms; see [Inputs and Secrets](../runbooks/inputs.md#redaction).
 Every execution is its own process group. Timeouts, operator stops and the
 end of the run kill the group, so a block cannot leave a child behind. The
 group is created at spawn, so nothing runsheets kills can reach the
-operator's shell or the server.
+operator's shell or the server. When the server itself stops (Ctrl-C, or a
+crash on the way up), an active run is ended as `abandoned` and whatever it
+left running is stopped the same way, so a `background` block cannot
+outlive the tool.
 
 ### File serving
 
 `/files/*` serves only regular files inside the runbook directory. Path
-components are normalised and checked against the real root; hidden entries
-(anything starting with `.`) are never served, which keeps `.git`, `.env`
-and editor state out of reach.
+components are normalised and checked against the real root, and symbolic
+links are resolved and must land inside it too; hidden entries (anything
+starting with `.`) are never served, which keeps `.git`, `.env` and editor
+state out of reach.
 
 ### No writes to the runbook
 

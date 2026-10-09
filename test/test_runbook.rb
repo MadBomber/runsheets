@@ -141,4 +141,16 @@ class TestRunbook < Minitest::Test
       assert_equal "Heading Title", rb.step("020-x").title
     end
   end
+
+  def test_invalid_timeout_warns_and_falls_back_to_the_default
+    files = { "runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "---\ntimeout: abc\n---\n```bash run\ntrue\n```\n",
+              "steps/020-b.md" => "---\ntimeout: 0\n---\n```bash run\ntrue\n```\n", "steps/030-c.md" => "---\ntimeout: 42\n---\n```bash run\ntrue\n```\n" }
+    with_runbook(files) do |rb|
+      a, b, c = rb.steps
+      assert_equal Runsheets::Step::DEFAULT_TIMEOUT, a.timeout
+      assert_equal Runsheets::Step::DEFAULT_TIMEOUT, b.timeout
+      assert_equal 42, c.timeout
+      assert_equal 2, rb.warnings.grep(/timeout must be a positive number/).size
+    end
+  end
 end

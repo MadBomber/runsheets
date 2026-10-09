@@ -35,9 +35,12 @@ detectors:
   DuplicateMethodCall:
     max_calls: 3
 
-  # Execution.new takes one keyword per field it records.
+  # Execution.new takes one keyword per field it records. Pages.layout takes
+  # the page frame (title, body, kind, step) plus the CSP nonce.
   LongParameterList:
     max_params: 5
+    exclude:
+      - "Runsheets::Pages#self.layout"
 
   # Data-holding classes: Execution tracks state, pid, timing and files.
   TooManyInstanceVariables:

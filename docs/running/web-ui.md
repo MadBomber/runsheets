@@ -216,5 +216,5 @@ poll endpoints) with the reason:
 | 403 | Missing session token on a POST, or a `Host` header that is not loopback. |
 | 404 | Unknown step, run, execution, or file. |
 | 409 | No active run, a run already active, block not executable, blank input referenced, unknown execution to stop, acknowledging a block that is not `terminal`. |
-| 422 | A step mark with a status other than `done` or `skipped`. |
+| 422 | A step mark with a status other than `done` or `skipped`, a mark on a document that is not a numbered step, or a finish with a status other than `completed` or `abandoned`. |
 | 428 | A destructive block was asked to run without its confirmation code. The page handles this by prompting for the code. |

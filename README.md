@@ -162,11 +162,16 @@ docs in a repository. The landing page lists previous runs.
 
 ## Security posture
 
-- Binds to loopback only. There is no multi-user story.
+- Binds to loopback by default. There is no multi-user story. `--bind` to
+  another address is possible, warns, and is a bad idea off a network you
+  control.
 - Executes only blocks whose info string opts in. Everything else is inert.
 - Every state-changing request needs a per-process token that only a page
   served by this process knows, and the `Host` header must be a loopback
   name. Together these stop a page on another origin from driving the tool.
+- Every page sets a Content-Security-Policy that lets only the page's own
+  script run. Raw HTML in a runbook renders; script in it does not, so a
+  runbook cannot drive the tool either.
 - Destructive blocks show the blast radius and need a confirmation code the
   server issues per block, checked server-side.
 - Secret inputs reach the child process but never the run record. Captured
@@ -175,6 +180,8 @@ docs in a repository. The landing page lists previous runs.
 - The tool writes nothing inside the runbook directory, except the
   `last_verified` line of `runbook.md`, offered after a run that verified
   the runbook and written only when asked.
+- Stopping the server ends an active run as abandoned and stops whatever it
+  left running.
 
 ## Development
 

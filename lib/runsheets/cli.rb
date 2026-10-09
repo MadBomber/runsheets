@@ -69,7 +69,7 @@ module Runsheets
         return runbook.warnings.empty? ? 0 : 1
       end
 
-      serve(runbook, options, out:)
+      serve(runbook, options, out:, err:)
       0
     rescue Errno::EADDRINUSE
       err.puts "#{PROGRAM}: port #{options[:port]} on #{options[:bind]} is already in use; pick another with --port"
@@ -79,10 +79,12 @@ module Runsheets
       1
     end
 
-    def self.serve(runbook, options, out: $stdout)
+    def self.serve(runbook, options, out: $stdout, err: $stderr)
+      bind, port = options.values_at(:bind, :port)
       session = Session.new(runbook:)
-      Web.configure_for(session, bind: options[:bind], port: options[:port])
-      url = "http://#{options[:bind]}:#{options[:port]}/"
+      Web.configure_for(session, bind:, port:)
+      url = "http://#{bind}:#{port}/"
+      err.puts bind_warning(bind) unless Web.loopback?(bind)
 
       out.puts <<~INFO
         #{PROGRAM} #{VERSION}
@@ -95,6 +97,27 @@ module Runsheets
       Web.run! do
         open_browser(url) if options[:open]
       end
+    ensure
+      shutdown(session, out:) if session
+    end
+
+    # When the server stops (Ctrl-C, or an error), end the active run as
+    # abandoned so nothing it started is left running and its record does
+    # not stay "running" forever.
+    def self.shutdown(session, out: $stdout)
+      return unless session.active?
+
+      run = session.run
+      session.abandon_if_active
+      out.puts "#{PROGRAM}: abandoned run #{run.id}; stopped what it left running"
+    end
+
+    def self.bind_warning(bind)
+      <<~WARN.chomp
+        #{PROGRAM}: warning: binding to #{bind}, which is not a loopback address.
+        Anyone who can reach this address and guess the session token can run blocks as you.
+        #{Web.wildcard?(bind) ? 'The Host header check is off for a wildcard bind.' : 'Only requests with this address in the Host header are accepted.'}
+      WARN
     end
 
     def self.open_browser(url)

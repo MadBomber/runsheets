@@ -1,8 +1,14 @@
 # frozen_string_literal: true
 
+require "rack/utils"
+
 module Runsheets
   # Pure functions that build the HTML pages from a Session. No HTTP here, so
   # every page can be rendered and inspected in a test.
+  #
+  # Every page function takes +nonce:+, the Content-Security-Policy nonce the
+  # web layer put in the response header; the page's one inline script and
+  # stylesheet carry it, and nothing else on the page can run script.
   module Pages
     APP_NAME = "runsheets"
     APP_FULL = "executable runbooks"
@@ -27,8 +33,9 @@ module Runsheets
     # Layout
     # ------------------------------------------------------------------
 
-    def self.layout(session, title:, body:, kind:, step: nil)
+    def self.layout(session, title:, body:, kind:, step: nil, nonce: nil)
       runbook = session.runbook
+      nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
       <<~HTML
         <!DOCTYPE html>
         <html lang="en">
@@ -38,7 +45,7 @@ module Runsheets
           <meta name="rs-token" content="#{h session.token}">
           <meta name="rs-runbook" content="#{h runbook.slug}">
           <title>#{h title} · #{h runbook.title}</title>
-          <style>#{Assets.stylesheet}</style>
+          <style#{nonce_attr}>#{Assets.stylesheet}</style>
         </head>
         <body class="kind-#{kind}">
           #{header(session, step:, kind:)}
@@ -52,7 +59,7 @@ module Runsheets
             <span>#{h APP_NAME} · #{h APP_FULL} · #{h runbook.dir}</span>
             <span class="keys"><kbd>h</kbd> home <kbd>←</kbd><kbd>→</kbd> prev/next step <kbd>s</kbd> sidebar</span>
           </footer>
-          <script>#{Assets.javascript}</script>
+          <script#{nonce_attr}>#{Assets.javascript}</script>
         </body>
         </html>
       HTML
@@ -206,12 +213,12 @@ module Runsheets
     # Landing page
     # ------------------------------------------------------------------
 
-    def self.landing(session)
+    def self.landing(session, nonce: nil)
       runbook = session.runbook
       body = [page_head(runbook), warnings_banner(runbook.warnings), meta_table(runbook),
               run_panel(session), steps_list(session), history_panel(session),
               "<article class=\"markdown-body\">#{runbook.preamble_html}</article>"].join("\n")
-      layout(session, title: "Home", body:, kind: :landing)
+      layout(session, title: "Home", body:, kind: :landing, nonce:)
     end
 
     def self.page_head(runbook)
@@ -354,7 +361,7 @@ module Runsheets
 
       rows = runbook.steps.map do |step|
         status = step_mark(session, step)
-        badges = ["<span class=\"badge #{step.kind}\">#{step.kind}</span>"]
+        badges = ["<span class=\"badge #{h step.kind}\">#{h step.kind}</span>"]
         badges << '<span class="badge destructive">destructive</span>' if step.destructive?
         <<~LI
           <li>
@@ -422,7 +429,7 @@ module Runsheets
     # Step page
     # ------------------------------------------------------------------
 
-    def self.step(session, step)
+    def self.step(session, step, nonce: nil)
       body = <<~HTML
         <div class="page-head">
           <h1>#{"<span class=\"num\">#{h(step.number || step.position)}</span>" if step.position} #{h step.title}</h1>
@@ -435,11 +442,11 @@ module Runsheets
         #{step_nav(session.runbook, step)}
         <script type="application/json" id="rs-prior">#{prior_executions_json(session, step)}</script>
       HTML
-      layout(session, title: step.title, body:, kind: :step, step:)
+      layout(session, title: step.title, body:, kind: :step, step:, nonce:)
     end
 
     def self.step_badges(step)
-      badges = ["<span class=\"badge #{step.kind}\">#{step.kind}</span>"]
+      badges = ["<span class=\"badge #{h step.kind}\">#{h step.kind}</span>"]
       badges << '<span class="badge destructive">destructive</span>' if step.destructive?
       badges << "<span class=\"badge\">timeout #{step.timeout}s</span>" if step.executable_blocks.any?
       badges
@@ -525,7 +532,7 @@ module Runsheets
     # Checks page: every verify document on one page
     # ------------------------------------------------------------------
 
-    def self.verify(session)
+    def self.verify(session, nonce: nil)
       runbook = session.runbook
       docs    = runbook.verify_documents
       checks  = runbook.verify_blocks.size
@@ -559,7 +566,7 @@ module Runsheets
         #{sections.join}
         <script type="application/json" id="rs-prior">#{prior_executions_json(session, *docs)}</script>
       HTML
-      layout(session, title: "Checks", body:, kind: :verify)
+      layout(session, title: "Checks", body:, kind: :verify, nonce:)
     end
 
     def self.output_for(run, live, hash)
@@ -573,7 +580,7 @@ module Runsheets
     # Runsheet (run record) page and errors
     # ------------------------------------------------------------------
 
-    def self.run(session, record)
+    def self.run(session, record, nonce: nil)
       html = Renderer.render(record.transcript, id_prefix: "run").html
       body = <<~HTML
         <div class="page-head">
@@ -583,7 +590,7 @@ module Runsheets
         #{drift_panel(session, record)}
         <article class="markdown-body">#{html}</article>
       HTML
-      layout(session, title: "Runsheet #{record.id}", body:, kind: :run)
+      layout(session, title: "Runsheet #{record.id}", body:, kind: :run, nonce:)
     end
 
     # Blocks whose code has changed, or that are gone, since this run.
@@ -613,7 +620,7 @@ module Runsheets
       HTML
     end
 
-    def self.error(session, message, status)
+    def self.error(session, message, status, nonce: nil)
       body = <<~HTML
         <div class="page-head">
           <h1>#{status}</h1>
@@ -621,7 +628,7 @@ module Runsheets
           <p><a class="btn" href="/">#{ICONS[:home]} Home</a></p>
         </div>
       HTML
-      layout(session, title: "Error #{status}", body:, kind: :error)
+      layout(session, title: "Error #{status}", body:, kind: :error, nonce:)
     end
   end
 end
