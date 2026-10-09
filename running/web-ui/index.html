@@ -909,6 +909,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#choosing-a-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a runbook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#landing-page" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1425,6 +1436,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#choosing-a-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a runbook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#landing-page" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1660,6 +1682,8 @@ a footer with the keyboard shortcuts.</p>
   on pages that are not steps.</li>
 <li><strong>Run pill</strong>: grey "no active run", or green with the run id when a run is
   active. The green pill links to the live run record.</li>
+<li><strong>Runbooks</strong> appears when the server was started on a directory of
+  runbooks, and leads back to the chooser.</li>
 </ul>
 <h2 id="sidebar">Sidebar<a class="headerlink" href="#sidebar" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1709,6 +1733,14 @@ in the browser.</p>
 <p>A manual mark always wins over the execution-derived mark, so a step whose
 block failed but was then marked done shows <code>✓</code>. The failure is still in
 the record.</p>
+<h2 id="choosing-a-runbook">Choosing a runbook<a class="headerlink" href="#choosing-a-runbook" title="Permanent link">&para;</a></h2>
+<p>Started on a directory of runbooks (<code>runsheets ops/runbooks</code>), the server
+opens on the chooser at <code>/library</code>: one panel per runbook with its title,
+whether it is a single file or a directory, its step count, tags, authoring
+warnings, and the <code>when_to_use</code> text. <strong>Open</strong> serves that runbook; every
+other page redirects here until one is open. A runbook that does not load
+is listed with the error instead of a button. While a run is active the
+buttons are disabled: finish or abandon the run, then switch.</p>
 <h2 id="landing-page">Landing page<a class="headerlink" href="#landing-page" title="Permanent link">&para;</a></h2>
 <p>In order:</p>
 <ol>
@@ -1850,6 +1882,10 @@ drifting away from it.</p>
 <tr>
 <td><span class="keys"><kbd class="key-h">H</kbd></span></td>
 <td>Home</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-r">R</kbd></span></td>
+<td>Runbooks (the chooser, when started on a directory of runbooks)</td>
 </tr>
 <tr>
 <td><span class="keys"><kbd class="key-arrow-left">Left</kbd></span> / <span class="keys"><kbd class="key-arrow-right">Right</kbd></span></td>

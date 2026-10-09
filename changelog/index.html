@@ -1436,6 +1436,12 @@
 </ul>
 <h3 id="added-milestone-4-packaging">Added (milestone 4: packaging)<a class="headerlink" href="#added-milestone-4-packaging" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A directory of runbooks (<code>Runsheets::Library</code>): <code>runsheets DIR</code> where DIR
+  holds single-file runbooks and runbook directories side by side opens on a
+  chooser page (<code>/library</code>) listing them with title, kind, steps, tags and
+  warnings; opening one serves it, and a Runbooks button in the header goes
+  back to choose another. Switching is refused while a run is active.
+  <code>--check</code> on such a directory checks every runbook.</li>
 <li>Layered settings through <code>myway_config</code> (<code>Runsheets::Config</code>): the command
   line beats <code>RUNSHEETS_*</code> environment variables (<code>RUNSHEETS_PORT</code>,
   <code>RUNSHEETS_BIND</code>, <code>RUNSHEETS_RUNS_DIR</code>, <code>RUNSHEETS_OPEN</code>, <code>RUNSHEETS_CHECK</code>,
