@@ -1528,18 +1528,21 @@ on Sinatra and is tested in isolation.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  step.rb                     one markdown file: front matter, body, html, blocks
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  single_file.rb              splits a one-file runbook into preamble and ## sections
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  runbook.rb                  a directory or a single file: steps, verify, rollback; last_verified stamp
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  diff.rb                     line diff for drift between a record and the runbook
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  redactor.rb                 replaces secret values in captured output
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  execution.rb                one execution: state, pid, files, timing
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  executor.rb                 spawns, pumps output through the redactor, reaps, times out, stops
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  run_record.rb               run.json, run.md, blocks/; list, load, verdicts, drift
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  session.rb                  the active run, inputs, live executions, confirmation codes, stamp offer
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  web.rb                      Sinatra routes and the security checks
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  pages.rb                    pure functions that build the HTML
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  assets.rb                   inline CSS and JavaScript
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  cli.rb                      option parsing and the exe entry point
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>bin/runsheets
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>examples/hello/               a safe runbook; also the test fixture
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  diff.rb                     line diff for drift between a record and the runbook
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  redactor.rb                 replaces secret values in captured output
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  execution.rb                one execution: state, pid, files, timing
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  executor.rb                 spawns, pumps output through the redactor, reaps, times out, stops
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  run_record.rb               run.json, run.md, blocks/; list, load, verdicts, drift
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  session.rb                  the active run, inputs, live executions, confirmation codes, stamp offer
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  web.rb                      Sinatra routes and the security checks
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  pages.rb                    pure functions that build the HTML
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  pages/chooser.rb            the library page: header, folder pane, runbook pane
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>  pages/tree.rb               the folder tree in the library page's left pane
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  assets.rb                   inline CSS and JavaScript
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>  cli.rb                      option parsing and the exe entry point
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>bin/runsheets
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>examples/hello/               a safe runbook; also the test fixture
 </span></code></pre></div>
 <div class="diagram">
 <p><img alt="Rendering and execution pipelines" src="../../assets/images/pipeline.svg" /></p>
@@ -1623,7 +1626,14 @@ test without HTTP. <code>Assets</code> holds the CSS and JavaScript as strings; 
 page is one self-contained response and the gem serves no static files.</p>
 <p>The JavaScript is small and framework-free: sidebar toggle, outline, copy
 buttons, the execute-and-poll loop, restoring prior executions from a JSON
-blob the step page embeds, and keyboard shortcuts.</p>
+blob the step page embeds, keyboard shortcuts, and on the library page the
+tree filter and cursor.</p>
+<p>Started on a directory of runbooks, <code>Web</code> holds a <code>Library</code> beside the
+session. <code>Library</code> scans the tree once (folders to any depth, a runbook
+directory being a leaf), keeps each runbook loaded for the detail pane,
+and rescans when a folder or a runbook file changes. Opening a runbook
+builds a new <code>Session</code> around it; the runbook's slug is its path inside the
+library, so run records of <code>a/backup</code> and <code>b/backup</code> never meet.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p>Minitest. The model classes are tested directly against the example
 runbook and small generated runbooks in temporary directories; the executor

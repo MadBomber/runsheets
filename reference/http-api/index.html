@@ -1124,6 +1124,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Pages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The library
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1398,6 +1415,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Pages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The library
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1694,6 +1728,34 @@ to that response; the page's own inline script and stylesheet carry it.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="the-library">The library<a class="headerlink" href="#the-library" title="Permanent link">&para;</a></h3>
+<p>When the server was started on a directory of runbooks, these routes exist
+too; otherwise they are 404. Until a runbook is open every other page
+redirects to <code>/library</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method and path</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /library</code></td>
+<td>The library page: the folder tree, and the root folder in the main pane.</td>
+</tr>
+<tr>
+<td><code>GET /library/*slug</code></td>
+<td>The same page with that runbook or folder selected. The slug is the path inside the library (<code>platform/database/backup</code>). 404 for an unknown one.</td>
+</tr>
+<tr>
+<td><code>POST /library/open</code></td>
+<td>Opens the runbook named by the <code>slug</code> field and redirects to <code>/</code>. Needs the token. 404 for an unknown slug, 409 while a run is active.</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>GET</code> of a library page rescans the directory when anything in it has
+changed, so a runbook added while the server is up shows on the next visit.</p>
 <h2 id="run-lifecycle">Run lifecycle<a class="headerlink" href="#run-lifecycle" title="Permanent link">&para;</a></h2>
 <h3 id="post-run"><code>POST /run</code><a class="headerlink" href="#post-run" title="Permanent link">&para;</a></h3>
 <p>Starts a run. Form fields: <code>_token</code>, <code>inputs[NAME]</code> for each input, and
