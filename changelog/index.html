@@ -1402,6 +1402,10 @@
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Development: <code>.loki</code> task file for asgard, <code>.rubocop.yml</code>, <code>.reek.yml</code> and a
+  Reek baseline under <code>.quality/</code>; the quality tools are in the Gemfile and
+  <code>asgard quality</code> passes every gate. Ten methods were split to get under the
+  Flog threshold; behaviour is unchanged.</li>
 <li><code>Runbook.load</code> raises "no such runbook" for a missing path; <code>Runbook</code>
   gains <code>main_path</code>, <code>single_file?</code>; <code>Step.new</code> takes <code>data:</code> and
   <code>interpreters:</code>; <code>Renderer.render</code> and <code>Block.new</code> take <code>interpreters:</code>.</li>
