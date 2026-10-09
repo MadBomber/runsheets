@@ -1454,6 +1454,10 @@
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>runsheet</code> with no RUNBOOK serves the bundled <code>examples/hello</code>. <code>--init</code>
+  still needs an explicit path.</li>
+<li>The <code>runsheet</code> executable lives in <code>bin/</code> (was <code>exe/</code>); <code>bin/console</code> and
+  <code>bin/setup</code> are gone, so <code>bin/</code> holds only what the gem installs.</li>
 <li>Development: <code>.loki</code> task file for asgard, <code>.rubocop.yml</code>, <code>.reek.yml</code> and a
   Reek baseline under <code>.quality/</code>; the quality tools are in the Gemfile and
   <code>asgard quality</code> passes every gate. Ten methods were split to get under the

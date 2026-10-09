@@ -1460,12 +1460,14 @@
 
 
 <h1 id="command-line">Command Line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h1>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheet [options] RUNBOOK
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheet [options] [RUNBOOK]
 </span></code></pre></div>
 <p><code>RUNBOOK</code> is either a runbook directory (it must contain <code>runbook.md</code>) or
 a single markdown file whose <code>##</code> headings are the steps (see
 <a href="../../runbooks/structure/#single-file-runbooks">Directory Structure</a>). It
-is the only positional argument.</p>
+is the only positional argument. Leave it out and the bundled
+<code>examples/hello</code> is served, which is the quickest way to see the tool;
+<code>--init</code> is the one mode that always needs a path.</p>
 <h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1610,7 +1612,7 @@ anything it left running (a <code>background</code> block, a block that was stil
 going) is stopped, and the run record is written, so nothing outlives the
 tool and no record is left saying <code>running</code>.</p>
 <h2 id="running-from-a-checkout">Running from a checkout<a class="headerlink" href="#running-from-a-checkout" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>exe/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>bin/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
 </span></code></pre></div>
 
 
