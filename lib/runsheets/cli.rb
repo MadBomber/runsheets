@@ -4,22 +4,27 @@ require "optparse"
 require "fileutils"
 
 module Runsheets
-  # The `runsheet` command: load a runbook (a directory or a single markdown
+  # The `runsheets` command: load a runbook (a directory or a single markdown
   # file) and serve it, check it, or scaffold a new one.
+  #
+  # Settings come from Config: bundled defaults, then the config file, then
+  # RUNSHEETS_* variables, then whatever is given on the command line.
   module CLI
-    PROGRAM  = "runsheet"
-    DEFAULTS = { port: 4567, bind: "127.0.0.1", runs_dir: nil, open: false, check: false, init: false }.freeze
+    PROGRAM = "runsheets"
 
     # The runbook served when none is named: the bundled hello example,
     # found relative to this file so it works from a checkout and from an
     # installed gem alike.
     DEFAULT_RUNBOOK = File.expand_path("../../examples/hello", __dir__)
 
-    # Parse argv into an options hash. Raises OptionParser::ParseError on bad
-    # input; returns nil after printing help or the version.
-    def self.parse(argv, defaults = DEFAULTS, out: $stdout)
-      options = defaults.dup
-      parser  = OptionParser.new do |opts|
+    # Parse argv into a hash holding only what was given: Config attribute
+    # names for the options, :config for the config file. Raises
+    # OptionParser::ParseError on bad input; returns nil after printing help
+    # or the version.
+    def self.parse(argv, out: $stdout)
+      options  = {}
+      defaults = Config.bundled_defaults
+      parser   = OptionParser.new do |opts|
         opts.banner = <<~BANNER
           #{PROGRAM} #{VERSION} - executable runbooks in your browser
 
@@ -31,17 +36,26 @@ module Runsheets
           #{DEFAULT_RUNBOOK}
           Fenced blocks marked `bash run`, `ruby run`, `bash destructive`
           or `bash background` get buttons; every execution is recorded under
-          #{Runsheets.runs_dir}
+          #{defaults[:runs_dir]}
+
+          Settings are layered: the user config #{Config.xdg_path},
+          then ./config/runsheets.yml (or the file --config names), then the
+          environment variable named beside each option, then the command line,
+          which wins. RUNBOOK itself can be set as `dir:` in a config file or
+          with RUNSHEETS_DIR. Flags take 1, true, yes or on; --no-open,
+          --no-check and --no-init switch a flag off that a lower layer turned on.
 
           Options:
         BANNER
 
-        opts.on("-p", "--port PORT", Integer, "Port to listen on (default: #{defaults[:port]})") { options[:port] = it }
-        opts.on("-b", "--bind HOST", "Address to bind to (default: #{defaults[:bind]})") { options[:bind] = it }
-        opts.on("--runs-dir DIR", "Where run records are written (default: #{Runsheets.runs_dir})") { options[:runs_dir] = it }
-        opts.on("-o", "--open", "Open the browser once the server is up") { options[:open] = true }
-        opts.on("-c", "--check", "Load the runbook, report authoring warnings, and exit") { options[:check] = true }
-        opts.on("--init", "Create a new runbook skeleton at RUNBOOK (a directory, or a .md file) and exit") { options[:init] = true }
+        opts.on("-c", "--config FILE", "Config file to read in place of ./config/runsheets.yml [RUNSHEETS_CONFIG]") { options[:config] = it }
+        opts.on("-p", "--port PORT", Integer, "Port to listen on (default: #{defaults[:port]}) [RUNSHEETS_PORT]") { options[:port] = it }
+        opts.on("-b", "--bind HOST", "Address to bind to (default: #{defaults[:bind]}) [RUNSHEETS_BIND]") { options[:bind] = it }
+        opts.on("--runs-dir DIR", "Where run records are written (default: #{defaults[:runs_dir]}) [RUNSHEETS_RUNS_DIR]") { options[:runs_dir] = it }
+        opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
+        opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
+        opts.on("--[no-]init", "Create a new runbook skeleton at RUNBOOK (a directory, or a .md file) and exit [RUNSHEETS_INIT]") { options[:init] = it }
+        opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
         opts.on("-v", "--version", "Print the version and exit") do
           out.puts "#{PROGRAM} #{VERSION}"
           return nil
@@ -54,10 +68,33 @@ module Runsheets
 
       rest = parser.parse(argv)
       raise OptionParser::ParseError, "too many arguments: #{rest.join(' ')}" if rest.size > 1
-      raise OptionParser::ParseError, "--init needs the path of the runbook to create" if options[:init] && rest.empty?
 
-      options[:runbook] = rest.empty? ? DEFAULT_RUNBOOK : File.expand_path(rest.first)
+      options[:dir] = rest.first if rest.first
       options
+    end
+
+    # Build the effective settings from parsed options and install them as
+    # Runsheets.config. The command line beats the environment, which beats
+    # the config file, which beats the bundled defaults.
+    def self.configure(options)
+      Runsheets.configure(options.except(:config), path: options[:config])
+    end
+
+    # --dump: print the settings in force as a config file. Redirect it to
+    # save them: `runsheets --dump -p 4580 > ~/.config/runsheets/runsheets.yml`.
+    def self.dump(config, out: $stdout)
+      out.print config.to_config_yaml
+      0
+    end
+
+    # The runbook a configuration points at: its dir, else the bundled example.
+    # --init insists on an explicit one.
+    def self.runbook_path(config)
+      if config.init && config.dir.nil?
+        raise OptionParser::ParseError, "--init needs the path of the runbook to create (RUNBOOK, dir: in the config file, or RUNSHEETS_DIR)"
+      end
+
+      config.dir || DEFAULT_RUNBOOK
     end
 
     # Entry point for the executable. Returns the process exit status.
@@ -65,29 +102,33 @@ module Runsheets
       options = parse(argv, out:)
       return 0 unless options
 
-      Runsheets.runs_dir = options[:runs_dir] if options[:runs_dir]
-      return init(options[:runbook], out:) if options[:init]
+      config  = configure(options)
+      return dump(config, out:) if config.dump
 
-      runbook = Runbook.load(options[:runbook])
+      path    = runbook_path(config)
+      return init(path, out:) if config.init
+
+      runbook = Runbook.load(path)
       runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{it}" }
 
-      if options[:check]
+      if config.check
         out.puts "#{runbook.title}: #{runbook.steps.size} steps, #{runbook.warnings.size} warnings"
         return runbook.warnings.empty? ? 0 : 1
       end
 
-      serve(runbook, options, out:, err:)
+      serve(runbook, config, out:, err:)
       0
     rescue Errno::EADDRINUSE
-      err.puts "#{PROGRAM}: port #{options[:port]} on #{options[:bind]} is already in use; pick another with --port"
+      err.puts "#{PROGRAM}: port #{config.port} on #{config.bind} is already in use; pick another with --port"
       1
-    rescue OptionParser::ParseError, RunbookError => e
+    rescue OptionParser::ParseError, RunbookError, ConfigError => e
       err.puts "#{PROGRAM}: #{e.message}"
       1
     end
 
-    def self.serve(runbook, options, out: $stdout, err: $stderr)
-      bind, port = options.values_at(:bind, :port)
+    def self.serve(runbook, config, out: $stdout, err: $stderr)
+      bind = config.bind
+      port = config.port
       session = Session.new(runbook:)
       Web.configure_for(session, bind:, port:)
       url = "http://#{bind}:#{port}/"
@@ -97,12 +138,13 @@ module Runsheets
         #{PROGRAM} #{VERSION}
         Runbook: #{runbook.title} (#{runbook.single_file? ? runbook.main_path : runbook.dir})
         Runs:    #{Runsheets.runs_dir}
+        Config:  #{config.files.empty? ? 'none (defaults)' : config.files.join(', ')}
         Open #{url} in your browser
         Press Ctrl-C to stop
       INFO
 
       Web.run! do
-        open_browser(url) if options[:open]
+        open_browser(url) if config.open
       end
     ensure
       shutdown(session, out:) if session

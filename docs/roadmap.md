@@ -64,7 +64,7 @@ Done.
 
 Done.
 
-- **Single-file runbooks**: `runsheet path/to/runbook.md` reads one file
+- **Single-file runbooks**: `runsheets path/to/runbook.md` reads one file
   whose `##` headings are the steps, with step attributes in an HTML
   comment after the heading and Verify and Rollback sections standing in
   for the extra files. Everything downstream sees the same `Runbook`.
@@ -78,7 +78,7 @@ Done.
   runbook whose blocks are `sql run` through `psql`. Neither can run
   against this machine; both load clean under `--check` and are test
   fixtures for the loader.
-- **`runsheet --init`** scaffolds a starter runbook, directory or single
+- **`runsheets --init`** scaffolds a starter runbook, directory or single
   file, that passes `--check`.
 - **Vocabulary settled**: the document is the *runbook*; the record of a
   run is the *runsheet*. The page, sidebar and buttons now say so.

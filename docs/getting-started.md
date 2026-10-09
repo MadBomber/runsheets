@@ -25,13 +25,13 @@ runbook of your own.
     git clone https://github.com/MadBomber/runsheets
     cd runsheets
     bundle install
-    bundle exec bin/runsheet --help
+    bundle exec bin/runsheets --help
     ```
 
 Check it is on the path:
 
 ```bash
-runsheet --version
+runsheets --version
 ```
 
 ## Run the example
@@ -47,13 +47,13 @@ cd "$(gem contents runsheets | grep 'examples/hello/runbook.md' | xargs dirname)
 Then serve it:
 
 ```bash
-runsheet --open .
+runsheets --open .
 ```
 
 You will see:
 
 ```text
-runsheet 0.1.0
+runsheets 0.1.0
 Runbook: Hello, runsheets (/path/to/examples/hello)
 Runs:    /Users/you/.local/share/runsheets/runs
 Open http://127.0.0.1:4567/ in your browser
@@ -175,9 +175,9 @@ panel shows the diff between what ran and what the runbook says now.
 ### 9. Start your own
 
 ```bash
-runsheet --init ops/runbooks/my-procedure       # a directory runbook
-runsheet --init ops/runbooks/my-procedure.md    # or one file, ## headings as steps
-runsheet --check ops/runbooks/my-procedure
+runsheets --init ops/runbooks/my-procedure       # a directory runbook
+runsheets --init ops/runbooks/my-procedure.md    # or one file, ## headings as steps
+runsheets --check ops/runbooks/my-procedure
 ```
 
 For the shape of a real one, read `examples/staging-teardown` (a
@@ -207,7 +207,7 @@ acknowledgements. `run.json` is the same as data. See
 ## Check a runbook without serving it
 
 ```bash
-runsheet --check path/to/runbook
+runsheets --check path/to/runbook
 ```
 
 Loads the runbook, prints every authoring warning (unknown block flags,

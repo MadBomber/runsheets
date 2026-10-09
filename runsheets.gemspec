@@ -38,7 +38,7 @@ Gem::Specification.new do |spec|
     end
   end
 
-  # The one executable, `runsheet`, lives in bin/. There is no exe/ directory
+  # The one executable, `runsheets`, lives in bin/. There is no exe/ directory
   # and no other scripts under bin/.
   spec.bindir = "bin"
   spec.executables = spec.files.grep(%r{\Abin/}) { |f| File.basename(f) }
@@ -50,4 +50,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "kramdown",             "~> 2.4"
   spec.add_dependency "kramdown-parser-gfm",  "~> 1.1"
   spec.add_dependency "rouge",                ">= 4.0"
+  spec.add_dependency "myway_config",         "~> 0.1"
 end

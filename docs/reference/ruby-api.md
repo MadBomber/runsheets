@@ -125,7 +125,7 @@ end
 exit(failed ? 1 : 0)
 ```
 
-Or simply `runsheet --check DIR` per runbook.
+Or simply `runsheets --check DIR` per runbook.
 
 ## Running a runbook from a script
 
@@ -315,15 +315,29 @@ Runsheets::Web.run!
 ```
 
 `configure_for` wires the session in and restricts permitted hosts to
-loopback plus the bind address. This is what `runsheet` does.
+loopback plus the bind address. This is what `runsheets` does.
 
 ## Configuration
 
 ```ruby
-Runsheets.runs_dir          # ENV["RUNSHEETS_RUNS_DIR"] or ~/.local/share/runsheets/runs
+Runsheets.config            # Runsheets::Config: the layered settings (see the CLI page)
+Runsheets.config.port       # 4567 unless the config file, RUNSHEETS_PORT or the CLI say otherwise
+Runsheets.config.files      # the config files that exist and were read
+Runsheets.config.to_config_yaml   # the settings in force as config-file text (what --dump prints)
+Runsheets.configure({ port: 4580 }, path: "/etc/runsheets.yml")  # install your own
+Runsheets.runs_dir          # Runsheets.config.runs_dir unless assigned
 Runsheets.runs_dir = "/srv/runs"
+Runsheets.reset_config!     # rebuild from the layers on next use
 Runsheets::VERSION
 ```
+
+`Runsheets::Config` is a [myway_config](https://github.com/madbomber/myway_config)
+class. Its layers, lowest to highest: `lib/runsheets/config/defaults.yml` in the gem,
+`~/.config/runsheets/runsheets.yml`, the project config (`./config/runsheets.yml`,
+or the file `path:` or `RUNSHEETS_CONFIG` names), `RUNSHEETS_*`
+variables, then the overrides hash. A `Runsheets::ConfigError` is raised
+for a port that is not a whole number or a named config file that is
+missing.
 
 ## Errors
 

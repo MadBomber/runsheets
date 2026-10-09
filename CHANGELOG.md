@@ -34,7 +34,20 @@
 
 ### Added (milestone 4: packaging)
 
-- Single-file runbooks: `runsheet path/to/file.md` reads one markdown
+- Layered settings through `myway_config` (`Runsheets::Config`): the command
+  line beats `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`,
+  `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`, `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`,
+  `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, and `RUNSHEETS_DIR` for the `RUNBOOK` argument), which beat
+  the project config `./config/runsheets.yml` (or the file `--config FILE` /
+  `RUNSHEETS_CONFIG` names), which beats the XDG user config
+  `~/.config/runsheets/runsheets.yml`, which beats the bundled
+  `lib/runsheets/config/defaults.yml`. `--no-open`, `--no-check` and `--no-init` switch a
+  flag off that a lower layer turned on. `Runsheets.config` exposes the
+  settings in force; `Runsheets.configure` installs others.
+- `runsheets --dump` prints the settings in force in the shape of a config
+  file to stdout and exits; redirect it to save a run's options as the
+  defaults for later runs. `RUNSHEETS_DUMP` and `--no-dump` as for any flag.
+- Single-file runbooks: `runsheets path/to/file.md` reads one markdown
   file whose `##` headings are the steps, with step attributes in an HTML
   comment after the heading and Verify and Rollback sections standing in
   for `verify.md` and `rollback.md` (`Runsheets::SingleFile`).
@@ -42,7 +55,7 @@
   `sql run` through `psql` works. Previously the mapping was honoured at
   spawn time but blocks were classified against the built-in languages
   only, so such blocks warned and had no Run button.
-- `runsheet --init PATH` scaffolds a starter runbook (directory, or a
+- `runsheets --init PATH` scaffolds a starter runbook (directory, or a
   single file when the path ends in `.md`) that passes `--check`.
 - `examples/staging-teardown` (directory, the shape of a real AWS
   teardown) and `examples/db-maintenance.md` (single file, `sql run`
@@ -52,9 +65,12 @@
 
 ### Changed
 
-- `runsheet` with no RUNBOOK serves the bundled `examples/hello`. `--init`
+- The executable is `runsheets`, the same name as the gem (was `runsheet`).
+- `-c` is now short for `--config`; `--check` has no short form.
+- `myway_config` is a runtime dependency.
+- `runsheets` with no RUNBOOK serves the bundled `examples/hello`. `--init`
   still needs an explicit path.
-- The `runsheet` executable lives in `bin/` (was `exe/`); `bin/console` and
+- The `runsheets` executable lives in `bin/` (was `exe/`); `bin/console` and
   `bin/setup` are gone, so `bin/` holds only what the gem installs.
 - Development: `.loki` task file for asgard, `.rubocop.yml`, `.reek.yml` and a
   Reek baseline under `.quality/`; the quality tools are in the Gemfile and
@@ -115,7 +131,7 @@
 
 ### Added (milestone 1)
 
-- `runsheet RUNBOOK_DIR` serves a runbook directory on loopback; `--check`
+- `runsheets RUNBOOK_DIR` serves a runbook directory on loopback; `--check`
   loads it and reports authoring warnings.
 - Runbook model: `runbook.md` front matter and preamble, ordered `steps/`,
   optional `verify.md` and `rollback.md`, `inputs` with secrets,

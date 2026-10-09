@@ -29,7 +29,7 @@ The child process receives, in this order of precedence:
 
 1. The `RUNSHEETS_*` variables identifying the run, step and block.
 2. The run's inputs, secrets included.
-3. The full environment of the `runsheet` process.
+3. The full environment of the `runsheets` process.
 
 Standard input is `/dev/null`. A `read` returns immediately with nothing;
 use a `terminal` block for anything interactive.
@@ -43,7 +43,7 @@ therefore mean the same thing on every operator's machine.
 ## Output
 
 Standard output and standard error both go to one pipe, interleaved in the
-order the process wrote them. A thread in the `runsheet` process reads the
+order the process wrote them. A thread in the `runsheets` process reads the
 pipe, passes each chunk through the run's redactor (see
 [Inputs and Secrets](../runbooks/inputs.md#redaction)), and appends it to
 the execution's `.out` file, flushing after every chunk. The page polls the
@@ -76,7 +76,7 @@ The execution is recorded with state `timed_out`. Its `exit_status` is
 report, and `signal` holds the raw number.
 
 The process group is created with `pgroup: true` at spawn, so the killing
-cannot reach anything the operator's shell started. Stopping the `runsheet`
+cannot reach anything the operator's shell started. Stopping the `runsheets`
 server itself does not kill running blocks; finish the run first.
 
 ## Stopping

@@ -1,7 +1,7 @@
 # Command Line
 
 ```text
-Usage: runsheet [options] [RUNBOOK]
+Usage: runsheets [options] [RUNBOOK]
 ```
 
 `RUNBOOK` is either a runbook directory (it must contain `runbook.md`) or
@@ -9,18 +9,21 @@ a single markdown file whose `##` headings are the steps (see
 [Directory Structure](../runbooks/structure.md#single-file-runbooks)). It
 is the only positional argument. Leave it out and the bundled
 `examples/hello` is served, which is the quickest way to see the tool;
-`--init` is the one mode that always needs a path.
+`--init` is the one mode that always needs a path. `dir:` in the config file
+or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 
 ## Options
 
 | Option | Default | Meaning |
 | --- | --- | --- |
+| `-c`, `--config FILE` | `./config/runsheets.yml` | Config file to read in place of the project config; see [Settings](#settings). A file named here must exist. |
 | `-p`, `--port PORT` | `4567` | Port to listen on. |
 | `-b`, `--bind HOST` | `127.0.0.1` | Address to bind to. See the note below before changing it. |
 | `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where run records are written. |
-| `-o`, `--open` | off | Open the default browser once the server is listening. |
-| `-c`, `--check` | off | Load the runbook, print authoring warnings, and exit without serving. |
-| `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. |
+| `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
+| `--check` | off | Load the runbook, print authoring warnings, and exit without serving. `--no-check` turns it off. |
+| `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. `--no-init` turns it off. |
+| `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-v`, `--version` | | Print the version and exit. |
 | `-h`, `--help` | | Print usage and exit. |
 
@@ -29,49 +32,50 @@ is the only positional argument. Leave it out and the bundled
 Start a new runbook, then serve it:
 
 ```bash
-runsheet --init ops/runbooks/db-refresh        # a directory
-runsheet --init ops/runbooks/db-refresh.md     # or a single file
-runsheet --open ops/runbooks/db-refresh
+runsheets --init ops/runbooks/db-refresh        # a directory
+runsheets --init ops/runbooks/db-refresh.md     # or a single file
+runsheets --open ops/runbooks/db-refresh
 ```
 
 Serve a runbook and open it:
 
 ```bash
-runsheet --open ops/runbooks/staging-teardown
-runsheet --open ops/runbooks/db-maintenance.md
+runsheets --open ops/runbooks/staging-teardown
+runsheets --open ops/runbooks/db-maintenance.md
 ```
 
 Serve on another port because something else has 4567:
 
 ```bash
-runsheet -p 4580 ops/runbooks/staging-teardown
+runsheets -p 4580 ops/runbooks/staging-teardown
 ```
 
 Keep run records inside a project (but outside the runbook):
 
 ```bash
-runsheet --runs-dir ./tmp/runs ops/runbooks/staging-teardown
+runsheets --runs-dir ./tmp/runs ops/runbooks/staging-teardown
 ```
 
 Validate every runbook in a repository:
 
 ```bash
-for dir in ops/runbooks/*/; do runsheet --check "$dir" || failed=1; done
+for dir in ops/runbooks/*/; do runsheets --check "$dir" || failed=1; done
 exit "${failed:-0}"
 ```
 
 ## What it prints
 
 ```text
-runsheet 0.1.0
+runsheets 0.1.0
 Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
 Runs:    /Users/you/.local/share/runsheets/runs
+Config:  /Users/you/.config/runsheets/runsheets.yml
 Open http://127.0.0.1:4567/ in your browser
 Press Ctrl-C to stop
 ```
 
 Authoring warnings are printed to stderr before the banner, prefixed
-`runsheet: warning:`. The server still starts; warnings mark blocks and
+`runsheets: warning:`. The server still starts; warnings mark blocks and
 steps in the page but do not block serving.
 
 Puma then prints its own startup lines. Press ++ctrl+c++ to stop. Any block
@@ -84,15 +88,75 @@ want a clean record.
 | Status | When |
 | --- | --- |
 | `0` | Normal exit, or `--check` found no warnings. |
-| `1` | Bad arguments, the runbook could not be loaded, the port is in use, or `--check` found warnings. |
+| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, or `--check` found warnings. |
 
-## Environment
+## Settings
+
+Every option is a setting with the same name (`port`, `bind`, `runs_dir`,
+`open`, `check`, `init`, `dump`), and the `RUNBOOK` argument is the setting `dir`.
+Settings are layered with [myway_config](https://github.com/madbomber/myway_config);
+each layer overrides the one below it, and anything a layer leaves out
+comes from further down:
+
+1. **Command line.** Whatever is given wins outright.
+2. **Environment variables**, `RUNSHEETS_` plus the setting name in upper
+   case: `RUNSHEETS_PORT`, `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`,
+   `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`, `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, `RUNSHEETS_DIR`.
+3. **The project config**, `./config/runsheets.yml` in the current directory,
+   or the file `--config FILE` or `RUNSHEETS_CONFIG` names in its place. The
+   project file may be absent; a file named explicitly must exist.
+4. **The user config**, `~/.config/runsheets/runsheets.yml` (or under
+   `$XDG_CONFIG_HOME`), which myway_config reads for every application. This
+   is where personal settings belong.
+5. **Bundled defaults**, `lib/runsheets/config/defaults.yml` inside the gem. That file is
+   the list of settings and documents each one.
+
+Config files are flat YAML, one key per setting. Paths may start with
+`~` and relative paths are taken from the current directory. Flags are on
+for `1`, `true`, `yes` or `on` (any case) and off for any other value, so
+`RUNSHEETS_OPEN=off` switches off an `open: true` in the file, and
+`--no-open` switches off either. A blank value (`RUNSHEETS_PORT=`) counts as
+unset. A port that is not a whole number, or a named config file that does
+not exist, is reported and the command exits `1`.
+
+```yaml
+# ~/.config/runsheets/runsheets.yml
+dir: ~/ops/runbooks/db-refresh
+port: 4580
+runs_dir: ~/ops/runs
+open: true
+```
+
+With that file, plain `runsheets` serves the db-refresh runbook on port 4580
+and opens the browser; `runsheets --check` checks it instead; and
+`RUNSHEETS_PORT=4581 runsheets` or `runsheets -p 4581` moves it for one run. A
+repository can carry its own `config/runsheets.yml` (say `dir:` and
+`runs_dir:`) that applies whenever `runsheets` is run from its root.
 
 | Variable | Effect |
 | --- | --- |
-| `RUNSHEETS_RUNS_DIR` | Default for `--runs-dir`. |
-| `PORT` | Not used. Pass `--port`. |
+| `RUNSHEETS_CONFIG` | The file read in place of `./config/runsheets.yml`, when `--config` is not given. |
+| `RUNSHEETS_<SETTING>` | The setting of that name, as above. |
+| `RACK_ENV` | Selects an environment section (`development`, `test`, `production`) in `defaults.yml`; none is required. |
+| `PORT` | Not used. Set `RUNSHEETS_PORT` or pass `--port`. |
 | anything else | Inherited by every executed block, and used to pre-fill inputs of the same name. See [Inputs and Secrets](../runbooks/inputs.md). |
+
+## Saving settings
+
+`--dump` prints the settings in force, after every layer has been applied,
+in the shape of a config file, and exits. Redirect it to save them. Run it
+with the options you want to keep and they become the defaults for later
+runs:
+
+```bash
+runsheets --dump -p 4580 ~/ops/runbooks/db-refresh        # look first
+runsheets --dump -p 4580 ~/ops/runbooks/db-refresh > ~/.config/runsheets/runsheets.yml
+runsheets                                                  # now serves db-refresh on 4580
+```
+
+Redirect to `config/runsheets.yml` instead for a project config to commit
+with a repository. `dump` itself is never in the output, so a saved file
+cannot make every later run print and exit.
 
 ## About `--bind`
 
@@ -116,5 +180,5 @@ tool and no record is left saying `running`.
 ## Running from a checkout
 
 ```bash
-bundle exec bin/runsheet --open examples/hello
+bundle exec bin/runsheets --open examples/hello
 ```

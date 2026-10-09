@@ -51,7 +51,7 @@ When the start-run form is submitted, each input resolves in this order:
 
 1. What the operator typed in the form.
 2. If blank, the environment variable of the same name in the process that
-   started `runsheet`. A devcontainer with `AWS_PROFILE` already set needs no
+   started `runsheets`. A devcontainer with `AWS_PROFILE` already set needs no
    typing.
 3. If still blank, the `default` from the front matter.
 4. Otherwise the empty string.
@@ -137,7 +137,7 @@ echo "saved $(wc -c < "$RUNSHEETS_RUN_DIR/stacks-before.json") bytes"
 
 ## The rest of the environment
 
-The child inherits the full environment of the `runsheet` process, with
+The child inherits the full environment of the `runsheets` process, with
 inputs and the `RUNSHEETS_*` variables layered on top. SSO sessions, `PATH`,
 `HOME`, tunnels and anything else the operator's shell had are available.
-Start `runsheet` from the shell you would have run the commands in.
+Start `runsheets` from the shell you would have run the commands in.

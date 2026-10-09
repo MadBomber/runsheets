@@ -24,7 +24,7 @@ lib/runsheets/
   pages.rb                    pure functions that build the HTML
   assets.rb                   inline CSS and JavaScript
   cli.rb                      option parsing and the exe entry point
-bin/runsheet
+bin/runsheets
 examples/hello/               a safe runbook; also the test fixture
 ```
 

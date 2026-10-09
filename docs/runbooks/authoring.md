@@ -100,7 +100,7 @@ Most existing runbooks are one markdown file with `## Step` headings.
 5. Replace hard-coded account ids, profiles and names with inputs.
 6. Move any "if it goes wrong" section into `rollback.md` and any "check it
    worked" section into `verify.md`.
-7. Run `runsheet --check .` and fix the warnings.
+7. Run `runsheets --check .` and fix the warnings.
 8. Run it once for real, from a clean shell, and finish the run. Now the
    runbook has a record of its last verification that nobody had to date by
    hand.
@@ -111,7 +111,7 @@ later milestone; see the [roadmap](../roadmap.md).
 ## Checking your work
 
 ```bash
-runsheet --check path/to/runbook
+runsheets --check path/to/runbook
 ```
 
 Reports, with the file and block they belong to:

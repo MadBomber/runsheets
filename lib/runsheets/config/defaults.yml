@@ -1,0 +1,33 @@
+# Bundled defaults for the runsheets command. This file is the lowest layer;
+# every key here is a setting. Higher layers override it, lowest to highest:
+#
+#   ~/.config/runsheets/runsheets.yml      XDG user config (myway_config)
+#   ./config/runsheets.yml                 project config, or the file --config / RUNSHEETS_CONFIG names
+#   RUNSHEETS_<KEY>                        environment variables
+#   command-line options                   -p, --bind, --runs-dir, ...
+#
+# Paths may start with ~. Flags accept true/false, yes/no, on/off or 1/0.
+defaults:
+  # The runbook to serve: a directory holding runbook.md, or a single .md
+  # file. Empty means the bundled examples/hello. (RUNBOOK argument, RUNSHEETS_DIR)
+  dir:
+  # Port to listen on. (--port, RUNSHEETS_PORT)
+  port: 4567
+  # Address to bind to. Anything but loopback exposes shell execution. (--bind, RUNSHEETS_BIND)
+  bind: 127.0.0.1
+  # Where run records are written. (--runs-dir, RUNSHEETS_RUNS_DIR)
+  runs_dir: ~/.local/share/runsheets/runs
+  # Open the browser once the server is up. (--open, RUNSHEETS_OPEN)
+  open: false
+  # Load the runbook, report authoring warnings, and exit. (--check, RUNSHEETS_CHECK)
+  check: false
+  # Create a runbook skeleton at dir and exit. (--init, RUNSHEETS_INIT)
+  init: false
+  # Print the settings in force as a config file to stdout and exit. (--dump, RUNSHEETS_DUMP)
+  dump: false
+
+# Per-environment overrides (RACK_ENV). None are needed; the sections exist
+# so myway_config recognises the usual environment names.
+development: {}
+test: {}
+production: {}

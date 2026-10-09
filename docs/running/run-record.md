@@ -21,8 +21,9 @@ verification run adds `-verify`. Two runs started in the same second get
 
 ## Location
 
-Default: `~/.local/share/runsheets/runs`. Override with `--runs-dir` or
-`RUNSHEETS_RUNS_DIR`.
+Default: `~/.local/share/runsheets/runs`. Override with `--runs-dir`,
+`RUNSHEETS_RUNS_DIR`, or `runs_dir:` in the config file (see
+[Command Line](cli.md#settings)).
 
 Why outside the runbook: captured output may contain account ids,
 hostnames, row counts, anything a command prints. That does not belong in a
@@ -207,7 +208,7 @@ only such runs are offered the `last_verified` stamp.
 - At finish, after anything still running has been stopped.
 
 So a `run.json` read while a run is active is at most one poll interval
-behind. If the `runsheet` process is killed mid-run, the record stays with
+behind. If the `runsheets` process is killed mid-run, the record stays with
 `status: running`; the block files are intact.
 
 ## Reading records programmatically

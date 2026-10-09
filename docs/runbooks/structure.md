@@ -167,7 +167,7 @@ The rules:
   file is called `runbook.md`. The working directory for blocks, and the
   root for `/files/`, is the file's directory.
 
-`runsheet --init name.md` writes a starter file in this shape. The bundled
+`runsheets --init name.md` writes a starter file in this shape. The bundled
 `examples/db-maintenance.md` is a complete one.
 
 ## What runsheets does not read

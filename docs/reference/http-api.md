@@ -2,7 +2,7 @@
 
 The page's JavaScript and HTML forms are the intended clients, but the
 endpoints are plain enough to drive with `curl`, which is also how the
-smoke test works. All of them are served by the one `runsheet` process on
+smoke test works. All of them are served by the one `runsheets` process on
 loopback.
 
 ## Authentication

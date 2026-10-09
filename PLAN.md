@@ -45,7 +45,7 @@ The rendering is the vehicle. The run record is the point.
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Name | `runsheets` gem, `runsheet` command | `runbook` and `rb` are taken on RubyGems; `myrb` and `mrb` are taken and `mrb` is the mruby ecosystem's own abbreviation; `livedoc` already means living documentation in BDD circles and is taken on npm and PyPI. `runsheets` was free on RubyGems, npm, PyPI, Homebrew and PATH on 2026-10-07. A runsheet is the theatre and broadcast term for the timed, ordered list of what happens, which matches "the run record is the point". |
+| Name | `runsheets` gem, `runsheets` command | `runbook` and `rb` are taken on RubyGems; `myrb` and `mrb` are taken and `mrb` is the mruby ecosystem's own abbreviation; `livedoc` already means living documentation in BDD circles and is taken on npm and PyPI. `runsheets` was free on RubyGems, npm, PyPI, Homebrew and PATH on 2026-10-07. A runsheet is the theatre and broadcast term for the timed, ordered list of what happens, which matches "the run record is the point". |
 | Project home | Standalone open-source project, not part of xyzzy | Generic tool; xyzzy's gates (95% per-file coverage, Trunk) would be a tax on a shell-heavy tool. xyzzy's runbooks are inspiration only. |
 | GUI or CLI | Browser GUI served from a local Sinatra process | Markdown renders properly; the page is a natural home for the run log. Terminal markdown is possible but not pleasant. |
 | Attached or detached | Detached (runs on the operator's machine or devcontainer) | The blocks are shell against the operator's environment: SSO sessions, tunnels, local DBs, `gh`. None of that exists inside a deployed app process, and executing markdown blocks in a web app is a security hole. |
@@ -278,7 +278,7 @@ recording and rendering are tested without spawning processes.
 4. **Packaging.** Done 2026-10-08. Gem with an `exe/` entry point, README with the
    document structure and block convention, minitest suite, two realistic sample
    runbooks (a directory and a single file), single-file runbooks, SQL through the
-   interpreters map, `runsheet --init`, vocabulary settled. The name was picked on
+   interpreters map, `runsheets --init`, vocabulary settled. The name was picked on
    2026-10-07.
 
 ## Open questions
@@ -389,7 +389,7 @@ kramdown, kramdown-parser-gfm, rouge). Library layout:
   `load` for history.
 - `session.rb`: the active run, in-memory inputs (secrets included), live
   executions; refuses to execute a block that references a blank declared input.
-- `web.rb`, `pages.rb`, `assets.rb`, `cli.rb`, `exe/runsheet`.
+- `web.rb`, `pages.rb`, `assets.rb`, `cli.rb`, `exe/runsheets`.
 - `examples/hello`: a safe runbook exercising every block kind, also the test
   fixture. 78 minitest tests, including a rack-test drive of the whole flow.
 
@@ -471,7 +471,7 @@ map, a real converted runbook, `capture`, the vocabulary split.
   built-in `INTERPRETERS` only, so a front-matter mapping for `sql` was honoured at
   spawn time but the block never got a Run button. `Block.new`, `Renderer.render` and
   `Step.new` now take `interpreters:` and the runbook passes its merged map down.
-- `runsheet --init PATH` writes a starter runbook (directory, or single file when the
+- `runsheets --init PATH` writes a starter runbook (directory, or single file when the
   path ends in `.md`) that passes `--check`; the CLI option became `:runbook`.
 - `examples/staging-teardown` (directory: manual, automated with expect, terminal,
   background SSM tunnel, verify, destructive with a blast radius, rollback) and

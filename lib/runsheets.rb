@@ -22,8 +22,6 @@ module Runsheets
   class RunbookError < Error; end
   class RunError < Error; end
 
-  DEFAULT_RUNS_DIR = File.join(Dir.home, ".local", "share", "runsheets", "runs")
-
   autoload :Assets, File.expand_path("runsheets/assets", __dir__)
   autoload :CLI,    File.expand_path("runsheets/cli", __dir__)
   autoload :Pages,  File.expand_path("runsheets/pages", __dir__)
@@ -32,11 +30,24 @@ module Runsheets
   class << self
     attr_writer :runs_dir
 
-    # Where run records are written. Overridable with RUNSHEETS_RUNS_DIR.
-    def runs_dir = @runs_dir || ENV["RUNSHEETS_RUNS_DIR"] || DEFAULT_RUNS_DIR
+    # The settings in force (see Config). Until configure is called they come
+    # from the config file, the environment and the bundled defaults.
+    def config = @config ||= Config.new
+
+    # Build and install the settings; overrides beat every other layer and
+    # path names the config file. The CLI calls this with what it parsed.
+    def configure(overrides = nil, path: nil) = @config = Config.new(overrides, path:)
+
+    # Forget the installed settings so the next call to config rebuilds them.
+    def reset_config! = @config = nil
+
+    # Where run records are written: an explicit assignment, else the
+    # configured runs_dir (--runs-dir, RUNSHEETS_RUNS_DIR, config file).
+    def runs_dir = @runs_dir || config.runs_dir
   end
 end
 
+require_relative "runsheets/config"
 require_relative "runsheets/front_matter"
 require_relative "runsheets/fences"
 require_relative "runsheets/block"

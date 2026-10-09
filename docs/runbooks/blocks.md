@@ -97,7 +97,7 @@ a runbook; keep Ruby blocks few and meaningful.
 ## Rules
 
 - **Unknown flags are an authoring error.** They render with a visible
-  warning in the block's toolbar and are listed by `runsheet --check`. They
+  warning in the block's toolbar and are listed by `runsheets --check`. They
   are never silently ignored.
 - **Conflicting flags warn.** `bash background terminal` picks the first and
   warns. `destructive` always wins because it is the safer reading.

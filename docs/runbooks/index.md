@@ -72,4 +72,4 @@ echo "hello from $(hostname)"
 ```
 ````
 
-Serve it with `runsheet hello`.
+Serve it with `runsheets hello`.

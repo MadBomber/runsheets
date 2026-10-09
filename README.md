@@ -25,25 +25,31 @@ Requires Ruby 3.4 or newer.
 ## Run
 
 ```bash
-runsheet                         # serve the bundled examples/hello on http://127.0.0.1:4567/
-runsheet path/to/runbook         # serve your own runbook
-runsheet --open path/to/runbook  # and open the browser
-runsheet --check path/to/runbook # load it, print authoring warnings, exit
-runsheet --init path/to/new      # scaffold a runbook (a .md path makes a single file)
+runsheets                         # serve the bundled examples/hello on http://127.0.0.1:4567/
+runsheets path/to/runbook         # serve your own runbook
+runsheets --open path/to/runbook  # and open the browser
+runsheets --check path/to/runbook # load it, print authoring warnings, exit
+runsheets --init path/to/new      # scaffold a runbook (a .md path makes a single file)
 ```
 
 `path/to/runbook` is a directory, or a single markdown file whose `##`
 headings are the steps. Try the bundled examples:
 
 ```bash
-runsheet --open examples/hello                # safe to run: every block kind
-runsheet --check examples/staging-teardown    # a realistic AWS teardown
-runsheet --check examples/db-maintenance.md   # single file, sql blocks via psql
+runsheets --open examples/hello                # safe to run: every block kind
+runsheets --check examples/staging-teardown    # a realistic AWS teardown
+runsheets --check examples/db-maintenance.md   # single file, sql blocks via psql
 ```
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
-records go; default `~/.local/share/runsheets/runs`, also settable with
-`RUNSHEETS_RUNS_DIR`).
+records go; default `~/.local/share/runsheets/runs`), `--open`, `--check`,
+`--init`, `--config FILE`, and `--dump` to print the settings in force as a
+config file (redirect it to save them). Settings are layered: the command line beats
+`RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`, `RUNSHEETS_DIR` for
+the runbook, ...), which beat `./config/runsheets.yml` (or the file `--config` or
+`RUNSHEETS_CONFIG` names), which beats `~/.config/runsheets/runsheets.yml`,
+which beats the defaults bundled in `lib/runsheets/config/defaults.yml`. See
+[docs/running/cli.md](docs/running/cli.md#settings).
 
 ## A runbook is a directory
 
@@ -142,7 +148,7 @@ flags. A block with no flag is display only, whatever its language.
 | ```` ```text expect ```` | Not executed. Shown beside the output of the executable block above it, with a matches/differs hint. |
 
 An unknown flag, or `run` on a language that cannot execute, renders with a
-visible warning instead of being ignored. `runsheet --check` lists them.
+visible warning instead of being ignored. `runsheets --check` lists them.
 
 Each execution is a fresh process with the runbook directory as its working
 directory. Nothing carries over between blocks except the environment.
@@ -189,7 +195,7 @@ docs in a repository. The landing page lists previous runs.
 ```bash
 bundle install
 bundle exec rake test
-bundle exec bin/runsheet --open examples/hello
+bundle exec bin/runsheets --open examples/hello
 ```
 
 The model (`Runbook`, `Step`, `Block`, `Renderer`, `Executor`,
