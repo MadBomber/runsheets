@@ -1,8 +1,10 @@
 # Running
 
-runsheets is a script an operator starts and stops. It serves one runbook on
-loopback, executes blocks on request in the operator's own environment, and
-writes a record of each run to disk.
+runsheets is a script an operator starts and stops. It serves one runbook at a
+time on loopback, executes blocks on request in the operator's own
+environment, and writes a record of each run to disk. The runbook is a
+directory or a single all-in-one markdown file; given a directory of
+runbooks, the operator chooses one in the browser.
 
 <div class="grid cards" markdown>
 
@@ -30,10 +32,12 @@ writes a record of each run to disk.
 
 ## One run at a time
 
-A `runsheets` process serves exactly one runbook and holds at most one active
-run. Starting a second run while one is active is refused; finish or
-abandon the first. To work two runbooks at once, start two processes on
-different ports.
+A `runsheets` process serves one runbook at a time and holds at most one
+active run. Starting a second run while one is active is refused; finish or
+abandon the first. Started on a directory of runbooks, the process shows a
+chooser and serves whichever runbook the operator opens; switching to
+another is refused while a run is active. To work two runbooks at once,
+start two processes on different ports.
 
 ## Where the shell comes from
 

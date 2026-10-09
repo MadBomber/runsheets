@@ -4,11 +4,14 @@
 Usage: runsheets [options] [RUNBOOK]
 ```
 
-`RUNBOOK` is either a runbook directory (it must contain `runbook.md`) or
-a single markdown file whose `##` headings are the steps (see
-[Directory Structure](../runbooks/structure.md#single-file-runbooks)). It
-is the only positional argument. Leave it out and the bundled
-`examples/hello` is served, which is the quickest way to see the tool;
+`RUNBOOK` is one of three things: a runbook directory (it must contain
+`runbook.md`), a single all-in-one markdown file whose `##` headings are the
+steps (see [Single-file runbooks](../runbooks/structure.md#single-file-runbooks)),
+or a directory holding several of either side by side. Given such a directory of
+runbooks, the page opens on a chooser listing them and the operator picks
+one; `runsheets examples` shows the three bundled examples that way. It is
+the only positional argument. Leave it out and the bundled `examples/hello`
+is served, which is the quickest way to see the tool;
 `--init` is the one mode that always needs a path. `dir:` in the config file
 or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 
@@ -21,7 +24,7 @@ or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 | `-b`, `--bind HOST` | `127.0.0.1` | Address to bind to. See the note below before changing it. |
 | `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where run records are written. |
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
-| `--check` | off | Load the runbook, print authoring warnings, and exit without serving. `--no-check` turns it off. |
+| `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. `--no-check` turns it off. |
 | `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. `--no-init` turns it off. |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-v`, `--version` | | Print the version and exit. |
@@ -37,11 +40,12 @@ runsheets --init ops/runbooks/db-refresh.md     # or a single file
 runsheets --open ops/runbooks/db-refresh
 ```
 
-Serve a runbook and open it:
+Serve a runbook and open it, as a directory or as one all-in-one file:
 
 ```bash
-runsheets --open ops/runbooks/staging-teardown
-runsheets --open ops/runbooks/db-maintenance.md
+runsheets --open ops/runbooks/staging-teardown       # a directory
+runsheets --open ops/runbooks/db-maintenance.md      # a single file
+runsheets --open ops/runbooks                        # choose among them
 ```
 
 Serve on another port because something else has 4567:
@@ -56,11 +60,11 @@ Keep run records inside a project (but outside the runbook):
 runsheets --runs-dir ./tmp/runs ops/runbooks/staging-teardown
 ```
 
-Validate every runbook in a repository:
+Validate every runbook in a repository (a directory of runbooks is checked
+as a whole):
 
 ```bash
-for dir in ops/runbooks/*/; do runsheets --check "$dir" || failed=1; done
-exit "${failed:-0}"
+runsheets --check ops/runbooks
 ```
 
 ## What it prints

@@ -236,4 +236,36 @@ class TestCLI < Minitest::Test
     assert_equal 0, CLI.run(%w[--no-dump --check], out:, err: StringIO.new)
     assert_includes out.string, "Hello, runsheets: 6 steps, 0 warnings"
   end
+
+  def test_check_on_a_directory_of_runbooks_checks_each_one
+    out = StringIO.new
+    err = StringIO.new
+    assert_equal 0, CLI.run(["--check", File.expand_path("../examples", __dir__)], out:, err:)
+    lines = out.string.lines.map(&:chomp)
+    assert_equal 3, lines.size
+    assert_includes lines, "Hello, runsheets: 6 steps, 0 warnings"
+    assert_includes lines, "Monthly PostgreSQL maintenance: 5 steps, 0 warnings"
+    assert_empty err.string
+  end
+
+  def test_check_on_a_directory_with_a_broken_runbook_fails
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "fine.md"), "---\ntitle: Fine\n---\n\n## Step\n<!-- kind: manual -->\n\nDo it.\n")
+      FileUtils.mkdir_p(File.join(dir, "bad"))
+      File.write(File.join(dir, "bad", "runbook.md"), "no front matter, no steps\n")
+      out = StringIO.new
+      err = StringIO.new
+      assert_equal 1, CLI.run(["--check", dir], out:, err:)
+      assert_includes out.string, "Fine: 1 steps, 0 warnings"
+      assert_includes err.string, "runsheets: warning: bad: no steps found"
+    end
+  end
+
+  def test_an_empty_directory_is_reported
+    Dir.mktmpdir do |dir|
+      err = StringIO.new
+      assert_equal 1, CLI.run(["--check", dir], out: StringIO.new, err:)
+      assert_includes err.string, "no runbooks in"
+    end
+  end
 end

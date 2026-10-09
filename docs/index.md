@@ -46,7 +46,9 @@ runsheets closes that gap:
 ```bash
 gem install runsheets
 git clone https://github.com/MadBomber/runsheets
-runsheets --open runsheets/examples/hello
+runsheets --open runsheets/examples/hello              # a runbook directory
+runsheets --open runsheets/examples/db-maintenance.md  # a single all-in-one file
+runsheets --open runsheets/examples                    # or choose from all of them
 ```
 
 The example runbook is safe to run end to end. Start a run from the landing

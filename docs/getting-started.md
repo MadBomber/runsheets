@@ -63,6 +63,14 @@ Press Ctrl-C to stop
 `--open` launches your default browser. Without it, open the printed URL
 yourself.
 
+The argument can also be a single all-in-one markdown file, or a directory
+holding several runbooks to choose from in the browser:
+
+```bash
+runsheets --open ../db-maintenance.md    # one file, ## headings as steps
+runsheets --open ..                      # all the examples, pick one
+```
+
 ## Walk through a run
 
 ### 1. The landing page

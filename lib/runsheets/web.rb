@@ -38,14 +38,36 @@ module Runsheets
     # middleware stack captures this hash the first time the app is built.
     set :host_authorization, { permitted_hosts: LOOPBACK_HOSTS.dup, allow_if: ->(env) { Web.bind_allows?(env) } }
 
+    set :rs_library, nil
+    set :rs_token, nil
+
     # Wire a Session into the app and record the bind address the Host
-    # check should honour. Returns the class for chaining.
-    def self.configure_for(session, bind: "127.0.0.1", port: 4567)
+    # check should honour. With a library (a directory of runbooks) the
+    # session may be nil until the operator chooses one; every session
+    # opened from the library shares one token. Returns the class.
+    def self.configure_for(session, bind: "127.0.0.1", port: 4567, library: nil)
+      raise ArgumentError, "a session or a library is needed" if session.nil? && library.nil?
+
       set :rs_session, session
+      set :rs_library, library
+      set :rs_token, session&.token || SecureRandom.hex(16)
       set :bind, bind
       set :port, port
       set :rs_bind, bind
       self
+    end
+
+    # The session being served right now, if a runbook is open.
+    def self.session = settings.rs_session
+
+    # Open one of the library's runbooks: it becomes the session served.
+    # Refused while a run is active, since a session holds the run.
+    def self.open_runbook(slug)
+      library = settings.rs_library or raise RunbookError, "no library to choose from"
+      raise RunError, "a run is active (#{session.run.id}); finish it before opening another runbook" if session&.active?
+
+      runbook = library.runbook(slug)
+      set :rs_session, Session.new(runbook:, token: settings.rs_token, library:)
     end
 
     # Does the bind address let this request's Host through, beyond the
@@ -107,12 +129,15 @@ module Runsheets
 
     helpers do
       def rs      = settings.rs_session
+      def library = settings.rs_library
       def runbook = rs.runbook
 
       def token_ok?
-        token = rs.token
+        token = settings.rs_token
         [request.env["HTTP_X_RUNSHEETS_TOKEN"], params["_token"]].any? { it.is_a?(String) && Rack::Utils.secure_compare(it, token) }
       end
+
+      def library_route? = request.path_info == "/library" || request.path_info.start_with?("/library/")
 
       def wants_json? = request.path_info.start_with?("/blocks/", "/executions/") || request.accept?("application/json")
 
@@ -132,8 +157,16 @@ module Runsheets
         yield nonce
       end
 
+      # Without a session there is no runbook to lay a page out around, so
+      # the error is plain text.
       def fail_with(message, status)
-        halt status, (wants_json? ? json({ error: message }, status:) : page { Pages.error(rs, message, status, nonce: it) })
+        body = if wants_json? then json({ error: message }, status:)
+               elsif rs        then page { Pages.error(rs, message, status, nonce: it) }
+               else
+                 content_type :text
+                 "#{status}: #{message}\n"
+               end
+        halt status, body
       end
 
       def execution_json(execution)
@@ -149,13 +182,33 @@ module Runsheets
     end
 
     before do
-      fail_with("runsheets has no runbook loaded", 503) unless rs
-      if request.get? || request.head?
-        rs.refresh_runbook!
-        next
-      end
+      reading = request.get? || request.head?
+      fail_with("missing or invalid session token", 403) unless reading || token_ok?
+      next if library_route?
 
-      fail_with("missing or invalid session token", 403) unless token_ok?
+      unless rs
+        redirect "/library" if library
+        fail_with("runsheets has no runbook loaded", 503)
+      end
+      rs.refresh_runbook! if reading
+    end
+
+    # -- library: choosing a runbook -----------------------------------
+
+    # The library, or a 404 when the server was started on one runbook.
+    before "/library*" do
+      fail_with("runsheets was started on one runbook, not a directory of them", 404) unless library
+    end
+
+    get "/library" do
+      page { Pages.library(library, rs, settings.rs_token, nonce: it) }
+    end
+
+    post "/library/open" do
+      slug = params["slug"].to_s
+      fail_with("no runbook named #{slug}", 404) unless library.find(slug)
+      Web.open_runbook(slug)
+      redirect "/"
     end
 
     # A destructive block without its typed confirmation: tell the page the

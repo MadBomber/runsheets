@@ -494,6 +494,7 @@ module Runsheets
           if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
           switch (e.key) {
             case 'h': go('h'); break;
+            case 'r': go('r'); break;
             case 'ArrowLeft':  go('←'); break;
             case 'ArrowRight': go('→'); break;
             case 's': toggleSidebar(); break;

@@ -31,8 +31,9 @@ module Runsheets
           Usage: #{PROGRAM} [options] [RUNBOOK]
 
           RUNBOOK is a directory holding runbook.md and a steps/ directory of
-          markdown files, or a single markdown file whose ## headings are the
-          steps. Without one, the bundled example is served:
+          markdown files, a single all-in-one markdown file whose ## headings
+          are the steps, or a directory of such runbooks to choose from in the
+          browser. Without one, the bundled example is served:
           #{DEFAULT_RUNBOOK}
           Fenced blocks marked `bash run`, `ruby run`, `bash destructive`
           or `bash background` get buttons; every execution is recorded under
@@ -108,15 +109,10 @@ module Runsheets
       path    = runbook_path(config)
       return init(path, out:) if config.init
 
-      runbook = Runbook.load(path)
-      runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{it}" }
+      target = Library.library?(path) ? Library.load(path) : Runbook.load(path)
+      return check(target, out:, err:) if config.check
 
-      if config.check
-        out.puts "#{runbook.title}: #{runbook.steps.size} steps, #{runbook.warnings.size} warnings"
-        return runbook.warnings.empty? ? 0 : 1
-      end
-
-      serve(runbook, config, out:, err:)
+      serve(target, config, out:, err:)
       0
     rescue Errno::EADDRINUSE
       err.puts "#{PROGRAM}: port #{config.port} on #{config.bind} is already in use; pick another with --port"
@@ -126,17 +122,40 @@ module Runsheets
       1
     end
 
-    def self.serve(runbook, config, out: $stdout, err: $stderr)
+    # --check: report authoring warnings for a runbook, or for every runbook
+    # in a library, one line each. Exit 1 when anything warned or failed.
+    def self.check(target, out: $stdout, err: $stderr)
+      runbooks = target.is_a?(Library) ? target.entries.map { check_entry(it, err:) } : [target]
+      runbooks.compact.each do |runbook|
+        runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{runbook.slug}: #{it}" } if target.is_a?(Library)
+        runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{it}" } unless target.is_a?(Library)
+        out.puts "#{runbook.title}: #{runbook.steps.size} steps, #{runbook.warnings.size} warnings"
+      end
+      clean = runbooks.all? { it && it.warnings.empty? }
+      clean ? 0 : 1
+    end
+
+    # One library entry's runbook, or nil (and a message) when it does not load.
+    def self.check_entry(entry, err: $stderr)
+      return Runbook.load(entry.path) if entry.ok?
+
+      err.puts "#{PROGRAM}: error: #{entry.slug}: #{entry.error}"
+      nil
+    end
+
+    # Serve a runbook, or a library of them (the operator chooses in the browser).
+    def self.serve(target, config, out: $stdout, err: $stderr)
       bind = config.bind
       port = config.port
-      session = Session.new(runbook:)
-      Web.configure_for(session, bind:, port:)
+      library = target.is_a?(Library) ? target : nil
+      session = library ? nil : Session.new(runbook: target)
+      Web.configure_for(session, bind:, port:, library:)
       url = "http://#{bind}:#{port}/"
       err.puts bind_warning(bind) unless Web.loopback?(bind)
 
       out.puts <<~INFO
         #{PROGRAM} #{VERSION}
-        Runbook: #{runbook.title} (#{runbook.single_file? ? runbook.main_path : runbook.dir})
+        #{target_line(target)}
         Runs:    #{Runsheets.runs_dir}
         Config:  #{config.files.empty? ? 'none (defaults)' : config.files.join(', ')}
         Open #{url} in your browser
@@ -147,7 +166,15 @@ module Runsheets
         open_browser(url) if config.open
       end
     ensure
-      shutdown(session, out:) if session
+      shutdown(Web.session, out:) if Web.session
+    end
+
+    def self.target_line(target)
+      if target.is_a?(Library)
+        "Library: #{target.size} runbooks in #{target.dir}: #{target.entries.map(&:slug).join(', ')}"
+      else
+        "Runbook: #{target.title} (#{target.single_file? ? target.main_path : target.dir})"
+      end
     end
 
     # When the server stops (Ctrl-C, or an error), end the active run as

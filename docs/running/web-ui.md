@@ -11,6 +11,8 @@ a footer with the keyboard shortcuts.
   on pages that are not steps.
 - **Run pill**: grey "no active run", or green with the run id when a run is
   active. The green pill links to the live run record.
+- **Runbooks** appears when the server was started on a directory of
+  runbooks, and leads back to the chooser.
 
 ## Sidebar
 
@@ -40,6 +42,16 @@ in the browser.
 A manual mark always wins over the execution-derived mark, so a step whose
 block failed but was then marked done shows `✓`. The failure is still in
 the record.
+
+## Choosing a runbook
+
+Started on a directory of runbooks (`runsheets ops/runbooks`), the server
+opens on the chooser at `/library`: one panel per runbook with its title,
+whether it is a single file or a directory, its step count, tags, authoring
+warnings, and the `when_to_use` text. **Open** serves that runbook; every
+other page redirects here until one is open. A runbook that does not load
+is listed with the error instead of a button. While a run is active the
+buttons are disabled: finish or abandon the run, then switch.
 
 ## Landing page
 
@@ -200,6 +212,7 @@ drifting away from it.
 | Key | Action |
 | --- | --- |
 | ++h++ | Home |
+| ++r++ | Runbooks (the chooser, when started on a directory of runbooks) |
 | ++arrow-left++ / ++arrow-right++ | Previous / next step |
 | ++s++ | Toggle the sidebar |
 | ++escape++ | Leave a text field |

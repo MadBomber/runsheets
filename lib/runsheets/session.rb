@@ -19,10 +19,13 @@ module Runsheets
 
     STOP_WAIT = Executor::GRACE + 1.0
 
-    attr_reader :runbook, :runs_root, :executor, :run, :token
+    attr_reader :runbook, :runs_root, :executor, :run, :token, :library
 
-    def initialize(runbook:, runs_root: Runsheets.runs_dir, executor: Executor.new, token: SecureRandom.hex(16))
+    # library: the Library this runbook was chosen from, when the server was
+    # started on a directory of runbooks; nil when it serves one runbook.
+    def initialize(runbook:, runs_root: Runsheets.runs_dir, executor: Executor.new, token: SecureRandom.hex(16), library: nil)
       @runbook    = runbook
+      @library    = library
       @runs_root  = runs_root
       @executor   = executor
       @token      = token

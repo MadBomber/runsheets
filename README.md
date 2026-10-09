@@ -26,19 +26,24 @@ Requires Ruby 3.4 or newer.
 
 ```bash
 runsheets                         # serve the bundled examples/hello on http://127.0.0.1:4567/
-runsheets path/to/runbook         # serve your own runbook
+runsheets path/to/runbook         # serve a runbook directory (runbook.md + steps/)
+runsheets path/to/runbook.md      # serve a single all-in-one markdown file
+runsheets path/to/runbooks        # a directory of runbooks: choose one in the browser
 runsheets --open path/to/runbook  # and open the browser
 runsheets --check path/to/runbook # load it, print authoring warnings, exit
 runsheets --init path/to/new      # scaffold a runbook (a .md path makes a single file)
 ```
 
-`path/to/runbook` is a directory, or a single markdown file whose `##`
-headings are the steps. Try the bundled examples:
+The argument is one of three things: a runbook directory, a single
+all-in-one markdown file whose `##` headings are the steps (see
+[Single-file runbooks](docs/runbooks/structure.md#single-file-runbooks)),
+or a directory holding several of either. Try the bundled examples:
 
 ```bash
+runsheets --open examples                      # all three, pick one in the browser
 runsheets --open examples/hello                # safe to run: every block kind
 runsheets --check examples/staging-teardown    # a realistic AWS teardown
-runsheets --check examples/db-maintenance.md   # single file, sql blocks via psql
+runsheets --open examples/db-maintenance.md    # a single all-in-one file, sql blocks via psql
 ```
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
