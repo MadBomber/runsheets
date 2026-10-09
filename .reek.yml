@@ -1,0 +1,79 @@
+---
+# Reek configuration for runsheets. The asgard quality gate (dev/quality.loki)
+# compares smell counts per file against .quality/reek_baseline.txt and fails
+# on new or worsened files, so the baseline grandfathers what is here today
+# and anything added later has to come in clean.
+detectors:
+
+  # Disabled: conflicts with the no-comment-per-class coding style.
+  IrresponsibleModule:
+    enabled: false
+
+  # Disabled: bang methods without non-bang counterparts are the convention
+  # for state transitions here (started!, finished!, stamp!, write!).
+  MissingSafeMethod:
+    enabled: false
+
+  # Disabled: explicit nil checks are idiomatic Ruby.
+  NilCheck:
+    enabled: false
+
+  # Disabled: method size and complexity are Flog's job (the primary gate)
+  # plus RuboCop's Metrics cops.
+  TooManyStatements:
+    enabled: false
+
+  # Pages and the run record are modules of pure functions over a few
+  # objects; a method that mostly asks its argument questions is the design.
+  FeatureEnvy:
+    enabled: false
+
+  UtilityFunction:
+    enabled: false
+
+  # Template-building code repeats step.slug / run.id a few times per method.
+  DuplicateMethodCall:
+    max_calls: 3
+
+  # Execution.new takes one keyword per field it records.
+  LongParameterList:
+    max_params: 5
+
+  # Data-holding classes: Execution tracks state, pid, timing and files.
+  TooManyInstanceVariables:
+    max_instance_variables: 14
+
+  TooManyMethods:
+    max_methods: 40
+
+  # Accept standard short names for limited-scope variables.
+  UncommunicativeVariableName:
+    accept:
+      - _
+      - a
+      - b
+      - e
+      - h
+      - i
+      - j
+      - k
+      - n
+      - s
+      - v
+
+  UncommunicativeParameterName:
+    accept:
+      - i   # index
+      - j
+
+  UncommunicativeMethodName:
+    accept:
+      - h   # Pages.h / Renderer.h, the HTML escape
+
+exclude_paths:
+  - test
+  - docs
+  - examples
+  - site
+  - pkg
+  - tmp

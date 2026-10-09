@@ -1,0 +1,45 @@
+# frozen_string_literal: true
+# runsheets — executable runbooks: markdown steps rendered in the browser, run and recorded.
+#
+# Asgard task file. The shared MadBomber gem tasks come from madbomber/dev,
+# found by walking up from this directory (so no relative paths to keep):
+#   gem_tasks.loki  console, build, install, release
+#   quality.loki    quality (every *_check gate in parallel), test_check, rubocop_check, ...
+#   git.loki        push, pull, fetch
+#   doc_tasks.loki  doc_builder, doc_server (mkdocs.yml is present)
+# Run `asgard help` for the full list.
+
+import_up "dev/gem_tasks.loki"
+import_up "dev/quality.loki"
+import_up "dev/git.loki"
+import_up "dev/doc_tasks.loki"
+
+class Tasks
+  @@gem_name ||= "runsheets".freeze
+
+  header "runsheets v#{gem_version} — executable runbooks"
+  footer "Try: asgard serve   (serves examples/hello and opens the browser)"
+
+  desc "Run the test suite"
+  def test
+    sh "bundle exec rake test"
+  end
+
+  desc "serve [RUNBOOK]", "Serve a runbook (default: examples/hello) and open the browser"
+  option :port, aliases: "-p", type: :numeric, default: 4567, desc: "Port to listen on"
+  option :open, type: :boolean, default: true, desc: "Open the browser once the server is up"
+  def serve(runbook = "examples/hello")
+    sh "bundle exec exe/runsheet --port #{options[:port]}#{' --open' if options[:open]} #{runbook}", exec: true
+  end
+
+  desc "Load every bundled example runbook and report authoring warnings"
+  def check
+    examples = Dir.glob("examples/*").select { |path| File.directory?(path) || path.end_with?(".md") }
+    examples.each { |path| sh "bundle exec exe/runsheet --check #{path}" }
+  end
+
+  desc "Scaffold a new runbook (a path ending in .md makes a single file)"
+  def init(path)
+    sh "bundle exec exe/runsheet --init #{path}"
+  end
+end

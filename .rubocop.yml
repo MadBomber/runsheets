@@ -1,0 +1,173 @@
+AllCops:
+  NewCops: enable
+  SuggestExtensions: false
+  TargetRubyVersion: 3.4
+  Exclude:
+    - 'examples/**/*'
+    - 'docs/**/*'
+    - 'site/**/*'
+    - 'pkg/**/*'
+    - 'tmp/**/*'
+    - 'vendor/**/*'
+
+# ── Style: disabled cops ───────────────────────────────────────────────────
+Style/StringLiterals:
+  Enabled: false
+
+Style/StringLiteralsInInterpolation:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/RescueModifier:
+  Enabled: false
+
+Style/TrivialAccessors:
+  Enabled: false
+
+Style/MultilineTernaryOperator:
+  Enabled: false
+
+Style/SafeNavigation:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/RescueStandardError:
+  Enabled: false
+
+Style/FormatString:
+  Enabled: false
+
+Style/StringConcatenation:
+  Enabled: false
+
+# exit_status == 0 reads better than .zero? for exit codes
+Style/NumericPredicate:
+  Enabled: false
+
+# ENV["NAME"] returning nil is the intent in the places it is used
+Style/FetchEnvVar:
+  Enabled: false
+
+# The pages are HTML built from heredocs; nested interpolation is the tool.
+Style/NestedTernaryOperator:
+  Enabled: false
+
+# ── Layout ─────────────────────────────────────────────────────────────────
+Layout/LineLength:
+  Max: 160
+  Exclude:
+    - 'test/**/*'
+    - 'lib/runsheets/pages.rb'   # HTML heredocs
+    - 'lib/runsheets/assets.rb'  # CSS and JavaScript heredocs
+
+Layout/ExtraSpacing:
+  Enabled: false
+
+Layout/HashAlignment:
+  Enabled: false
+
+Layout/FirstHashElementIndentation:
+  Enabled: false
+
+Layout/EmptyLineAfterGuardClause:
+  Enabled: false
+
+# ── Naming ─────────────────────────────────────────────────────────────────
+Naming/MethodParameterName:
+  Enabled: false
+
+Naming/RescuedExceptionsVariableName:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Naming/PredicatePrefix:
+  Enabled: false
+
+Naming/PredicateMethod:
+  Enabled: false
+
+Naming/VariableNumber:
+  Exclude:
+    - 'test/**/*'
+
+# ── Lint ───────────────────────────────────────────────────────────────────
+Lint/EmptyBlock:
+  Exclude:
+    - 'test/**/*'
+
+Lint/UnusedMethodArgument:
+  Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - 'Rakefile'
+    - 'test/**/*'
+
+# ── Gemspec ────────────────────────────────────────────────────────────────
+Gemspec/DevelopmentDependencies:
+  EnforcedStyle: Gemfile
+
+Gemspec/RequiredRubyVersion:
+  Enabled: false
+
+Gemspec/OrderedDependencies:
+  Enabled: false
+
+# ── Metrics ────────────────────────────────────────────────────────────────
+# Flog is the primary complexity gate (asgard flog_check); these thresholds
+# catch only egregious outliers.
+Metrics/MethodLength:
+  Max: 35
+  CountAsOne:
+    - heredoc
+    - array
+    - hash
+  Exclude:
+    - 'test/**/*'
+
+Metrics/AbcSize:
+  Max: 40
+  Exclude:
+    - 'test/**/*'
+
+Metrics/ClassLength:
+  Max: 300
+  Exclude:
+    - 'test/**/*'
+
+Metrics/ModuleLength:
+  Max: 300
+  Exclude:
+    - 'test/**/*'
+    - 'lib/runsheets/pages.rb'   # one function per page element
+    - 'lib/runsheets/assets.rb'  # CSS and JavaScript strings
+
+Metrics/CyclomaticComplexity:
+  Max: 20
+  Exclude:
+    - 'test/**/*'
+
+Metrics/PerceivedComplexity:
+  Max: 20
+  Exclude:
+    - 'test/**/*'
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Metrics/BlockLength:
+  Max: 60
+  Exclude:
+    - 'Rakefile'
+    - '*.gemspec'
+    - 'test/**/*'
+    - '.loki'
