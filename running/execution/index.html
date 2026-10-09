@@ -1505,7 +1505,7 @@ is on the <a href="../../roadmap/">roadmap</a>.</p>
 <ol>
 <li>The <code>RUNSHEETS_*</code> variables identifying the run, step and block.</li>
 <li>The run's inputs, secrets included.</li>
-<li>The full environment of the <code>runsheet</code> process.</li>
+<li>The full environment of the <code>runsheets</code> process.</li>
 </ol>
 <p>Standard input is <code>/dev/null</code>. A <code>read</code> returns immediately with nothing;
 use a <code>terminal</code> block for anything interactive.</p>
@@ -1515,7 +1515,7 @@ resolved relative to the runbook directory. Relative paths in a block
 therefore mean the same thing on every operator's machine.</p>
 <h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
 <p>Standard output and standard error both go to one pipe, interleaved in the
-order the process wrote them. A thread in the <code>runsheet</code> process reads the
+order the process wrote them. A thread in the <code>runsheets</code> process reads the
 pipe, passes each chunk through the run's redactor (see
 <a href="../../runbooks/inputs/#redaction">Inputs and Secrets</a>), and appends it to
 the execution's <code>.out</code> file, flushing after every chunk. The page polls the
@@ -1543,7 +1543,7 @@ it expires:</p>
 <code>128 + signal</code> (143 for TERM, 137 for KILL), matching what a shell would
 report, and <code>signal</code> holds the raw number.</p>
 <p>The process group is created with <code>pgroup: true</code> at spawn, so the killing
-cannot reach anything the operator's shell started. Stopping the <code>runsheet</code>
+cannot reach anything the operator's shell started. Stopping the <code>runsheets</code>
 server itself does not kill running blocks; finish the run first.</p>
 <h2 id="stopping">Stopping<a class="headerlink" href="#stopping" title="Permanent link">&para;</a></h2>
 <p>A running execution can be stopped by the operator: the Stop button on a

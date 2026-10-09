@@ -1686,7 +1686,7 @@ one before the closing <code>---</code>, and leaves every other byte alone. It r
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">end</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">exit</span><span class="p">(</span><span class="n">failed</span><span class="w"> </span><span class="p">?</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Or simply <code>runsheet --check DIR</code> per runbook.</p>
+<p>Or simply <code>runsheets --check DIR</code> per runbook.</p>
 <h2 id="running-a-runbook-from-a-script">Running a runbook from a script<a class="headerlink" href="#running-a-runbook-from-a-script" title="Permanent link">&para;</a></h2>
 <p><code>Session</code> is the same object the web page drives.</p>
 <div class="language-ruby highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">runbook</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">Runsheets</span><span class="o">::</span><span class="no">Runbook</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"examples/hello"</span><span class="p">)</span>
@@ -1843,12 +1843,25 @@ skipped by <code>list</code>.</p>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="no">Runsheets</span><span class="o">::</span><span class="no">Web</span><span class="o">.</span><span class="n">run!</span>
 </span></code></pre></div>
 <p><code>configure_for</code> wires the session in and restricts permitted hosts to
-loopback plus the bind address. This is what <code>runsheet</code> does.</p>
+loopback plus the bind address. This is what <code>runsheets</code> does.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="language-ruby highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">runs_dir</span><span class="w">          </span><span class="c1"># ENV["RUNSHEETS_RUNS_DIR"] or ~/.local/share/runsheets/runs</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">runs_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/srv/runs"</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="no">Runsheets</span><span class="o">::</span><span class="no">VERSION</span>
+<div class="language-ruby highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">config</span><span class="w">            </span><span class="c1"># Runsheets::Config: the layered settings (see the CLI page)</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">port</span><span class="w">       </span><span class="c1"># 4567 unless the config file, RUNSHEETS_PORT or the CLI say otherwise</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">files</span><span class="w">      </span><span class="c1"># the config files that exist and were read</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">to_config_yaml</span><span class="w">   </span><span class="c1"># the settings in force as config-file text (what --dump prints)</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">configure</span><span class="p">({</span><span class="w"> </span><span class="ss">port</span><span class="p">:</span><span class="w"> </span><span class="mi">4580</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="ss">path</span><span class="p">:</span><span class="w"> </span><span class="s2">"/etc/runsheets.yml"</span><span class="p">)</span><span class="w">  </span><span class="c1"># install your own</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">runs_dir</span><span class="w">          </span><span class="c1"># Runsheets.config.runs_dir unless assigned</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">runs_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/srv/runs"</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="no">Runsheets</span><span class="o">.</span><span class="n">reset_config!</span><span class="w">     </span><span class="c1"># rebuild from the layers on next use</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="no">Runsheets</span><span class="o">::</span><span class="no">VERSION</span>
 </span></code></pre></div>
+<p><code>Runsheets::Config</code> is a <a href="https://github.com/madbomber/myway_config">myway_config</a>
+class. Its layers, lowest to highest: <code>lib/runsheets/config/defaults.yml</code> in the gem,
+<code>~/.config/runsheets/runsheets.yml</code>, the project config (<code>./config/runsheets.yml</code>,
+or the file <code>path:</code> or <code>RUNSHEETS_CONFIG</code> names), <code>RUNSHEETS_*</code>
+variables, then the overrides hash. A <code>Runsheets::ConfigError</code> is raised
+for a port that is not a whole number or a named config file that is
+missing.</p>
 <h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

@@ -1428,7 +1428,7 @@ and a real runbook to prove it; see the plan's open questions.</p>
 <h2 id="milestone-4-packaging">Milestone 4: packaging<a class="headerlink" href="#milestone-4-packaging" title="Permanent link">&para;</a></h2>
 <p>Done.</p>
 <ul>
-<li><strong>Single-file runbooks</strong>: <code>runsheet path/to/runbook.md</code> reads one file
+<li><strong>Single-file runbooks</strong>: <code>runsheets path/to/runbook.md</code> reads one file
   whose <code>##</code> headings are the steps, with step attributes in an HTML
   comment after the heading and Verify and Rollback sections standing in
   for the extra files. Everything downstream sees the same <code>Runbook</code>.</li>
@@ -1442,7 +1442,7 @@ and a real runbook to prove it; see the plan's open questions.</p>
   runbook whose blocks are <code>sql run</code> through <code>psql</code>. Neither can run
   against this machine; both load clean under <code>--check</code> and are test
   fixtures for the loader.</li>
-<li><strong><code>runsheet --init</code></strong> scaffolds a starter runbook, directory or single
+<li><strong><code>runsheets --init</code></strong> scaffolds a starter runbook, directory or single
   file, that passes <code>--check</code>.</li>
 <li><strong>Vocabulary settled</strong>: the document is the <em>runbook</em>; the record of a
   run is the <em>runsheet</em>. The page, sidebar and buttons now say so.</li>

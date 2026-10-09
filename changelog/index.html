@@ -1436,7 +1436,20 @@
 </ul>
 <h3 id="added-milestone-4-packaging">Added (milestone 4: packaging)<a class="headerlink" href="#added-milestone-4-packaging" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Single-file runbooks: <code>runsheet path/to/file.md</code> reads one markdown
+<li>Layered settings through <code>myway_config</code> (<code>Runsheets::Config</code>): the command
+  line beats <code>RUNSHEETS_*</code> environment variables (<code>RUNSHEETS_PORT</code>,
+  <code>RUNSHEETS_BIND</code>, <code>RUNSHEETS_RUNS_DIR</code>, <code>RUNSHEETS_OPEN</code>, <code>RUNSHEETS_CHECK</code>,
+  <code>RUNSHEETS_INIT</code>, <code>RUNSHEETS_DUMP</code>, and <code>RUNSHEETS_DIR</code> for the <code>RUNBOOK</code> argument), which beat
+  the project config <code>./config/runsheets.yml</code> (or the file <code>--config FILE</code> /
+  <code>RUNSHEETS_CONFIG</code> names), which beats the XDG user config
+  <code>~/.config/runsheets/runsheets.yml</code>, which beats the bundled
+  <code>lib/runsheets/config/defaults.yml</code>. <code>--no-open</code>, <code>--no-check</code> and <code>--no-init</code> switch a
+  flag off that a lower layer turned on. <code>Runsheets.config</code> exposes the
+  settings in force; <code>Runsheets.configure</code> installs others.</li>
+<li><code>runsheets --dump</code> prints the settings in force in the shape of a config
+  file to stdout and exits; redirect it to save a run's options as the
+  defaults for later runs. <code>RUNSHEETS_DUMP</code> and <code>--no-dump</code> as for any flag.</li>
+<li>Single-file runbooks: <code>runsheets path/to/file.md</code> reads one markdown
   file whose <code>##</code> headings are the steps, with step attributes in an HTML
   comment after the heading and Verify and Rollback sections standing in
   for <code>verify.md</code> and <code>rollback.md</code> (<code>Runsheets::SingleFile</code>).</li>
@@ -1444,7 +1457,7 @@
   <code>sql run</code> through <code>psql</code> works. Previously the mapping was honoured at
   spawn time but blocks were classified against the built-in languages
   only, so such blocks warned and had no Run button.</li>
-<li><code>runsheet --init PATH</code> scaffolds a starter runbook (directory, or a
+<li><code>runsheets --init PATH</code> scaffolds a starter runbook (directory, or a
   single file when the path ends in <code>.md</code>) that passes <code>--check</code>.</li>
 <li><code>examples/staging-teardown</code> (directory, the shape of a real AWS
   teardown) and <code>examples/db-maintenance.md</code> (single file, <code>sql run</code>
@@ -1454,9 +1467,12 @@
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>runsheet</code> with no RUNBOOK serves the bundled <code>examples/hello</code>. <code>--init</code>
+<li>The executable is <code>runsheets</code>, the same name as the gem (was <code>runsheet</code>).</li>
+<li><code>-c</code> is now short for <code>--config</code>; <code>--check</code> has no short form.</li>
+<li><code>myway_config</code> is a runtime dependency.</li>
+<li><code>runsheets</code> with no RUNBOOK serves the bundled <code>examples/hello</code>. <code>--init</code>
   still needs an explicit path.</li>
-<li>The <code>runsheet</code> executable lives in <code>bin/</code> (was <code>exe/</code>); <code>bin/console</code> and
+<li>The <code>runsheets</code> executable lives in <code>bin/</code> (was <code>exe/</code>); <code>bin/console</code> and
   <code>bin/setup</code> are gone, so <code>bin/</code> holds only what the gem installs.</li>
 <li>Development: <code>.loki</code> task file for asgard, <code>.rubocop.yml</code>, <code>.reek.yml</code> and a
   Reek baseline under <code>.quality/</code>; the quality tools are in the Gemfile and
@@ -1517,7 +1533,7 @@
 </ul>
 <h3 id="added-milestone-1">Added (milestone 1)<a class="headerlink" href="#added-milestone-1" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>runsheet RUNBOOK_DIR</code> serves a runbook directory on loopback; <code>--check</code>
+<li><code>runsheets RUNBOOK_DIR</code> serves a runbook directory on loopback; <code>--check</code>
   loads it and reports authoring warnings.</li>
 <li>Runbook model: <code>runbook.md</code> front matter and preamble, ordered <code>steps/</code>,
   optional <code>verify.md</code> and <code>rollback.md</code>, <code>inputs</code> with secrets,

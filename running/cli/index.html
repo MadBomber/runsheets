@@ -886,10 +886,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#environment" class="md-nav__link">
+  <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Environment
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saving-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving settings
       
     </span>
   </a>
@@ -1335,10 +1346,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#environment" class="md-nav__link">
+  <a href="#settings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Environment
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saving-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving settings
       
     </span>
   </a>
@@ -1460,14 +1482,15 @@
 
 
 <h1 id="command-line">Command Line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h1>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheet [options] [RUNBOOK]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheets [options] [RUNBOOK]
 </span></code></pre></div>
 <p><code>RUNBOOK</code> is either a runbook directory (it must contain <code>runbook.md</code>) or
 a single markdown file whose <code>##</code> headings are the steps (see
 <a href="../../runbooks/structure/#single-file-runbooks">Directory Structure</a>). It
 is the only positional argument. Leave it out and the bundled
 <code>examples/hello</code> is served, which is the quickest way to see the tool;
-<code>--init</code> is the one mode that always needs a path.</p>
+<code>--init</code> is the one mode that always needs a path. <code>dir:</code> in the config file
+or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Settings</a>.</p>
 <h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1478,6 +1501,11 @@ is the only positional argument. Leave it out and the bundled
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>-c</code>, <code>--config FILE</code></td>
+<td><code>./config/runsheets.yml</code></td>
+<td>Config file to read in place of the project config; see <a href="#settings">Settings</a>. A file named here must exist.</td>
+</tr>
 <tr>
 <td><code>-p</code>, <code>--port PORT</code></td>
 <td><code>4567</code></td>
@@ -1496,17 +1524,22 @@ is the only positional argument. Leave it out and the bundled
 <tr>
 <td><code>-o</code>, <code>--open</code></td>
 <td>off</td>
-<td>Open the default browser once the server is listening.</td>
+<td>Open the default browser once the server is listening. <code>--no-open</code> turns it off.</td>
 </tr>
 <tr>
-<td><code>-c</code>, <code>--check</code></td>
+<td><code>--check</code></td>
 <td>off</td>
-<td>Load the runbook, print authoring warnings, and exit without serving.</td>
+<td>Load the runbook, print authoring warnings, and exit without serving. <code>--no-check</code> turns it off.</td>
 </tr>
 <tr>
 <td><code>--init</code></td>
 <td>off</td>
-<td>Create a starter runbook at <code>RUNBOOK</code> and exit: a directory with <code>runbook.md</code>, two steps, <code>verify.md</code> and <code>rollback.md</code>, or a single file when the path ends in <code>.md</code>. Refuses to touch an existing file or a non-empty directory.</td>
+<td>Create a starter runbook at <code>RUNBOOK</code> and exit: a directory with <code>runbook.md</code>, two steps, <code>verify.md</code> and <code>rollback.md</code>, or a single file when the path ends in <code>.md</code>. Refuses to touch an existing file or a non-empty directory. <code>--no-init</code> turns it off.</td>
+</tr>
+<tr>
+<td><code>--dump</code></td>
+<td>off</td>
+<td>Print the settings in force as a config file to stdout and exit. <code>--no-dump</code> turns it off. See <a href="#saving-settings">Saving settings</a>.</td>
 </tr>
 <tr>
 <td><code>-v</code>, <code>--version</code></td>
@@ -1522,33 +1555,34 @@ is the only positional argument. Leave it out and the bundled
 </table>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Start a new runbook, then serve it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># a directory</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runsheet<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh.md<span class="w">     </span><span class="c1"># or a single file</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-refresh
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># a directory</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh.md<span class="w">     </span><span class="c1"># or a single file</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-refresh
 </span></code></pre></div>
 <p>Serve a runbook and open it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/staging-teardown
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>runsheet<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-maintenance.md
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/staging-teardown
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-maintenance.md
 </span></code></pre></div>
 <p>Serve on another port because something else has 4567:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runsheet<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>ops/runbooks/staging-teardown
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runsheets<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>ops/runbooks/staging-teardown
 </span></code></pre></div>
 <p>Keep run records inside a project (but outside the runbook):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheet<span class="w"> </span>--runs-dir<span class="w"> </span>./tmp/runs<span class="w"> </span>ops/runbooks/staging-teardown
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheets<span class="w"> </span>--runs-dir<span class="w"> </span>./tmp/runs<span class="w"> </span>ops/runbooks/staging-teardown
 </span></code></pre></div>
 <p>Validate every runbook in a repository:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">for</span><span class="w"> </span>dir<span class="w"> </span><span class="k">in</span><span class="w"> </span>ops/runbooks/*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>runsheet<span class="w"> </span>--check<span class="w"> </span><span class="s2">"</span><span class="nv">$dir</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">failed</span><span class="o">=</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">for</span><span class="w"> </span>dir<span class="w"> </span><span class="k">in</span><span class="w"> </span>ops/runbooks/*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>runsheets<span class="w"> </span>--check<span class="w"> </span><span class="s2">"</span><span class="nv">$dir</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">failed</span><span class="o">=</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">exit</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">failed</span><span class="k">:-</span><span class="nv">0</span><span class="si">}</span><span class="s2">"</span>
 </span></code></pre></div>
 <h2 id="what-it-prints">What it prints<a class="headerlink" href="#what-it-prints" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheet 0.1.0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheets 0.1.0
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Open http://127.0.0.1:4567/ in your browser
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>Press Ctrl-C to stop
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Config:  /Users/you/.config/runsheets/runsheets.yml
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>Open http://127.0.0.1:4567/ in your browser
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>Press Ctrl-C to stop
 </span></code></pre></div>
 <p>Authoring warnings are printed to stderr before the banner, prefixed
-<code>runsheet: warning:</code>. The server still starts; warnings mark blocks and
+<code>runsheets: warning:</code>. The server still starts; warnings mark blocks and
 steps in the page but do not block serving.</p>
 <p>Puma then prints its own startup lines. Press <span class="keys"><kbd class="key-control">Ctrl</kbd><span>+</span><kbd class="key-c">C</kbd></span> to stop. Any block
 still executing when the server stops is not killed by runsheets; its
@@ -1569,11 +1603,48 @@ want a clean record.</p>
 </tr>
 <tr>
 <td><code>1</code></td>
-<td>Bad arguments, the runbook could not be loaded, the port is in use, or <code>--check</code> found warnings.</td>
+<td>Bad arguments or settings, the runbook could not be loaded, the port is in use, or <code>--check</code> found warnings.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<p>Every option is a setting with the same name (<code>port</code>, <code>bind</code>, <code>runs_dir</code>,
+<code>open</code>, <code>check</code>, <code>init</code>, <code>dump</code>), and the <code>RUNBOOK</code> argument is the setting <code>dir</code>.
+Settings are layered with <a href="https://github.com/madbomber/myway_config">myway_config</a>;
+each layer overrides the one below it, and anything a layer leaves out
+comes from further down:</p>
+<ol>
+<li><strong>Command line.</strong> Whatever is given wins outright.</li>
+<li><strong>Environment variables</strong>, <code>RUNSHEETS_</code> plus the setting name in upper
+   case: <code>RUNSHEETS_PORT</code>, <code>RUNSHEETS_BIND</code>, <code>RUNSHEETS_RUNS_DIR</code>,
+   <code>RUNSHEETS_OPEN</code>, <code>RUNSHEETS_CHECK</code>, <code>RUNSHEETS_INIT</code>, <code>RUNSHEETS_DUMP</code>, <code>RUNSHEETS_DIR</code>.</li>
+<li><strong>The project config</strong>, <code>./config/runsheets.yml</code> in the current directory,
+   or the file <code>--config FILE</code> or <code>RUNSHEETS_CONFIG</code> names in its place. The
+   project file may be absent; a file named explicitly must exist.</li>
+<li><strong>The user config</strong>, <code>~/.config/runsheets/runsheets.yml</code> (or under
+   <code>$XDG_CONFIG_HOME</code>), which myway_config reads for every application. This
+   is where personal settings belong.</li>
+<li><strong>Bundled defaults</strong>, <code>lib/runsheets/config/defaults.yml</code> inside the gem. That file is
+   the list of settings and documents each one.</li>
+</ol>
+<p>Config files are flat YAML, one key per setting. Paths may start with
+<code>~</code> and relative paths are taken from the current directory. Flags are on
+for <code>1</code>, <code>true</code>, <code>yes</code> or <code>on</code> (any case) and off for any other value, so
+<code>RUNSHEETS_OPEN=off</code> switches off an <code>open: true</code> in the file, and
+<code>--no-open</code> switches off either. A blank value (<code>RUNSHEETS_PORT=</code>) counts as
+unset. A port that is not a whole number, or a named config file that does
+not exist, is reported and the command exits <code>1</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># ~/.config/runsheets/runsheets.yml</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runbooks/db-refresh</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4580</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nt">runs_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runs</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">open</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span></code></pre></div>
+<p>With that file, plain <code>runsheets</code> serves the db-refresh runbook on port 4580
+and opens the browser; <code>runsheets --check</code> checks it instead; and
+<code>RUNSHEETS_PORT=4581 runsheets</code> or <code>runsheets -p 4581</code> moves it for one run. A
+repository can carry its own <code>config/runsheets.yml</code> (say <code>dir:</code> and
+<code>runs_dir:</code>) that applies whenever <code>runsheets</code> is run from its root.</p>
 <table>
 <thead>
 <tr>
@@ -1583,12 +1654,20 @@ want a clean record.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>RUNSHEETS_RUNS_DIR</code></td>
-<td>Default for <code>--runs-dir</code>.</td>
+<td><code>RUNSHEETS_CONFIG</code></td>
+<td>The file read in place of <code>./config/runsheets.yml</code>, when <code>--config</code> is not given.</td>
+</tr>
+<tr>
+<td><code>RUNSHEETS_&lt;SETTING&gt;</code></td>
+<td>The setting of that name, as above.</td>
+</tr>
+<tr>
+<td><code>RACK_ENV</code></td>
+<td>Selects an environment section (<code>development</code>, <code>test</code>, <code>production</code>) in <code>defaults.yml</code>; none is required.</td>
 </tr>
 <tr>
 <td><code>PORT</code></td>
-<td>Not used. Pass <code>--port</code>.</td>
+<td>Not used. Set <code>RUNSHEETS_PORT</code> or pass <code>--port</code>.</td>
 </tr>
 <tr>
 <td>anything else</td>
@@ -1596,6 +1675,18 @@ want a clean record.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="saving-settings">Saving settings<a class="headerlink" href="#saving-settings" title="Permanent link">&para;</a></h2>
+<p><code>--dump</code> prints the settings in force, after every layer has been applied,
+in the shape of a config file, and exits. Redirect it to save them. Run it
+with the options you want to keep and they become the defaults for later
+runs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># look first</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w"> </span>&gt;<span class="w"> </span>~/.config/runsheets/runsheets.yml
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>runsheets<span class="w">                                                  </span><span class="c1"># now serves db-refresh on 4580</span>
+</span></code></pre></div>
+<p>Redirect to <code>config/runsheets.yml</code> instead for a project config to commit
+with a repository. <code>dump</code> itself is never in the output, so a saved file
+cannot make every later run print and exit.</p>
 <h2 id="about-bind">About <code>--bind</code><a class="headerlink" href="#about-bind" title="Permanent link">&para;</a></h2>
 <p>The default binds to loopback and the server only accepts requests whose
 <code>Host</code> header is <code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code> or the bind address. That
@@ -1612,7 +1703,7 @@ anything it left running (a <code>background</code> block, a block that was stil
 going) is stopped, and the run record is written, so nothing outlives the
 tool and no record is left saying <code>running</code>.</p>
 <h2 id="running-from-a-checkout">Running from a checkout<a class="headerlink" href="#running-from-a-checkout" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>bin/runsheet<span class="w"> </span>--open<span class="w"> </span>examples/hello
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>bundle<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>bin/runsheets<span class="w"> </span>--open<span class="w"> </span>examples/hello
 </span></code></pre></div>
 
 

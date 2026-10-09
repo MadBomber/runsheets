@@ -1264,7 +1264,7 @@ writes a record of each run to disk.</p>
 <ul>
 <li>
 <p><strong><a href="cli/">Command Line</a></strong></p>
-<p><code>runsheet</code> and its options, exit codes, and the environment variables it
+<p><code>runsheets</code> and its options, exit codes, and the environment variables it
 honours.</p>
 </li>
 <li>
@@ -1285,13 +1285,13 @@ and the <code>run.md</code> transcript.</p>
 </ul>
 </div>
 <h2 id="one-run-at-a-time">One run at a time<a class="headerlink" href="#one-run-at-a-time" title="Permanent link">&para;</a></h2>
-<p>A <code>runsheet</code> process serves exactly one runbook and holds at most one active
+<p>A <code>runsheets</code> process serves exactly one runbook and holds at most one active
 run. Starting a second run while one is active is refused; finish or
 abandon the first. To work two runbooks at once, start two processes on
 different ports.</p>
 <h2 id="where-the-shell-comes-from">Where the shell comes from<a class="headerlink" href="#where-the-shell-comes-from" title="Permanent link">&para;</a></h2>
 <p>Executed blocks inherit the environment of the shell that started
-<code>runsheet</code>. If a runbook needs an SSO session, a VPN, a tunnel, or a
+<code>runsheets</code>. If a runbook needs an SSO session, a VPN, a tunnel, or a
 particular <code>PATH</code>, set those up in the terminal first, then start the
 server from it.</p>
 <div class="diagram">

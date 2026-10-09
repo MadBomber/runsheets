@@ -1554,8 +1554,9 @@ correctly and contains no colons (awkward on macOS and in archives). A
 verification run adds <code>-verify</code>. Two runs started in the same second get
 <code>-2</code>, <code>-3</code> suffixes.</p>
 <h2 id="location">Location<a class="headerlink" href="#location" title="Permanent link">&para;</a></h2>
-<p>Default: <code>~/.local/share/runsheets/runs</code>. Override with <code>--runs-dir</code> or
-<code>RUNSHEETS_RUNS_DIR</code>.</p>
+<p>Default: <code>~/.local/share/runsheets/runs</code>. Override with <code>--runs-dir</code>,
+<code>RUNSHEETS_RUNS_DIR</code>, or <code>runs_dir:</code> in the config file (see
+<a href="../cli/#settings">Command Line</a>).</p>
 <p>Why outside the runbook: captured output may contain account ids,
 hostnames, row counts, anything a command prints. That does not belong in a
 repository next to the docs. The runbook directory stays clean, and
@@ -1805,7 +1806,7 @@ only such runs are offered the <code>last_verified</code> stamp.</p>
 <li>At finish, after anything still running has been stopped.</li>
 </ul>
 <p>So a <code>run.json</code> read while a run is active is at most one poll interval
-behind. If the <code>runsheet</code> process is killed mid-run, the record stays with
+behind. If the <code>runsheets</code> process is killed mid-run, the record stays with
 <code>status: running</code>; the block files are intact.</p>
 <h2 id="reading-records-programmatically">Reading records programmatically<a class="headerlink" href="#reading-records-programmatically" title="Permanent link">&para;</a></h2>
 <div class="language-ruby highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">require</span><span class="w"> </span><span class="s2">"runsheets"</span>

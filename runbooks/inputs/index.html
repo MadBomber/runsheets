@@ -1510,7 +1510,7 @@ copy-pasteable into a terminal unchanged:</p>
 <ol>
 <li>What the operator typed in the form.</li>
 <li>If blank, the environment variable of the same name in the process that
-   started <code>runsheet</code>. A devcontainer with <code>AWS_PROFILE</code> already set needs no
+   started <code>runsheets</code>. A devcontainer with <code>AWS_PROFILE</code> already set needs no
    typing.</li>
 <li>If still blank, the <code>default</code> from the front matter.</li>
 <li>Otherwise the empty string.</li>
@@ -1602,10 +1602,10 @@ it needs to:</p>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="sb">```</span>
 </span></code></pre></div>
 <h2 id="the-rest-of-the-environment">The rest of the environment<a class="headerlink" href="#the-rest-of-the-environment" title="Permanent link">&para;</a></h2>
-<p>The child inherits the full environment of the <code>runsheet</code> process, with
+<p>The child inherits the full environment of the <code>runsheets</code> process, with
 inputs and the <code>RUNSHEETS_*</code> variables layered on top. SSO sessions, <code>PATH</code>,
 <code>HOME</code>, tunnels and anything else the operator's shell had are available.
-Start <code>runsheet</code> from the shell you would have run the commands in.</p>
+Start <code>runsheets</code> from the shell you would have run the commands in.</p>
 
 
 
