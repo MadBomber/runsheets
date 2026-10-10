@@ -82,7 +82,14 @@ class TestRenderer < Minitest::Test
     assert_includes out, 'src="/files/assets/a.svg"'
     assert_includes out, 'src="https://x/y.png"'
     assert_includes out, 'href="#top"'
-    assert_includes out, 'href="/files/steps/notes.md"'
+    assert_includes out, 'href="/docs/steps/notes.md"'
+  end
+
+  def test_links_to_markdown_go_to_the_docs_route_and_other_files_to_files
+    out = Renderer.rewrite_relative_urls('<a href="../guide.MD#setup">g</a><a href="data.csv">d</a><img src="x.md">', "steps")
+    assert_includes out, 'href="/docs/guide.MD#setup"'
+    assert_includes out, 'href="/files/steps/data.csv"'
+    assert_includes out, 'src="/files/steps/x.md"'
   end
 
   def test_relative_url_escaping_root_is_left_alone

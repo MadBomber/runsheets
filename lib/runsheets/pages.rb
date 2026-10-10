@@ -22,7 +22,6 @@ module Runsheets
       alert:  '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v5"/><path d="M12 18h.01"/></svg>',
       log:    '<svg class="icon" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
       check:  '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="m8.5 12 2.5 2.5L21 4.5"/></svg>',
-      stamp:  '<svg class="icon" viewBox="0 0 24 24"><path d="M5 20h14"/><path d="M7 16h10v-3H7z"/><path d="M10 13V9a2 2 0 1 1 4 0v4"/></svg>',
       folder: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
       file:   '<svg class="icon" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>',
       search: '<svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>',
@@ -37,7 +36,7 @@ module Runsheets
     # Layout
     # ------------------------------------------------------------------
 
-    def self.layout(session, title:, body:, kind:, step: nil, nonce: nil)
+    def self.layout(session, title:, body:, kind:, step: nil, nonce: nil, query: "")
       runbook = session.runbook
       nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
       <<~HTML
@@ -52,7 +51,7 @@ module Runsheets
           <style#{nonce_attr}>#{Assets.stylesheet}</style>
         </head>
         <body class="kind-#{kind}">
-          #{header(session, step:, kind:)}
+          #{header(session, step:, kind:, query:)}
           <div class="rs-shell">
             #{sidebar(session, step:, kind:)}
             <main class="rs-main">
@@ -61,12 +60,20 @@ module Runsheets
           </div>
           <footer class="rs-footer">
             <span>#{h APP_NAME} · #{h APP_FULL} · #{h runbook.dir}</span>
-            <span class="keys"><kbd>h</kbd> home <kbd>←</kbd><kbd>→</kbd> prev/next step <kbd>s</kbd> sidebar</span>
+            <span class="keys"><kbd>f</kbd> search <kbd>h</kbd> home <kbd>←</kbd><kbd>→</kbd> prev/next step <kbd>s</kbd> sidebar</span>
           </footer>
           <script#{nonce_attr}>#{Assets.javascript}</script>
         </body>
         </html>
       HTML
+    end
+
+    # The search box in every header: a plain GET form, so it works
+    # without script. [f] focuses it.
+    def self.search_box(query = "")
+      "<form class=\"rs-search\" action=\"/search\" method=\"get\" role=\"search\">#{ICONS[:search]}" \
+        "<input type=\"search\" name=\"q\" id=\"rs-search\" value=\"#{h query}\" placeholder=\"Search runbooks\" " \
+        "aria-label=\"Search runbooks\" autocomplete=\"off\" spellcheck=\"false\"><kbd>f</kbd></form>"
     end
 
     def self.nav_button(label, href, icon, key: nil, title: nil)
@@ -81,7 +88,7 @@ module Runsheets
 
     def self.step_href(step) = "/steps/#{Rack::Utils.escape_path(step.slug)}"
 
-    def self.header(session, step:, kind:)
+    def self.header(session, step:, kind:, query: "")
       runbook   = session.runbook
       prev, nxt = step ? runbook.neighbors(step) : [nil, nil]
       crumbs    = library_crumbs(session)
@@ -108,6 +115,7 @@ module Runsheets
           </div>
           <nav class="crumbs" aria-label="Breadcrumb">#{crumbs.join('<span class="sep">/</span>')}</nav>
           <nav class="actions" aria-label="Step navigation">
+            #{search_box(query)}
             #{nav_button('Runbooks', '/library', :book, key: 'r', title: 'Choose another runbook') if session.library}
             #{nav_button('Prev', prev && step_href(prev), :prev, key: '←', title: prev&.title)}
             #{nav_button('Next', nxt && step_href(nxt), :next, key: '→', title: nxt&.title)}
@@ -139,7 +147,7 @@ module Runsheets
             <ol class="steps">#{step_items(session, step).join}</ol>
           </section>
           #{"<section><h2>Also</h2><ul>#{extras.join}</ul></section>" unless extras.empty?}
-          #{rollback_panel(session.runbook, kind)}
+          #{rollback_panel(session, kind)}
           <section class="outline"><h2>On this page</h2><ol id="outline"></ol></section>
         </aside>
       HTML
@@ -172,14 +180,15 @@ module Runsheets
       "<li#{' class="active"' if active}><a href=\"#{h href}\"><span class=\"num\">#{icon}</span><span class=\"name\">#{h name}</span><span></span></a></li>"
     end
 
-    def self.rollback_panel(runbook, kind)
-      return "" unless runbook.rollback && kind == :step
+    def self.rollback_panel(session, kind)
+      rollback = session.runbook.rollback
+      return "" unless rollback && kind == :step
 
       <<~HTML
         <section>
           <details>
             <summary>Rollback</summary>
-            <div class="rollback-body markdown-body">#{runbook.rollback.html}</div>
+            <div class="rollback-body markdown-body">#{document_html(session, rollback)}</div>
           </details>
         </section>
       HTML
@@ -243,7 +252,7 @@ module Runsheets
       <<~HTML
         <div class="page-head">
           <h1>#{ICONS[:book]} #{h runbook.title}</h1>
-          <p class="sub">#{runbook.steps.size} step#{'s' unless runbook.steps.size == 1}#{" · last verified #{h runbook.last_verified}" if runbook.last_verified}</p>
+          <p class="sub">#{runbook.steps.size} step#{'s' unless runbook.steps.size == 1}</p>
           #{"<div class=\"badges\">#{badges.join}</div>" unless badges.empty?}
         </div>
       HTML
@@ -272,13 +281,12 @@ module Runsheets
       rows["Prerequisites"] = "<ul>#{runbook.prerequisites.map { "<li>#{h it}</li>" }.join}</ul>" if runbook.prerequisites.any?
       rows["Blast radius"] = "<span class=\"badge destructive\">destructive</span> #{h runbook.blast_radius}" if runbook.blast_radius
       rows["Escalation"] = h(runbook.escalation) if runbook.escalation
-      rows["Last verified"] = h(runbook.last_verified) if runbook.last_verified
       rows
     end
 
     # Start-run form, or the active run's controls.
     def self.run_panel(session)
-      session.active? ? active_run_panel(session) : stamp_panel(session) + start_panel(session)
+      session.active? ? active_run_panel(session) : start_panel(session)
     end
 
     def self.active_run_panel(session)
@@ -317,25 +325,6 @@ module Runsheets
     def self.finish_form(token, status, label, style)
       "<form method=\"post\" action=\"/run/finish\"><input type=\"hidden\" name=\"_token\" value=\"#{h token}\">" \
         "<input type=\"hidden\" name=\"status\" value=\"#{status}\"><button class=\"btn #{style}\" type=\"submit\">#{h label}</button></form>"
-    end
-
-    # Offer to write last_verified after a run that verified the runbook.
-    def self.stamp_panel(session)
-      run = session.stamp_candidate
-      return "" unless run
-
-      runbook = session.runbook
-      what = run.verify? ? "Verification #{h run.id} ran every check with nothing left failing" : "Run #{h run.id} completed with all #{runbook.steps.size} steps done"
-      <<~HTML
-        <section class="panel stamp">
-          <h2>#{ICONS[:stamp]} Record the verification</h2>
-          <p>#{what}. Stamp <code>last_verified: #{h session.stamp_date}</code> into <code>runbook.md</code>?#{" It currently says <code>#{h runbook.last_verified}</code>." if runbook.last_verified} This is the only change runsheets ever makes to a runbook, and only when you ask.</p>
-          <div class="btn-row">
-            <form method="post" action="/run/stamp"><input type="hidden" name="_token" value="#{h session.token}"><button class="btn ok" type="submit">Stamp runbook.md</button></form>
-            <form method="post" action="/run/stamp/dismiss"><input type="hidden" name="_token" value="#{h session.token}"><button class="btn" type="submit">Not now</button></form>
-          </div>
-        </section>
-      HTML
     end
 
     def self.start_panel(session)
@@ -419,24 +408,18 @@ module Runsheets
 
     def self.history_row(run, total)
       s       = run.summary
-      verdict = history_verdict(run, s, total)
+      verdict = s[:status]
       kind    = run.verify? ? "verify" : "run"
       <<~LI
         <li class="#{h verdict}">
           <a href="/runs/#{h s[:id]}">#{h s[:id]}</a>
           <span class="badge #{kind}">#{kind}</span>
-          <span class="meta verdict">#{h verdict}#{' · stamped' if s[:stamped]}</span>
+          <span class="meta verdict">#{h verdict}</span>
           <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h duration_text(s[:duration])}</span>
           <span class="meta">#{s[:executions]} exec · #{s[:failures]} failed</span>
           <span class="meta">#{history_progress(run, s, total)}</span>
         </li>
       LI
-    end
-
-    def self.history_verdict(run, summary, total)
-      return "running" if summary[:status] == "running"
-
-      run.verified?(steps: total) ? "verified" : summary[:status]
     end
 
     def self.history_progress(run, summary, total)
@@ -460,7 +443,7 @@ module Runsheets
         </div>
         #{warnings_banner(step.warnings)}
         #{step_banners(session, step)}
-        <article class="markdown-body">#{step.html}</article>
+        <article class="markdown-body">#{document_html(session, step)}</article>
         #{mark_panel(session, step)}
         #{step_nav(session.runbook, step)}
         <script type="application/json" id="rs-prior">#{prior_executions_json(session, step)}</script>
@@ -500,6 +483,30 @@ module Runsheets
                "<strong>This step is destructive.</strong> Read it fully before running anything. #{confirm}"
              end
       "<div class=\"banner danger\">#{ICONS[:alert]}<div>#{body}</div></div>"
+    end
+
+    # A document's rendered markdown with every button that cannot work right
+    # now rendered disabled, its title saying why.
+    def self.document_html(session, doc)
+      locks = { "execute" => execute_lock(session, doc), "acknowledge" => acknowledge_lock(session) }
+      locks.compact.reduce(doc.html) { |html, (action, reason)| lock_buttons(html, action, reason) }
+    end
+
+    # Why blocks in +doc+ cannot execute right now, or nil if they can.
+    def self.execute_lock(session, doc)
+      return "Start a run to execute blocks" unless session.active?
+      return "A verification run only executes verify steps and verify.md" if session.verifying? && !session.runbook.verify_document?(doc)
+
+      nil
+    end
+
+    # Why terminal blocks cannot be confirmed right now, or nil if they can.
+    def self.acknowledge_lock(session) = session.active? ? nil : "Start a run to confirm terminal blocks"
+
+    # Every button in +html+ with this data-action, disabled, marked
+    # data-locked, and titled with +reason+.
+    def self.lock_buttons(html, action, reason)
+      html.gsub(%(data-action="#{action}"), %(data-action="#{action}" data-locked disabled title="#{h reason}"))
     end
 
     def self.info_banner(html) = "<div class=\"banner info\">#{ICONS[:alert]}<div>#{html}</div></div>"
@@ -575,14 +582,14 @@ module Runsheets
           <section class="check-doc">
             <h2 id="check-#{h doc.slug}"><span class="badge verify">#{label}</span> <a href="#{h step_href(doc)}">#{h doc.title}</a></h2>
             #{warnings_banner(doc.warnings)}
-            <article class="markdown-body">#{doc.html}</article>
+            <article class="markdown-body">#{document_html(session, doc)}</article>
           </section>
         SECTION
       end
       body = <<~HTML
         <div class="page-head">
           <h1>#{ICONS[:check]} Checks</h1>
-          <p class="sub">#{docs.size} verify document#{'s' unless docs.size == 1} · #{checks} executable check#{'s' unless checks == 1}#{" · last verified #{h runbook.last_verified}" if runbook.last_verified}</p>
+          <p class="sub">#{docs.size} verify document#{'s' unless docs.size == 1} · #{checks} executable check#{'s' unless checks == 1}</p>
         </div>
         #{banner}
         #{toolbar}
@@ -643,6 +650,20 @@ module Runsheets
       HTML
     end
 
+    # A plain markdown document the runbook links to: rendered, with nothing
+    # executable, its front matter (if any) left out.
+    def self.document(session, path, nonce: nil)
+      text  = FrontMatter.parse(File.read(path, encoding: "UTF-8")).body
+      title = Renderer.title_of(text) || File.basename(path, ".*")
+      base  = File.dirname(path).delete_prefix(Runbook.real_path(session.runbook.root)).delete_prefix("/")
+      html  = Renderer.rewrite_relative_urls(Renderer.render_plain(text), base)
+      body  = <<~HTML
+        <div class="banner info">#{ICONS[:alert]}<div>A document linked from this runbook, not a step: nothing here executes.</div></div>
+        <article class="markdown-body">#{html}</article>
+      HTML
+      layout(session, title:, body:, kind: :document, nonce:)
+    end
+
     def self.error(session, message, status, nonce: nil)
       body = <<~HTML
         <div class="page-head">
@@ -658,3 +679,4 @@ end
 
 require_relative "pages/chooser"
 require_relative "pages/tree"
+require_relative "pages/search"

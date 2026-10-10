@@ -47,18 +47,16 @@ Done.
   `verify.md`. A **Checks** page gathers those documents with a **Run all**
   button that runs every check in order. The record is written like any
   other run and listed in history with a `verify` badge.
-- **`last_verified` write-back**: after a completed run with every step
-  done, or a completed verification with every check run and nothing left
-  failing, the landing page offers to stamp the run's date into
-  `runbook.md`. Targeted replacement of that one front-matter line, only on
-  request, noted in the run record as a `stamp` event. The only write the
-  tool ever makes inside a runbook directory.
-- **Richer history**: each previous run shows its kind, verdict
-  (`verified`, `completed`, `abandoned`), start time, duration, executions
+- **Richer history**: each previous run shows its kind, status
+  (`completed`, `abandoned`, `running`), start time, duration, executions
   and failures, steps done or checks run, and which step it stopped at.
 - **Drift**: a run record page shows, for every block that ran, whether
   its code in the runbook has changed since, with a line diff, or whether
   the block is gone.
+
+This milestone also wrote a `last_verified` date back into `runbook.md`
+after a verifying run. That was later removed; runsheets now never writes
+inside a runbook directory.
 
 ## Milestone 4: packaging
 

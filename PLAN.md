@@ -18,6 +18,9 @@ Repo: `~/sandbox/git_repos/madbomber/runsheets`. Origin copy of this plan: `~/sc
 - [The run record](#the-run-record)
 - [Architecture](#architecture)
 - [Security posture](#security-posture)
+- [Sessions (milestone 5 design)](#sessions-milestone-5-design)
+- [Activity database (milestone 6 design)](#activity-database-milestone-6-design)
+- [Rails engine (milestone 7 design)](#rails-engine-milestone-7-design)
 - [Milestones](#milestones)
 - [Open questions](#open-questions)
 - [Discussion log](#discussion-log)
@@ -37,7 +40,6 @@ reliably.
 - fenced blocks the author marks as executable get a Run button
 - every execution and its output is captured, in order, into a run record
 - manual steps are acknowledged by the operator and that acknowledgement is recorded
-- finishing a run can stamp the runbook with the date it was last exercised
 
 The rendering is the vehicle. The run record is the point.
 
@@ -60,7 +62,7 @@ The rendering is the vehicle. The run record is the point.
 | Redaction | Child output goes through a pipe and a reader thread that replaces secret values before writing the `.out` file, holding back a tail that could be a partial secret | Letting the child write the file directly made redaction impossible. Plain string replacement; encoded secrets are documented as out of scope. |
 | Stopped is not failed | Operator stops and run-end stops record state `stopped`, distinct from `timed_out` | A background tunnel stopped on purpose must not mark the step failed. |
 | Standalone verification | A run of kind `verify` that may execute only verify documents, with its own record | Keeps "every execution belongs to a record" true; the alternative (executing verify blocks with no run) would have been the one unrecorded path. |
-| What earns the stamp | Completed, nothing left failing (latest execution per block), and all steps done or at least one check run | "Every step done" alone would let a step whose block failed be marked done and stamp anyway; "no failures ever" would block a stamp after a harmless retry. |
+| `last_verified` | Dropped 2026-10-09 (it was a front matter date stamped after a run that exercised the whole runbook) | It never said what "verified" meant: not that the prose was right, not that output was correct, and not tied to the runbook's content, so an edit the next day left the stamp standing. A runbook-wide date also fits sessions and pick-and-choose step execution badly. May come back as per-step dates computed from run history. |
 | Live reload | The session re-reads the runbook on a GET when a source file's mtime is newer than the load | Drift must compare against the file on disk, and editing a runbook with the server up is the natural authoring loop inherited from tdv.rb. |
 | Lineage | Builds on `~/scripts/tdv.rb` | Sinatra + kramdown GFM + rouge, directory index, breadcrumbs, search, sidebar outline. Reuse the layout and rendering; add execution and recording. |
 | Scripting language | Ruby, standard library plus the few gems tdv.rb already uses | Matches the author's tooling. |
@@ -102,7 +104,6 @@ blast_radius: >
   Destroys the staging database, container images, and DNS. Irreversible
   once Step 5 starts.
 escalation: Stop and contact the platform owner if any stack delete fails twice.
-last_verified: 2026-09-12
 tags: [aws, staging, destructive]
 inputs:
   - name: AWS_PROFILE
@@ -218,9 +219,7 @@ Why outside the runbook: captured output may contain account-scoped data that do
 belong in a repository next to the docs. The runbook directory stays clean and
 committable.
 
-One deliberate write-back into the runbook: finishing a run with every step done
-offers to update `last_verified` in `runbook.md`. That is the only file the tool ever
-modifies, and only on request.
+The tool never writes inside the runbook directory.
 
 The landing page lists previous runs for the runbook with start time, duration, steps
 completed, and whether any block failed, so the history is browsable without opening
@@ -257,10 +256,384 @@ recording and rendering are tested without spawning processes.
 - Destructive blocks require typed confirmation and show the blast radius first.
 - Secrets never reach the run record. Redaction runs over captured output before it is
   written.
-- The tool modifies exactly one file in the runbook directory, `runbook.md`, and only
-  to update `last_verified`, and only when asked.
+- The tool never modifies anything in the runbook directory.
 - No remote execution, no agent, no daemon. It is a script an operator starts and
   stops.
+
+## Sessions (milestone 5 design)
+
+Proposed 2026-10-09, not built. Using runsheets on a library showed that one run per
+runbook, started and finished by hand, is the wrong unit. An engineer sits down for a
+reason (a shift, an incident, a change window), works through parts of several
+runbooks, and stops. The record should look like that.
+
+### The model
+
+- **Session.** Everything that happens between the `runsheets` process starting and
+  terminating. It belongs to one engineer, and opens with a note saying why. It is the
+  engineer's notebook.
+- **Run.** One runbook's part of a session. Selecting a runbook establishes its run;
+  selecting it again later in the same session returns to the same run. Within it
+  the engineer works through the steps in sequence, or picks only the steps they
+  need, in any order.
+- **Switching.** Selecting a different runbook keeps the session going and leaves the
+  earlier run open. Nothing has to be finished first.
+- **Ending.** Runs are not finished one by one. Every run open in a session ends when
+  the session ends, and the session ends when the process terminates.
+
+### Flow
+
+1. `runsheets` starts. Before anything else the session needs **who** and **why**.
+   The browser opens on a Start session page with two fields: engineer (prefilled,
+   see below) and why (free text, required). The why is not a separate field of the
+   session: it is the first timestamped entry in the session notes. `--engineer` and `--why` on the
+   command line (or `RUNSHEETS_ENGINEER`, `RUNSHEETS_WHY`, config `engineer:`)
+   fill them in and skip the page. Engineer prefill: config, then `git config
+   user.name`, then `$USER`. The engineer is self-asserted, not authenticated; it
+   says who claimed to be at the keyboard.
+2. The engineer selects a runbook from the library (or the only runbook, when started
+   on one). The runbook's inputs form appears; submitting it establishes the run and
+   lands on the runbook page.
+3. On the runbook page: **Work through the steps** goes to step 1 with prev/next as
+   today; any step in the list can be opened and run directly. Run buttons are live
+   on every step page of a runbook that has a run in this session.
+4. Switching: the library is always reachable. Selecting another runbook establishes
+   (or returns to) its run. The header shows the session (engineer, the opening note, elapsed)
+   and the runbooks with runs in it.
+5. Ending: Ctrl-C in the terminal, or an **End session** button that ends the session
+   and stops the server. Either way every background process is stopped and every run
+   and the session are closed and written.
+
+### What changes
+
+- **Run end status** is derived when the session ends, not chosen: `completed` when
+  every step is done or skipped, `partial` when anything was executed or marked but not
+  every step, `opened` when the runbook was selected and nothing was done. A session
+  (and its runs) still marked running at startup (the process was killed) is closed as
+  `interrupted` by the next start.
+- **No Start run / Finish / Abandon buttons.** Selecting a runbook starts its run; the
+  session's end finishes it.
+- **Verification is not a separate run kind.** The Checks page and **Run all** work
+  inside the runbook's run.
+- **Inputs** belong to a run. A value given for a same-named input earlier in the
+  session is offered as the default. Secrets are never carried between runs.
+  Changing an input mid-run is an `inputs` event in the record.
+- **Background processes** keep running when the engineer switches runbooks. The
+  Running panel lists every one in the session with its runbook.
+- **One session per process.** Two engineers, or two sessions, means two processes on
+  two ports, as today.
+
+### Session notes
+
+Decided 2026-10-09. The session page has a free-text notes box; every entry is
+timestamped and goes into the session timeline. The why given at the start is the
+first note, nothing more. A session is a session whatever is being done in it: when
+maintenance turns into an incident, the engineer writes a note; there is no reason
+field to amend.
+
+### Session log
+
+Proposed 2026-10-10. Every session writes a `session.log`: a plain text file, appended
+as things happen, in the spirit of a Rails log. Every engineering action is a
+timestamped line, and the output an action produces is written into the log as it
+arrives. It is the session's notebook in its most durable and most readable form:
+`tail -f` it during the session, `grep` it afterwards, read it without runsheets.
+
+```text
+2026-10-10 14:02:05.120 INFO  [session] started engineer="Dewayne VanHoozer" host=darmok pid=1472 runsheets=0.0.1
+2026-10-10 14:02:05.121 INFO  [session] note: Monthly maintenance on the app database
+2026-10-10 14:02:30.010 INFO  [db-maintenance] run opened inputs PGHOST=localhost PGUSER=app_owner PGPASSWORD=[secret]
+2026-10-10 14:02:41.200 INFO  [db-maintenance 010-check-the-connection #1a2b] execute sql via psql -X -v ON_ERROR_STOP=1 --pset footer=off -f …
+2026-10-10 14:02:41.200 INFO  [#1a2b] $ select current_database() as database, current_user as role, version();
+2026-10-10 14:02:41.540 INFO  [#1a2b] >  database |   role    | version
+2026-10-10 14:02:41.540 INFO  [#1a2b] > ----------+-----------+------------------------------
+2026-10-10 14:02:41.541 INFO  [#1a2b] finished exit 0 in 0.34s
+2026-10-10 14:03:10.002 INFO  [db-maintenance 010-check-the-connection] marked done: connection fine
+2026-10-10 14:20:44.900 INFO  [session] ended (Ctrl-C) runs: db-maintenance partial
+```
+
+- **One event per line.** Timestamp to the millisecond, then tags in brackets naming
+  where it happened (`session`, the runbook, the step, the execution), then the event.
+  Multi-line text (a note, the code that ran) is one line per source line, each with the
+  same prefix, so every line of the file stands alone under `grep`.
+- **Code and output are marked.** `$` lines are the code that ran, `>` lines its output.
+  Output is written line by line as it arrives, each line tagged with its execution id,
+  so output from a background block and a foreground block running together stays
+  attributable: `grep '#1a2b'` extracts one execution.
+- **What is logged.** Every state change: session start and end (and how it ended),
+  notes, runbook selected, inputs (secret values as `[secret]`), execute (the
+  interpreter command and the code), destructive confirmation, stop, exit status and
+  duration, timeouts, terminal acknowledgements with their notes, step marks with their
+  notes. Page views and searches only with `--verbose`.
+- **Redaction.** The log goes through the same redactor as captured output; secret
+  values never reach it.
+- **Durability.** Opened in append mode and flushed after every line, so a crash or a
+  `kill -9` leaves everything up to that moment on disk. The next start notes the
+  interrupted session in its own log.
+- **Terminal echo.** The terminal that started `runsheets` shows the log live, the way
+  `rails server` shows the development log. On by default (decided 2026-10-10);
+  `--quiet` turns it off.
+- **Where.** `<runs-dir>/sessions/<session-id>/session.log`, one file per session, so
+  there is nothing to rotate.
+
+**Levels** (decided 2026-10-10): the Rails log levels, which are Ruby `Logger`'s.
+Each line carries its level after the timestamp (`INFO`, `WARN`, ...).
+
+| Level | What |
+| --- | --- |
+| `debug` | Page views, searches, polling, reloads of a changed runbook, the full environment handed to an execution (secrets as `[secret]`) |
+| `info` | Every engineering action and its output: session start and end, notes, runbook selected, inputs, execute and the code, output lines, exit 0, stop, step marks, acknowledgements |
+| `warn` | A block that exits non-zero or times out, a refused action (no active run, wrong confirmation code), authoring warnings when a runbook loads, an interrupted earlier session found at startup |
+| `error` | An execution that cannot start, a runbook that no longer loads, an exception inside the server |
+| `fatal` | The server cannot start or is going down on an error |
+
+`log_level` sets the file's level (default `info`; `--log-level`, `RUNSHEETS_LOG_LEVEL`,
+`--verbose` for `debug`). The terminal echo has its own level, default `info`, so a
+`debug` file does not flood the terminal. The level is a floor: the file at `info` holds
+every action and every line of output, which is the point of the log.
+
+**Logger** (decided 2026-10-10): Ruby's standard `Logger`, behind a small
+`Runsheets::SessionLog` with the same interface. `SessionLog` adds the bracketed tags
+(session, runbook, step, execution) through a formatter and fans each entry out to two
+`Logger`s, the file and the terminal, each with its own level. No new dependency.
+Considered:
+
+- **lumberjack** (2.1.0): an extension of `Logger` with structured attributes per
+  entry, per-thread context, formatters and several devices, depending only on
+  `logger`. The natural upgrade if each line should also carry structured fields (to
+  feed the activity database, milestone 6) or write through a host's logger in the
+  Rails engine (`lumberjack_rails`, milestone 7). Because `SessionLog` keeps the
+  `Logger` interface, swapping it in touches one class.
+- **lograge**: not a fit. It turns a Rails application's request logging into one
+  line per request and depends on `actionpack`, `railties` and `activesupport`;
+  runsheets is not a Rails app, and the session log is about actions, not requests.
+
+How it relates to the other records:
+
+- It replaces the planned `session.md` and, in time, `run.md`: the log is the
+  human-readable transcript, written as it happens rather than generated afterwards.
+- The per-execution `.out` files stay (decided 2026-10-10). They hold each execution's
+  output on its own, which is what the step page shows and drift compares; the log
+  holds the same output in the session's order.
+- With the activity database (milestone 6), the database holds the structure for
+  queries and the log holds the narrative. A row can carry the log's byte offset where
+  its event starts, so the session page can jump into the log.
+
+### Records
+
+```text
+<runs-dir>/
+  sessions/<session-id>/
+    session.log       every action and its output, appended as it happens
+    session.json      engineer, host, started_at, ended_at, status,
+                      runs (runbook slug + run dir, in the order first selected),
+                      notes, and a merged timeline of every event
+  <runbook-slug>/<session-id>/
+    run.json          as today, plus "session": "<session-id>"; no "kind"
+    run.md
+    blocks/
+```
+
+If the activity database (milestone 6) is built first, this layout shrinks to the
+output files; sessions, runs and notes live in the database.
+
+The run directory is named by the session id, so a runbook's history stays under its
+slug (the landing page's previous runs and drift need no other index) and
+each run points back to its session. Records written before sessions (no `session`
+field, a `kind` field) stay readable.
+
+### HTTP
+
+- `GET /session/new`, `POST /session`: the start page and form. Every other page
+  redirects to it until the session exists.
+- `POST /session/end`: closes everything and stops the server.
+- `POST /runs` with a runbook slug and inputs: establishes or returns to that
+  runbook's run. Replaces `POST /run` and `POST /library/open`.
+- `POST /run/finish` and the `kind=verify` start go away.
+- `GET /session`: the session page (the notebook so far), linked from the header.
+
+### Open questions
+
+- **Idle sessions.** A server left running for days is one long session. Warn on the
+  session page after some hours, or leave it to the engineer?
+
+## Activity database (milestone 6 design)
+
+Proposed 2026-10-10, not built. Today every run is a directory of files under the runs
+directory, and each runbook's history is found by listing its folder. That works for one
+runbook at a time. Sessions (milestone 5) make the record cross-cutting: a session
+spans runbooks, a run belongs to a session, notes and executions interleave on one
+timeline. The questions an engineer or a reviewer asks next are cross-cutting too:
+
+- What did this engineer do last Tuesday, across every runbook?
+- Every time step `030-drain-ecs-services` ran: when, by whom, with what result, and on
+  which version of the step?
+- Which sessions touched the staging teardown runbook during the incident window?
+- Which blocks fail most often? Which steps are never run at all?
+- Search the session notes for "rollback".
+
+Answering those from directories of JSON means reading every file every time. A
+SQLite database answers them with a query, and ties sessions, runs, runbooks, steps and
+executions together by key instead of by folder name.
+
+### What goes where
+
+| Kept in | What | Why |
+| --- | --- | --- |
+| SQLite | Sessions, notes, runs, step marks, acknowledgements, executions (command, state, exit status, timing, paths), the runbooks and step versions they ran against, the event timeline | Small, structured, relational; the cross-cutting queries need it; one transaction per event keeps the timeline consistent |
+| Files | `session.log`, and each execution's `.cmd` and `.out` | Output can be large and is streamed as it arrives; it is already redacted before it is written; files stay greppable; the log is the narrative a person reads (see Session log under milestone 5) |
+| Generated | `run.md`, `session.md` transcripts and `run.json` exports | Written from the database on demand and once more when the session ends, as the human-readable archive |
+
+Recommendation: the database is the system of record for structure, and the output files
+stay files. The alternative, keeping today's files as the record and the database as an
+index rebuilt from them, avoids a second source of truth but means two writes per event
+and a rebuild step whenever they disagree. Run records written before the database are
+brought in once by `runsheets --import`.
+
+### Schema sketch
+
+```text
+sessions        id, engineer, host, pid, started_at, ended_at, status
+notes           id, session_id, at, text                  -- the first note is the why
+runbooks        id, root, slug, path, title                -- unique (root, slug)
+runbook_versions id, runbook_id, digest, seen_at           -- digest of the source files
+steps           id, runbook_version_id, slug, position, title, kind, digest
+runs            id, session_id, runbook_id, runbook_version_id, started_at, ended_at,
+                status, inputs_json                        -- non-secret inputs only
+step_marks      id, run_id, step_slug, status, note, at
+acks            id, run_id, block_id, note, at
+executions      id, run_id, step_id, block_id, command, cmd_path, out_path, state,
+                exit_status, started_at, finished_at, duration, confirmed
+events          id, session_id, run_id, at, type, ref_id   -- the merged timeline
+runbook_fts     FTS5 over runbook titles, front matter prose and document bodies
+notes_fts       FTS5 over session notes
+```
+
+Step and runbook versions are content digests, so a record always says which text ran.
+That also gives drift for free and is what per-step "last worked" dates would be built on
+if they come back (see the `last_verified` decision).
+
+### Details
+
+- **Location.** `~/.local/share/runsheets/runsheets.db`, beside the runs directory, and a
+  `database` setting (`--database`, `RUNSHEETS_DATABASE`) to move it. One database per
+  user across every library; a runbook is identified by the library root plus its slug.
+- **Library.** The `sqlite3` gem, plain SQL behind a small `Runsheets::Store` class; no ORM.
+  Schema versions through `PRAGMA user_version` and numbered migrations in the gem.
+- **Store interface.** Everything above `Store` asks it questions (`record_execution`,
+  `history_for(runbook)`, `step_history(step)`, `session_timeline(id)`); nothing else
+  writes SQL. A Rails engine (milestone 7) supplies an ActiveRecord-backed store with the
+  same methods.
+- **Concurrency.** WAL mode and a busy timeout, so two `runsheets` processes (two
+  engineers, two ports) can share one database. Not for a network file system.
+- **Secrets.** Secret input values are never stored, as today. Captured output is
+  already redacted before it reaches disk. The database file is created `0600`.
+- **Search.** The in-memory search stays; FTS5 is the upgrade path when libraries grow
+  large, and it is what makes session notes searchable.
+- **Retention.** Records accumulate forever unless pruned. A `runsheets --prune DAYS`
+  that deletes old sessions with their output files, and nothing automatic.
+
+### Order
+
+Build the database before or together with sessions. Sessions designed on top of files
+(the Records section of milestone 5) would be written once for files and again for the
+database. With the database first, the session page, the timeline and notes are queries.
+
+### Open questions
+
+- **Source of truth.** Database for structure and files for output (recommended), or
+  files as the record with a rebuildable index?
+- **Shared database.** One per user (proposed), or a team database on a shared host? A
+  shared one changes the security model: other people's records and notes become visible.
+- **Dependency.** `sqlite3` is a native gem. Precompiled builds cover macOS arm64 and
+  Linux; acceptable for a tool that today needs only pure-Ruby gems?
+
+## Rails engine (milestone 7 design)
+
+Proposed 2026-10-10, not built. Package runsheets as a Rails engine that a larger
+Rails application mounts in its admin panel, so operators find the runbooks, their
+history and their sessions where they already work.
+
+### The tension with the original decision
+
+The Decisions table says runsheets is detached, a process on the operator's own
+machine, because "executing markdown blocks in a web app is a security hole" and because
+the blocks need the operator's environment (SSO sessions, tunnels, local tools). Mounted
+in a deployed app, both are true again:
+
+- A Run button would execute shell on an application server, as the application's user,
+  with the application's credentials and network reach, for anyone the admin panel
+  admits.
+- The operator's terminal environment is not there: no `aws sso login`, no VPN, no
+  tunnel.
+
+So the engine cannot simply be today's app behind a mount point. It needs an explicit
+execution policy.
+
+### Execution policy
+
+Three modes, chosen by the host application, most restrictive by default:
+
+1. **Read and record (default).** Every executable block renders as a `terminal`
+   block: the operator copies the command, runs it where it belongs, and confirms with
+   a note. Nothing executes on the server. Library, search, sessions, notes, step marks,
+   history and drift all work. This alone covers the admin-panel use: the procedure,
+   the record of who did what, and the audit trail, next to the app they operate.
+2. **In-app execution, allowlisted.** The host names the languages that may run on its
+   servers, typically `ruby` through `bin/rails runner` or in-process, and maybe `sql`
+   against a read replica. Runs go through ActiveJob, never in the web request, with the
+   same timeouts, redaction, destructive confirmation and records. Shell stays off unless
+   the host turns it on explicitly.
+3. **Remote runner (later).** A small `runsheets runner` process on the operator's
+   machine connects out to the app, picks up executions the operator started in the
+   admin panel, runs them in the operator's environment, and streams output back. The
+   page lives in the app; the shell stays on the laptop. This is the only mode that
+   brings back what detached runsheets has, and it is a project of its own.
+
+### Shape
+
+- **A separate gem, `runsheets-rails`**, depending on `runsheets`. The core gem keeps the
+  runbook model, rendering, search, block convention, records and the CLI; it gains no
+  Rails dependency.
+- **Mounting.** `mount Runsheets::Engine => "/admin/runsheets"`, inside whatever
+  constraint the host already uses for its admin area. A `Runsheets.configure` block
+  names the runbooks root (for example `Rails.root.join("docs/runbooks")`), the
+  execution mode, and a hook that authorizes each request.
+- **Identity.** The engineer is the host's `current_user`, not a name typed at the start
+  of a session. Notes and actions are attributed to a real account.
+- **Storage.** ActiveRecord models in the host's database behind the same `Store`
+  interface as milestone 6, with migrations installed by `bin/rails runsheets:install`.
+  Output stays on disk or moves to Active Storage.
+- **Security pieces Rails already has.** Its CSRF token replaces the per-process
+  session token; its content security policy nonce replaces ours; the Host check and
+  loopback binding do not apply and come out of the engine's path.
+- **Views.** The pages are built by plain Ruby functions returning HTML today. The engine
+  renders them inside the host's admin layout, or the host overrides views. An
+  admin-framework adapter (Avo, ActiveAdmin, Administrate) is optional and later; mounting
+  under the admin namespace with a menu link is enough to start.
+- **Runbooks in the app's repository.** The runbooks ship with the app and are read
+  from its deploy directory. runsheets never writes to them, so a read-only deploy is
+  fine. The original motivation (xyzzy's `docs/runbooks/` and the `bin/rails runbook`
+  idea in XYZZY-180) fits this shape.
+
+### What has to come first
+
+- Milestone 6's `Store` interface, so records are not tied to files.
+- The session model (milestone 5), which maps onto "a user working in the admin panel".
+- Separating the Sinatra web layer from the pieces the engine reuses: `Pages` should not
+  need a `Session` object that owns a process-wide token, and the executor needs a seam
+  for ActiveJob and, later, a remote runner.
+
+### Open questions
+
+- **Which mode first.** Read and record only (recommended for the first engine release),
+  or allowlisted in-app execution from the start?
+- **Who may do what.** One authorization hook, or roles: who may read, run, run
+  destructive blocks, see other people's sessions?
+- **Multi-user.** Several admins at once, each with their own session; does a runbook's
+  run belong to one user, or can two people work one run together?
+- **Admin framework.** Is there a specific host app and admin framework in mind? That
+  decides how much layout integration is worth building.
 
 ## Milestones
 
@@ -273,13 +646,23 @@ recording and rendering are tested without spawning processes.
    Inputs form with secrets and redaction of captured output.
 3. **Verification and history.** Done 2026-10-08. `verify` steps and `verify.md` runnable
    standalone as a verification run with a Checks page, `last_verified` write-back offered
-   after a verified run, richer run history with verdicts and the step a run stopped at,
+   after a verified run (removed 2026-10-09), richer run history with verdicts and the step a run stopped at,
    drift diffs on the run record page, rollback sidebar (from milestone 1).
 4. **Packaging.** Done 2026-10-08. Gem with an `exe/` entry point, README with the
    document structure and block convention, minitest suite, two realistic sample
    runbooks (a directory and a single file), single-file runbooks, SQL through the
    interpreters map, `runsheets --init`, vocabulary settled. The name was picked on
    2026-10-07.
+5. **Sessions.** Designed 2026-10-09, not started; part of the 0.0.1 release. A session per process with an
+   engineer and an opening why note; selecting a runbook establishes its run; runs end with the
+   session. See [Sessions](#sessions-milestone-5-design).
+6. **Activity database.** Designed 2026-10-10, not started. SQLite as the record of
+   sessions, runs, steps and executions, with output kept in files, behind a `Store`
+   interface. Best built before or with sessions. See
+   [Activity database](#activity-database-milestone-6-design).
+7. **Rails engine.** Designed 2026-10-10, not started. A `runsheets-rails` gem that a
+   Rails application mounts in its admin panel; read-and-record by default, execution
+   only by explicit policy. See [Rails engine](#rails-engine-milestone-7-design).
 
 ## Open questions
 

@@ -13,7 +13,6 @@ class TestRunbook < Minitest::Test
     assert_equal [1, 2, 3, 4, 5, 6], rb.steps.map(&:position)
     assert_equal %w[verify rollback], rb.extras.keys
     assert_equal %w[example safe], rb.tags
-    assert_equal Date.new(2026, 10, 7), rb.last_verified
     assert_empty rb.warnings
   end
 
@@ -71,15 +70,56 @@ class TestRunbook < Minitest::Test
 
   def test_warnings_are_collected
     files = {
-      "runbook.md" => "---\ninputs:\n  - name: bad-name\n---\n",
+      "runbook.md" => "---\ntitle: T\ninputs:\n  - name: bad-name\n---\n",
       "steps/010-a.md" => "---\nkind: automated\n---\nno blocks\n",
       "steps/020-b.md" => "```bash run nope\nx\n```\n"
     }
     with_runbook(files) do |rb|
-      assert_includes rb.warnings, "title missing from runbook.md front matter"
       assert_includes rb.warnings, "input name 'bad-name' is not a valid environment variable name"
       assert_includes rb.warnings, "010-a: automated step has no executable block"
       assert_includes rb.warnings, "020-b: block 020-b-1: unknown flag: nope"
+    end
+  end
+
+  def test_a_runbook_needs_front_matter_with_a_title
+    ["# No front matter\n", "---\ntags: [x]\n---\n", "---\ntitle: \"\"\n---\n"].each do |text|
+      error = assert_raises(Runsheets::RunbookError) { with_runbook("runbook.md" => text, "steps/010-a.md" => "a") { nil } }
+      assert_includes error.message, "runbook.md is not a runbook: it needs YAML front matter with a title"
+    end
+  end
+
+  def test_runbook_text_needs_a_titled_front_matter
+    assert Runsheets::Runbook.runbook_text?("---\ntitle: T\n---\nbody\n")
+    assert Runsheets::Runbook.runbook_text?("---\ntitle: [unclosed\n---\n"), "broken front matter was meant to be a runbook"
+    refute Runsheets::Runbook.runbook_text?("# Just a document\n")
+    refute Runsheets::Runbook.runbook_text?("---\ntags: [x]\n---\n# A document with other front matter\n")
+  end
+
+  def test_links_resolve_against_the_root_which_defaults_to_the_runbook_directory
+    Dir.mktmpdir do |lib|
+      dir = File.join(lib, "deploy")
+      FileUtils.mkdir_p(File.join(dir, "steps"))
+      File.write(File.join(dir, "runbook.md"), "---\ntitle: T\n---\nSee [notes](../notes.md) and [local](local.md).\n")
+      File.write(File.join(dir, "steps", "010-a.md"), "Back to [notes](../../notes.md).\n")
+
+      alone = Runsheets::Runbook.load(dir)
+      assert_equal File.expand_path(dir), alone.root
+      assert_includes alone.landing.html, 'href="../notes.md"', "climbing out of the root is left alone"
+      assert_includes alone.landing.html, 'href="/docs/local.md"'
+
+      in_library = Runsheets::Runbook.load(dir, root: lib)
+      assert_equal File.expand_path(lib), in_library.root
+      assert_includes in_library.landing.html, 'href="/docs/notes.md"'
+      assert_includes in_library.landing.html, 'href="/docs/deploy/local.md"'
+      assert_includes in_library.steps.first.html, 'href="/docs/notes.md"'
+    end
+  end
+
+  def test_document_at_finds_the_document_read_from_a_file
+    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a", "notes.md" => "n") do |rb|
+      assert_equal rb.landing, rb.document_at(File.join(rb.dir, "runbook.md"))
+      assert_equal "010-a", rb.document_at(File.join(rb.dir, "steps", "010-a.md")).slug
+      assert_nil rb.document_at(File.join(rb.dir, "notes.md"))
     end
   end
 
@@ -89,31 +129,6 @@ class TestRunbook < Minitest::Test
     assert rb.verify_document?(rb.step("verify"))
     refute rb.verify_document?(rb.step("010-say-hello"))
     assert_equal %w[045-check-the-greeting-1 verify-1 verify-2], rb.verify_blocks.map(&:id)
-  end
-
-  def test_stamp_last_verified_replaces_the_one_line
-    files = { "runbook.md" => "---\ntitle: T\nlast_verified: 2020-01-01\ntags: [a]\n---\n\n# T\n\nlast_verified: not this one\n", "steps/010-a.md" => "a" }
-    with_runbook(files) do |rb|
-      assert_equal "2020-01-01", rb.last_verified.to_s
-      text = rb.stamp_last_verified(Date.new(2026, 10, 8))
-      assert_equal "---\ntitle: T\nlast_verified: 2026-10-08\ntags: [a]\n---\n\n# T\n\nlast_verified: not this one\n", text
-      assert_equal "2026-10-08", Runsheets::Runbook.load(rb.dir).last_verified.to_s
-    end
-  end
-
-  def test_stamp_last_verified_adds_the_line_when_missing
-    files = { "runbook.md" => "---\r\ntitle: T\r\n---\r\nbody\r\n", "steps/010-a.md" => "a" }
-    with_runbook(files) do |rb|
-      text = rb.stamp_last_verified("2026-10-08")
-      assert_equal "---\r\ntitle: T\r\nlast_verified: 2026-10-08\r\n---\r\nbody\r\n", text
-    end
-  end
-
-  def test_stamp_last_verified_needs_front_matter
-    with_runbook("runbook.md" => "# No front matter\n", "steps/010-a.md" => "a") do |rb|
-      assert_raises(Runsheets::RunbookError) { rb.stamp_last_verified("2026-10-08") }
-      assert_equal "# No front matter\n", File.read(File.join(rb.dir, "runbook.md"))
-    end
   end
 
   def test_stale_when_a_source_file_changes_or_appears

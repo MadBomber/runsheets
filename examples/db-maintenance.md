@@ -8,7 +8,6 @@ prerequisites:
   - A role with ownership of the application tables (VACUUM and REINDEX need it)
   - Nobody running a long report; REINDEX takes a lock
 escalation: The data platform channel; after hours, the database on-call.
-last_verified: 2026-09-01
 tags: [postgres, maintenance]
 inputs:
   - name: PGHOST

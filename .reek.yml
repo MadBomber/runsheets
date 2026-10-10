@@ -10,7 +10,7 @@ detectors:
     enabled: false
 
   # Disabled: bang methods without non-bang counterparts are the convention
-  # for state transitions here (started!, finished!, stamp!, write!).
+  # for state transitions here (started!, finished!, write!).
   MissingSafeMethod:
     enabled: false
 

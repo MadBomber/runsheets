@@ -6,9 +6,9 @@ class TestFrontMatter < Minitest::Test
   FM = Runsheets::FrontMatter
 
   def test_splits_data_and_body
-    result = FM.parse("---\ntitle: Hi\nlast_verified: 2026-09-12\n---\n# Body\n")
+    result = FM.parse("---\ntitle: Hi\nupdated: 2026-09-12\n---\n# Body\n")
     assert_equal "Hi", result.data["title"]
-    assert_equal Date.new(2026, 9, 12), result.data["last_verified"]
+    assert_equal Date.new(2026, 9, 12), result.data["updated"]
     assert_equal "# Body\n", result.body
   end
 

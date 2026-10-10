@@ -2,12 +2,17 @@
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-09
+
 ### Fixed
 
+- Run, Start and "I ran this" buttons are disabled when they cannot work,
+  with a tooltip saying why: until a run is started, and, during a
+  verification run, on blocks outside the verify documents. Before, they
+  looked live and a click only showed a small "not run" status.
 - Single-file runbooks are reloaded from their own file. Before, a session
   reloaded the containing directory, so edits to a single-file runbook were
-  never picked up, and stamping `last_verified` into one failed with a 500
-  after the file had already been written.
+  never picked up.
 - Stopping the server (Ctrl-C) ends the active run as `abandoned` and stops
   everything it left running. Before, background blocks outlived the server
   and the run record stayed `running` forever.
@@ -26,7 +31,7 @@
   run active.
 - Only numbered steps can be marked done or skipped (422 otherwise). Marking
   the landing page or the `verify`/`rollback` documents used to count toward
-  "every step done", so a stamp could be offered without doing the steps.
+  "every step done".
 - A step whose `timeout` is not a positive integer warns and uses the default
   instead of timing out at once.
 - `Pages` requires `rack/utils` itself, so it works without `Web` loaded;
@@ -34,6 +39,20 @@
 
 ### Added (milestone 4: packaging)
 
+- Full-text search (`GET /search`, `Runsheets::Search`): a search box in
+  every header ([f] focuses it) searches every runbook in the library, or
+  the one runbook: titles, front matter prose, preambles, steps, verify
+  and rollback, code included. Every word must appear; "quoted phrases"
+  match as written. Results are ranked, with the matching steps and a
+  highlighted snippet for each, linking to the step (the open runbook) or
+  to its row in the library. Works before a runbook is open.
+- A relative link to a markdown file opens it as a page (`/docs/*`): one of
+  the runbook's own files goes to its step page, another runbook in the
+  library to its library page, and any other renders as a plain document
+  with nothing executable. Links resolve within the directory `runsheets`
+  was started on, so a runbook in a library can link anywhere in it.
+- Docs: a Concepts section (runbooks and plain documents, runs and
+  runsheets).
 - A directory of runbooks (`Runsheets::Library`): `runsheets DIR` where DIR
   holds single-file runbooks and runbook directories, in folders nested to
   any depth, opens on the library page (`/library`): a folder tree in the
@@ -73,11 +92,22 @@
 - `examples/staging-teardown` (directory, the shape of a real AWS
   teardown) and `examples/db-maintenance.md` (single file, `sql run`
   blocks via `psql`).
+- `examples/disk-space-triage.md`: a safe single-file runbook whose steps
+  link to plain markdown documents in the examples directory (a glossary,
+  a cleanup policy with an SVG diagram, and an overview of the examples).
+  None of them has runbook front matter, so none appears in the tree.
 - Vocabulary: the record of a run is the *runsheet* in the page, sidebar
   and buttons.
 
 ### Changed
 
+- The `last_verified` front matter key and the offer to stamp it into the
+  runbook are gone, along with the `verified` history verdict. runsheets
+  never writes inside a runbook directory.
+- A markdown file is a runbook only when it starts with YAML front matter
+  that has a `title`. A `runbook.md` or single-file runbook without one no
+  longer loads (it was a warning), and a library leaves such files out of
+  its tree as plain documents.
 - The executable is `runsheets`, the same name as the gem (was `runsheet`).
 - `-c` is now short for `--config`; `--check` has no short form.
 - `myway_config` is a runtime dependency.
@@ -102,14 +132,8 @@
   `kind` field.
 - A Checks page (`GET /verify`) gathers every verify document with a
   "Run all" button that executes each check in order.
-- `last_verified` write-back: after a completed run with every step done,
-  or a verification with every check run and nothing left failing, the
-  landing page offers to stamp the run's date into `runbook.md`
-  (`POST /run/stamp`, `POST /run/stamp/dismiss`). The stamp replaces that
-  one front-matter line and is recorded as a `stamp` event.
-- Run verdicts: `RunRecord#verified?`, `latest_executions`,
-  `unresolved_failures`, `last_step`. The history list shows kind, verdict,
-  start time, duration, counts, and the step a run stopped at.
+- Run history: `RunRecord#latest_executions`, `unresolved_failures`,
+  `last_step`. The history list shows kind, status, start time, duration, counts, and the step a run stopped at.
 - Drift: a finished run's page shows a line diff for every block whose
   code has changed since it ran, or that is gone (`Runsheets::Diff`,
   `RunRecord#drift`).

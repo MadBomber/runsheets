@@ -88,7 +88,7 @@ wrong and never needs scrolling to find.
 ## `assets/`
 
 Not special to runsheets, just the conventional place for images. Any file
-in the runbook directory can be referenced with a relative link and is
+under the directory `runsheets` was started on can be referenced with a relative link and is
 served through `/files/`:
 
 ```markdown
@@ -97,9 +97,16 @@ served through `/files/`:
 
 Relative `src` and `href` values are resolved against the markdown file's
 own directory, so from `steps/020-x.md` the path above resolves to
-`<runbook>/assets/topology.svg`. A path that climbs above the runbook
-directory is left untouched and will 404. Hidden entries (names starting
+`<runbook>/assets/topology.svg`. Started on a library, links may reach
+anywhere in the library; started on one runbook, only within it. A path
+that climbs out is left untouched and will 404. Hidden entries (names starting
 with `.`) are never served, which keeps `.git` and `.env` out of reach.
+
+A link to a markdown file is the exception. It goes to `/docs/`, which
+renders the file as a page: a link to one of the runbook's own files (a
+step, `verify.md`, `rollback.md`, `runbook.md`) opens that step's page, and
+any other markdown file is shown as a plain document with nothing
+executable. See [Runbooks and documents](../concepts/runbooks.md#plain-documents).
 
 ## Single-file runbooks
 
@@ -145,7 +152,8 @@ What to do when it fails partway, as rollback.md would hold.
 
 The rules:
 
-- The front matter is the runbook's, with the same keys as `runbook.md`.
+- The front matter is the runbook's, with the same keys as `runbook.md`,
+  and must have a `title`. Without one the file is a plain document.
 - Every `##` heading starts a step, in document order. Headings inside
   fenced code blocks are ignored. Deeper headings (`###`) belong to the
   step they sit under.
@@ -164,8 +172,8 @@ The rules:
   the slugs that were current when it ran, and the drift view shows the
   difference.
 - The slug is the file name without `.md`, or the directory name when the
-  file is called `runbook.md`. The working directory for blocks, and the
-  root for `/files/`, is the file's directory.
+  file is called `runbook.md`. The working directory for blocks is the
+  file's directory.
 
 `runsheets --init name.md` writes a starter file in this shape. The bundled
 `examples/db-maintenance.md` is a complete one.
@@ -178,15 +186,11 @@ count.
 
 ## Run records live elsewhere
 
-Executing a runbook never writes inside its directory. Run records go to
+runsheets never writes inside a runbook directory. Run records go to
 `~/.local/share/runsheets/runs/<slug>/<timestamp>/` by default; see
 [The Run Record](../running/run-record.md). This keeps the runbook directory
 clean and committable, and keeps captured output, which may contain
 account-scoped data, out of the docs repository.
-
-The one exception is the `last_verified` stamp: after a run that verified
-the runbook, the landing page offers to rewrite that single line of
-`runbook.md`'s front matter, and does so only when asked.
 
 runsheets re-reads the runbook whenever one of its markdown files changes,
 so you can edit steps with the server up and see them on the next page

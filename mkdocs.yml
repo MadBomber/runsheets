@@ -116,6 +116,10 @@ extra:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Concepts:
+      - concepts/index.md
+      - Runbooks and Documents: concepts/runbooks.md
+      - Runs and Runsheets: concepts/runs.md
   - Writing Runbooks:
       - runbooks/index.md
       - Directory Structure: runbooks/structure.md

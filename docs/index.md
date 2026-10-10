@@ -85,7 +85,6 @@ All four milestones of the [roadmap](roadmap.md) are built: rendering,
 executing `bash`, `ruby` and any mapped language such as `sql`, background
 processes with Start and Stop, destructive confirmation, terminal and
 manual acknowledgements, expected-output panels, secret redaction,
-standalone verification runs, the `last_verified` stamp, run history with
-drift, single-file runbooks, a scaffold command, and two realistic sample
-runbooks. The block convention is settled unless real use argues
-otherwise.
+standalone verification runs, run history with drift, single-file
+runbooks, a scaffold command, and two realistic sample runbooks. The block
+convention is settled unless real use argues otherwise.

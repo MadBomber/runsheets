@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 150" width="760" height="150" role="img" aria-labelledby="t d">
+  <title id="t">Disk space triage</title>
+  <desc id="d">Measure with df, find with du, check the cleanup policy, clean by hand, then verify use is under the threshold; loop back to find if it is not.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#8b95a8"/>
+    </marker>
+  </defs>
+  <g font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" text-anchor="middle">
+    <g>
+      <rect x="10" y="40" width="120" height="56" rx="10" fill="#10263d" stroke="#5ab0ff" stroke-width="1.5"/>
+      <text x="70" y="64" fill="#d9dee8" font-weight="600">Measure</text>
+      <text x="70" y="83" fill="#8b95a8" font-size="12" font-family="ui-monospace, Menlo, monospace">df -h</text>
+    </g>
+    <g>
+      <rect x="160" y="40" width="120" height="56" rx="10" fill="#10263d" stroke="#5ab0ff" stroke-width="1.5"/>
+      <text x="220" y="64" fill="#d9dee8" font-weight="600">Find</text>
+      <text x="220" y="83" fill="#8b95a8" font-size="12" font-family="ui-monospace, Menlo, monospace">du -sh</text>
+    </g>
+    <g>
+      <rect x="310" y="40" width="130" height="56" rx="10" fill="#211a3a" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="375" y="64" fill="#d9dee8" font-weight="600">Check policy</text>
+      <text x="375" y="83" fill="#8b95a8" font-size="12">plain document</text>
+    </g>
+    <g>
+      <rect x="470" y="40" width="120" height="56" rx="10" fill="#33240f" stroke="#ffb454" stroke-width="1.5"/>
+      <text x="530" y="64" fill="#d9dee8" font-weight="600">Clean</text>
+      <text x="530" y="83" fill="#8b95a8" font-size="12">by hand</text>
+    </g>
+    <g>
+      <rect x="620" y="40" width="130" height="56" rx="10" fill="#0f2e24" stroke="#3ddc97" stroke-width="1.5"/>
+      <text x="685" y="64" fill="#d9dee8" font-weight="600">Verify</text>
+      <text x="685" y="83" fill="#8b95a8" font-size="12">use ≤ threshold</text>
+    </g>
+    <g stroke="#8b95a8" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+      <path d="M130 68h28"/>
+      <path d="M280 68h28"/>
+      <path d="M440 68h28"/>
+      <path d="M590 68h28"/>
+      <path d="M685 96v28H220v-26" stroke-dasharray="5 4"/>
+    </g>
+    <text x="452" y="140" fill="#8b95a8" font-size="12">still over: find more</text>
+  </g>
+</svg>

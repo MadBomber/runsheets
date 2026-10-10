@@ -35,7 +35,6 @@ module Runsheets
       @executions = {}
       @challenges = {}
       @persisted  = Set.new
-      @stamp_dismissed = false
       @mutex      = Mutex.new
     end
 
@@ -64,7 +63,6 @@ module Runsheets
         @redactor = Redactor.for(@inputs, runbook)
         @executions.clear
         @challenges.clear
-        @stamp_dismissed = false
         @run = RunRecord.start(runs_root, runbook, inputs: @inputs, kind:)
       end
     end
@@ -92,47 +90,10 @@ module Runsheets
       self
     end
 
-    # --- last_verified write-back ------------------------------------------
-
-    # The finished run that could stamp runbook.md, or nil: it must have
-    # verified the runbook (see RunRecord#verified?), not been stamped or
-    # dismissed, and carry a date newer than the one already there.
-    def stamp_candidate
-      return nil if run.nil? || active? || @stamp_dismissed || run.stamped?
-      return nil unless run.verified?(steps: runbook.steps.size)
-      return nil if runbook.last_verified && runbook.last_verified.to_s >= stamp_date.to_s
-
-      run
-    end
-
-    def stampable? = !stamp_candidate.nil?
-
-    # The date a stamp would write: the day the run started.
-    def stamp_date = run&.started_at&.to_date
-
-    # Write last_verified into runbook.md, note it in the run record, and
-    # reload the runbook so the pages show the new date. Returns the date.
-    def stamp!
-      @mutex.synchronize do
-        candidate = stamp_candidate or raise RunError, "the last run cannot stamp last_verified"
-
-        date = stamp_date
-        runbook.stamp_last_verified(date)
-        candidate.stamp!(date)
-        reload_runbook!
-        date
-      end
-    end
-
-    def dismiss_stamp!
-      @stamp_dismissed = true
-      self
-    end
-
-    # Re-read the runbook from disk (its directory, or its one file). Used
-    # after a stamp and whenever the files change (see #refresh_runbook!).
+    # Re-read the runbook from disk (its directory, or its one file) whenever
+    # the files change (see #refresh_runbook!).
     def reload_runbook!
-      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug)
+      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug, root: runbook.root)
     end
 
     # Reload the runbook if any of its markdown files changed since it was

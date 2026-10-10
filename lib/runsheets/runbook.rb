@@ -27,26 +27,42 @@ module Runsheets
     STEPS_DIR = "steps"
     EXTRAS    = %w[verify rollback].freeze
 
-    attr_reader :dir, :slug, :main_path, :data, :landing, :steps, :extras, :inputs, :warnings, :loaded_at
+    attr_reader :dir, :root, :slug, :main_path, :data, :landing, :steps, :extras, :inputs, :warnings, :loaded_at
 
     # Load a runbook directory or a single-file runbook. The slug names the
     # runbook in run records and URLs: the directory or file name, unless
-    # +slug:+ says otherwise (a Library passes the path inside it).
-    def self.load(path, slug: nil)
+    # +slug:+ says otherwise (a Library passes the path inside it). +root:+
+    # is the directory relative links resolve against and /files/ and /docs/
+    # serve from: the library when the runbook is in one, else the runbook's
+    # own directory.
+    def self.load(path, slug: nil, root: nil)
       path = File.expand_path(path)
       if File.directory?(path)
-        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: slug || File.basename(path), single_file: false)
+        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: slug || File.basename(path), single_file: false, root:)
       elsif File.file?(path)
         slug ||= File.basename(path, ".*")
         slug   = File.basename(File.dirname(path)) if slug == File.basename(MAIN_FILE, ".*")
-        new(dir: File.dirname(path), main_path: path, slug:, single_file: true)
+        new(dir: File.dirname(path), main_path: path, slug:, single_file: true, root:)
       else
         raise RunbookError, "no such runbook: #{path}"
       end
     end
 
-    def initialize(dir:, main_path:, slug:, single_file:)
+    # Is the markdown file at +path+ a runbook rather than a plain document?
+    def self.runbook_file?(path) = runbook_text?(File.read(path, encoding: "UTF-8"))
+
+    # A runbook starts with YAML front matter that has a title; anything
+    # else is a plain document. Front matter that does not parse counts as
+    # a runbook: it was meant to be one, and loading it reports why not.
+    def self.runbook_text?(text)
+      !FrontMatter.parse(text).data["title"].to_s.strip.empty?
+    rescue RunbookError
+      true
+    end
+
+    def initialize(dir:, main_path:, slug:, single_file:, root: nil)
       @dir         = dir
+      @root        = File.expand_path(root || dir)
       @main_path   = main_path
       @slug        = slug
       @single_file = single_file
@@ -55,11 +71,12 @@ module Runsheets
       @loaded_at = Time.now
       parsed     = FrontMatter.parse(File.read(main_path, encoding: "UTF-8"))
       @data      = parsed.data
+      raise RunbookError, "#{File.basename(main_path)} is not a runbook: it needs YAML front matter with a title" if data["title"].to_s.strip.empty?
       @section_warnings = []
       if single_file
         load_single_file(parsed.body)
       else
-        @landing = Step.new(slug: "runbook", text: parsed.body, path: main_path, root: dir, interpreters:)
+        @landing = Step.new(slug: "runbook", text: parsed.body, path: main_path, root: @root, interpreters:)
         @steps   = load_steps
         @extras  = load_extras
       end
@@ -75,7 +92,6 @@ module Runsheets
     def prerequisites = Array(data["prerequisites"])
     def blast_radius  = data["blast_radius"]
     def escalation    = data["escalation"]
-    def last_verified = data["last_verified"]
     def tags          = Array(data["tags"]).map(&:to_s)
     def preamble_html = landing.html
 
@@ -91,31 +107,6 @@ module Runsheets
     def verify_document?(step) = verify_documents.include?(step)
 
     def verify_blocks = verify_documents.flat_map(&:executable_blocks)
-
-    # Set last_verified in a runbook's main file to +date+ by replacing that
-    # one line of the front matter (or adding it before the closing ---).
-    # This is the only write the tool ever makes inside a runbook. Returns
-    # the new text.
-    def self.stamp_last_verified(path, date)
-      text  = File.read(path, encoding: "UTF-8")
-      value = (date.is_a?(String) ? Date.parse(date) : date.to_date).iso8601
-      match = text.match(/\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?$/m)
-      raise RunbookError, "#{path} has no front matter to stamp" unless match
-
-      body  = match[1]
-      newl  = text.include?("\r\n") ? "\r\n" : "\n"
-      line  = "last_verified: #{value}"
-      body  = if body.match?(/^last_verified:.*$/)
-                body.sub(/^last_verified:[^\r\n]*/, line)
-              else
-                "#{body}#{line}#{newl}"
-              end
-      text[match.begin(1)...match.end(1)] = body
-      File.write(path, text)
-      text
-    end
-
-    def stamp_last_verified(date) = Runbook.stamp_last_verified(main_path, date)
 
     # The markdown files this runbook was built from.
     def source_files
@@ -137,6 +128,19 @@ module Runsheets
     def documents = @documents ||= [landing, *steps, *extras.values].to_h { [it.slug, it] }
 
     def step(slug) = documents[slug]
+
+    # The document read from the file at +path+, or nil. In a single-file
+    # runbook every document shares the file, so this is the landing page.
+    def document_at(path)
+      real = Runbook.real_path(path)
+      documents.each_value.find { it.path && Runbook.real_path(it.path) == real }
+    end
+
+    def self.real_path(path)
+      File.realpath(path)
+    rescue SystemCallError
+      File.expand_path(path)
+    end
 
     # [step, block] for a block id, or nil.
     def find_block(id)
@@ -170,7 +174,7 @@ module Runsheets
 
     def to_h
       { slug:, dir:, main_path:, single_file: single_file?, title:, when_to_use:, prerequisites:, blast_radius:, escalation:,
-        last_verified: last_verified&.to_s, tags:, inputs: inputs.map(&:to_h),
+        tags:, inputs: inputs.map(&:to_h),
         steps: steps.map(&:to_h), extras: extras.keys, warnings: }
     end
 
@@ -181,13 +185,13 @@ module Runsheets
       return [] unless File.directory?(steps_dir)
 
       names = Dir.glob("*.md", base: steps_dir).sort_by { [it[/\A\d+/].to_i, it] }
-      names.map.with_index(1) { |name, position| Step.load(File.join(steps_dir, name), root: dir, position:, interpreters:) }
+      names.map.with_index(1) { |name, position| Step.load(File.join(steps_dir, name), root:, position:, interpreters:) }
     end
 
     def load_extras
       EXTRAS.filter_map do |name|
         path = File.join(dir, "#{name}.md")
-        [name, Step.load(path, root: dir, interpreters:)] if File.file?(path)
+        [name, Step.load(path, root:, interpreters:)] if File.file?(path)
       end.to_h
     end
 
@@ -195,7 +199,7 @@ module Runsheets
     # the Verify and Rollback sections which become the extras.
     def load_single_file(body)
       preamble, sections = SingleFile.split(body)
-      @landing = Step.new(slug: "runbook", text: preamble, path: main_path, root: dir, interpreters:)
+      @landing = Step.new(slug: "runbook", text: preamble, path: main_path, root:, interpreters:)
       @steps   = []
       @extras  = {}
       sections.each { add_section(it) }
@@ -222,7 +226,7 @@ module Runsheets
 
     def section_step(section, slug:, position: nil)
       data = { "title" => section.title }.merge(section.data)
-      Step.new(slug:, text: section.body, path: main_path, root: dir, position:, data:, interpreters:)
+      Step.new(slug:, text: section.body, path: main_path, root:, position:, data:, interpreters:)
     end
 
     def section_warning(section, message)
@@ -232,7 +236,6 @@ module Runsheets
     def validate
       warnings = []
       warnings << (single_file? ? "no steps found: add a ## heading per step" : "no steps found in #{STEPS_DIR}/") if steps.empty?
-      warnings << "title missing from #{File.basename(main_path)} front matter" unless data["title"]
       inputs.reject(&:valid?).each { warnings << "input name '#{it.name}' is not a valid environment variable name" }
       dupes = steps.map(&:slug).tally.select { |_, n| n > 1 }.keys
       warnings << "duplicate step slugs: #{dupes.join(', ')}" if dupes.any?

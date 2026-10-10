@@ -142,14 +142,13 @@ class TestRunRecord < Minitest::Test
     end
   end
 
-  def test_verified_needs_completion_all_steps_and_no_unresolved_failure
+  def test_a_successful_rerun_clears_an_unresolved_failure
     with_runs_dir do |root|
       rb  = example_runbook
       run = RunRecord.start(root, rb)
       step  = rb.step("010-say-hello")
       block = step.blocks.first
       run.mark_step(step, status: "done")
-      refute run.verified?(steps: 1), "still running"
 
       cmd, log = run.paths_for(block)
       first = Runsheets::Execution.new(id: "a", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
@@ -163,33 +162,11 @@ class TestRunRecord < Minitest::Test
 
       assert_equal 1, run.failed_executions.size
       assert_empty run.unresolved_failures, "the re-run cleared the failure"
-      assert run.verified?(steps: 1)
-      refute run.verified?(steps: 2), "not every step done"
       assert_equal "010-say-hello", run.last_step
     end
   end
 
-  def test_verification_run_is_verified_when_checks_ran_clean
-    with_runs_dir do |root|
-      rb  = example_runbook
-      run = RunRecord.start(root, rb, kind: "verify")
-      run.finish!
-      refute run.verified?(steps: 6), "no checks ran"
-      run2 = RunRecord.start(root, rb, kind: "verify")
-      step = rb.step("verify")
-      block = step.blocks.first
-      cmd, log = run2.paths_for(block)
-      ex = Runsheets::Execution.new(id: "v", block_id: block.id, step_slug: step.slug, command: %w[bash], cmd_path: cmd, log_path: log)
-      run2.record_execution(ex, step:)
-      Runsheets::Executor.new.run(ex, code: "true\n")
-      run2.finish!
-      assert run2.verified?(steps: 6)
-      run2.finish!(status: "abandoned")
-      refute run2.verified?(steps: 6)
-    end
-  end
-
-  def test_stamp_event_and_drift
+  def test_drift
     with_runs_dir do |root|
       rb    = example_runbook
       run   = RunRecord.start(root, rb)
@@ -210,13 +187,6 @@ class TestRunRecord < Minitest::Test
       assert_equal([[block.id, :changed], ["old-step-1", :missing]], drift.map { [it[:block_id], it[:status]] })
       assert_includes drift.first[:diff].map(&:to_s), "-echo something else"
       assert_equal "echo gone\n", drift.last[:recorded]
-
-      refute run.stamped?
-      run.stamp!(Date.new(2026, 10, 8))
-      assert run.stamped?
-      assert run.summary[:stamped]
-      assert_includes File.read(File.join(run.dir, "run.md")), "stamped `last_verified: 2026-10-08`"
-      assert RunRecord.load(run.dir).stamped?
     end
   end
 

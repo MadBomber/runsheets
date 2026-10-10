@@ -36,14 +36,14 @@ class TestWebLibrary < Minitest::Test
     get "/library"
     assert last_response.ok?
     body = last_response.body
-    %w[db-maintenance hello staging-teardown].each { assert_includes body, "data-slug=\"#{it}\"" }
+    %w[db-maintenance disk-space-triage hello staging-teardown].each { assert_includes body, "data-slug=\"#{it}\"" }
     assert_includes body, 'href="/library/hello"'
     assert_includes body, "Monthly PostgreSQL maintenance"
-    assert_includes body, "3 runbooks"
+    assert_includes body, "4 runbooks"
     assert_includes body, "no runbook open"
     assert_includes body, 'id="lib-filter"'
     assert_includes body, 'name="slug" value="hello"'
-    assert_equal 3, body.scan(" Open</button>").size, "a card per runbook, each with Open"
+    assert_equal 4, body.scan(" Open</button>").size, "a card per runbook, each with Open"
     refute_includes body, 'data-key="o"', "the o key belongs to the detail pane, not a card"
     assert_includes last_response.headers["Content-Security-Policy"], "nonce-"
   end
@@ -88,10 +88,76 @@ class TestWebLibrary < Minitest::Test
     get "/library"
     assert_includes last_response.body, "Continue"
     assert_includes last_response.body, "Back to runbook"
-    assert_equal 2, last_response.body.scan(" Open</button>").size
+    assert_equal 3, last_response.body.scan(" Open</button>").size
     get "/library/hello"
     assert_includes last_response.body, ">open now<"
     assert_includes last_response.body, 'class="tree-runbook current active'
+  end
+
+  def test_plain_documents_anywhere_in_the_library_open_from_any_runbook
+    open_runbook("hello")
+    get "/"
+    assert_includes last_response.body, 'href="/docs/about-the-examples.md"', "a runbook directory links one level up"
+
+    get "/docs/about-the-examples.md"
+    assert last_response.ok?
+    assert_includes last_response.body, "<title>About these examples · Hello, runsheets</title>"
+    assert_includes last_response.body, 'href="/docs/policies/cleanup-policy.md"'
+
+    get "/docs/policies/cleanup-policy.md"
+    assert last_response.ok?
+    assert_includes last_response.body, 'src="/files/policies/images/triage-flow.svg"'
+    get "/files/policies/images/triage-flow.svg"
+    assert last_response.ok?
+
+    get "/docs/disk-space-triage.md"
+    assert_equal 302, last_response.status
+    assert_match %r{/library/disk-space-triage\z}, last_response.location, "another runbook opens in the library"
+    get "/docs/hello/steps/010-say-hello.md"
+    assert_match %r{/steps/010-say-hello\z}, last_response.location, "the open runbook's own step"
+  end
+
+  def test_search_works_before_a_runbook_is_open_and_links_into_the_library
+    get "/search", "q" => "vacuum"
+    assert last_response.ok?
+    body = last_response.body
+    assert_includes body, "<title>Search · runsheets</title>"
+    assert_includes body, "1 runbook match <strong>vacuum</strong>"
+    assert_includes body, 'href="/library/db-maintenance"'
+    assert_match %r{href="/library/db-maintenance#step-\d+-[a-z-]+"}, body, "a numbered step links to its row"
+    assert_includes body, "<mark>"
+    assert_includes body, 'id="lib-tree-nav"', "results sit beside the tree"
+    assert_includes body, 'value="vacuum"', "the header box keeps the query"
+
+    get "/library/db-maintenance"
+    assert_match(/<li id="step-\d+-[a-z-]+">/, last_response.body, "step rows carry the anchors")
+  end
+
+  def test_search_links_the_open_runbook_straight_to_its_steps
+    open_runbook("disk-space-triage")
+    get "/search", "q" => "threshold"
+    assert_includes last_response.body, "open now"
+    assert_includes last_response.body, 'href="/steps/verify"'
+  end
+
+  def test_search_with_no_query_or_no_match
+    get "/search"
+    assert last_response.ok?
+    assert_includes last_response.body, "Search the text of every runbook"
+    get "/search", "q" => "zzzz-not-there"
+    assert_includes last_response.body, "0 runbooks match"
+    assert_includes last_response.body, "No runbook contains every word"
+  end
+
+  def test_query_is_escaped
+    get "/search", "q" => "<script>alert(1)</script>"
+    refute_includes last_response.body, "<script>alert(1)</script>"
+    assert_includes last_response.body, "&lt;script&gt;"
+  end
+
+  def test_plain_documents_stay_out_of_the_tree
+    get "/library"
+    %w[about-the-examples disk-usage-glossary policies].each { refute_includes last_response.body, "data-slug=\"#{it}\"" }
   end
 
   def test_switching_runbooks_and_single_file_runbooks_open_too

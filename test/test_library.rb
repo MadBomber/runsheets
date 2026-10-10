@@ -15,10 +15,11 @@ class TestLibrary < Minitest::Test
     refute Library.library?("/nonexistent")
   end
 
-  def test_the_examples_directory_lists_its_three_runbooks_in_slug_order
+  def test_the_examples_directory_lists_its_four_runbooks_in_slug_order
     library = Library.load(EXAMPLES)
-    assert_equal %w[db-maintenance hello staging-teardown], library.entries.map(&:slug)
-    assert_equal 3, library.size
+    assert_equal %w[db-maintenance disk-space-triage hello staging-teardown], library.entries.map(&:slug)
+    assert_equal 4, library.size
+    assert_empty library.folders, "examples/docs holds only plain documents"
 
     single = library.find("db-maintenance")
     assert single.single_file?
@@ -193,6 +194,47 @@ class TestNestedLibrary < Minitest::Test
       FileUtils.rm(File.join(dir, "network", "new.md"))
       assert library.stale?
       assert_nil library.refresh!.find("network/new")
+    end
+  end
+
+  def test_markdown_without_a_front_matter_title_is_a_document_not_a_runbook
+    with_nested do |dir, _library|
+      write(dir, "glossary.md", "# Glossary\n\nTerms we use.\n")
+      write(dir, "database/conventions.md", "---\ntags: [style]\n---\n# Conventions\n")
+      library = Library.load(dir)
+      assert_nil library.find("glossary")
+      assert_nil library.find("database/conventions")
+      assert_equal 5, library.size
+    end
+  end
+
+  def test_a_document_edited_into_a_runbook_joins_the_tree
+    with_nested do |dir, _library|
+      write(dir, "glossary.md", "# Glossary\n")
+      library = Library.load(dir)
+      refute library.stale?
+      File.write(File.join(dir, "glossary.md"), format(SINGLE, "Glossary", "x"))
+      FileUtils.touch(File.join(dir, "glossary.md"), mtime: Time.now + 2)
+      assert library.stale?, "a document changed"
+      assert_equal "Glossary", library.refresh!.find("glossary").title
+    end
+  end
+
+  def test_runbooks_in_a_library_resolve_links_from_the_library_root
+    with_nested do |dir, library|
+      assert_equal File.realpath(dir), File.realpath(library.runbook("database/backup").root)
+      assert_equal File.realpath(dir), File.realpath(library.find("deploy").runbook.root)
+    end
+  end
+
+  def test_entry_at_finds_the_runbook_a_file_belongs_to
+    with_nested do |dir, library|
+      assert_equal "deploy", library.entry_at(File.join(dir, "deploy.md")).slug
+      assert_equal "database/backup", library.entry_at(File.join(dir, "database/backup/runbook.md")).slug
+      assert_equal "database/backup", library.entry_at(File.join(dir, "database/backup/steps/010-dump.md")).slug
+      write(dir, "notes.md", "# Notes\n")
+      assert_nil library.entry_at(File.join(dir, "notes.md"))
+      assert_nil library.entry_at(File.join(dir, "database/backupx.md")), "a name sharing a prefix is not inside"
     end
   end
 

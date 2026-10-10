@@ -121,7 +121,8 @@ of the `.cmd` and `.out` files.
 
 ## Blocks in the preamble, verify and rollback
 
-The convention applies to every markdown file runsheets renders. The
+The convention applies to every document of a runbook. A plain markdown
+file the runbook links to is rendered with every block display only. The
 preamble in `runbook.md` uses the id prefix `runbook`; `verify.md` and
 `rollback.md` use `verify` and `rollback`. A `bash run` block in
 `rollback.md` is executable from its page and from the sidebar panel's

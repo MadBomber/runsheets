@@ -30,6 +30,13 @@ runbooks, the operator chooses one in the browser.
 
 </div>
 
+## A run is a record, not a sequence
+
+Nothing executes without an active run, but a run does not make you follow
+the steps in order or do all of them: start one, open any step, and run
+just that block. See
+[Runs and Runsheets](../concepts/runs.md#a-run-is-a-record-not-a-sequence).
+
 ## One run at a time
 
 A `runsheets` process serves one runbook at a time and holds at most one

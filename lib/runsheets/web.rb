@@ -139,6 +139,9 @@ module Runsheets
 
       def library_route? = request.path_info == "/library" || request.path_info.start_with?("/library/")
 
+      # Pages that work before any runbook is open in a library.
+      def open_route? = library_route? || (library && request.path_info == "/search")
+
       def wants_json? = request.path_info.start_with?("/blocks/", "/executions/") || request.accept?("application/json")
 
       def json(data, status: 200)
@@ -184,7 +187,7 @@ module Runsheets
     before do
       reading = request.get? || request.head?
       fail_with("missing or invalid session token", 403) unless reading || token_ok?
-      next if library_route?
+      next if open_route?
 
       unless rs
         redirect "/library" if library
@@ -240,6 +243,15 @@ module Runsheets
       fail_with("not found: #{request.path_info}", 404)
     end
 
+    # -- search ---------------------------------------------------------
+
+    # Full-text search over every runbook in the library, or over the one
+    # runbook the server was started on.
+    get "/search" do
+      library ? library.refresh! : rs.refresh_runbook!
+      page { Pages.search(rs, library, params["q"].to_s, token: settings.rs_token, nonce: it) }
+    end
+
     # -- pages ----------------------------------------------------------
 
     get "/" do
@@ -252,8 +264,21 @@ module Runsheets
     end
 
     get "/files/*" do
-      path = Web.resolve_file(runbook.dir, params["splat"].first) or fail_with("no such file", 404)
+      path = Web.resolve_file(runbook.root, params["splat"].first) or fail_with("no such file", 404)
       send_file path
+    end
+
+    # A markdown file the runbook links to. One of the runbook's own files
+    # goes to its page, another runbook in the library to its library page,
+    # and anything else is rendered as a plain document.
+    get "/docs/*" do
+      path = Web.resolve_file(runbook.root, params["splat"].first) or fail_with("no such file", 404)
+      fail_with("not a markdown document", 404) unless Renderer.markdown_path?(path)
+      if (doc = runbook.document_at(path))
+        redirect(doc == runbook.landing ? "/" : Pages.step_href(doc))
+      end
+      entry = library&.entry_at(path) and redirect(Pages::Chooser.href(entry.slug))
+      page { Pages.document(rs, path, nonce: it) }
     end
 
     get "/verify" do
@@ -288,18 +313,6 @@ module Runsheets
       status = params["status"] || "completed"
       fail_with("status must be completed or abandoned", 422) unless RunRecord::FINAL_STATUSES.include?(status)
       rs.finish_run(status:)
-      redirect "/"
-    end
-
-    # last_verified write-back: the one write inside the runbook directory,
-    # only on request, only after a run that verified the runbook.
-    post "/run/stamp" do
-      rs.stamp!
-      redirect "/"
-    end
-
-    post "/run/stamp/dismiss" do
-      rs.dismiss_stamp!
       redirect "/"
     end
 

@@ -174,6 +174,7 @@ module Runsheets
       .rs-btn { padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
       .rs-btn:hover { border-color: var(--accent); }
       .rs-btn:disabled { opacity: .5; cursor: progress; }
+      .rs-btn[data-locked] { cursor: not-allowed; }
       .rs-run { background: rgba(90,176,255,.18); border-color: var(--accent); }
       .rs-run.rs-danger { background: rgba(255,107,107,.14); border-color: var(--danger); }
       .rs-status { font: 600 12px var(--mono); color: var(--muted); min-width: 6em; text-align: right; }
@@ -204,10 +205,8 @@ module Runsheets
       .meta code.secret { color: var(--warn); }
       .history li { grid-template-columns: auto auto auto auto auto 1fr; }
       .history li .verdict { font-weight: 700; }
-      .history li.verified .verdict { color: var(--ok); } .history li.abandoned .verdict { color: var(--warn); } .history li.running .verdict { color: var(--accent); }
+      .history li.completed .verdict { color: var(--ok); } .history li.abandoned .verdict { color: var(--warn); } .history li.running .verdict { color: var(--accent); }
       .badge.run { color: var(--accent); background: rgba(90,176,255,.12); }
-      .panel.stamp { border-color: rgba(61,220,151,.5); background: rgba(61,220,151,.05); }
-      .panel.stamp h2 { color: var(--ok); display: flex; align-items: center; gap: 6px; }
       .panel.drift { border-color: rgba(255,180,84,.5); max-width: none; }
       .panel.drift h2 { color: var(--warn); display: flex; align-items: center; gap: 6px; }
       .panel.drift ul { list-style: none; margin: 0; padding: 0; }
@@ -224,6 +223,26 @@ module Runsheets
 
       /* ---------- library: the tree ---------- */
       .lib-tree { padding-top: 12px; }
+      .rs-search { position: relative; display: flex; align-items: center; }
+      .rs-search > svg { position: absolute; left: 9px; color: var(--muted); pointer-events: none; }
+      .rs-search > kbd { position: absolute; right: 7px; opacity: .7; }
+      .rs-search input { width: 200px; padding: 6px 28px 6px 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 13px; outline: 0; }
+      .rs-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(90,176,255,.15); }
+      .rs-search input:focus ~ kbd { display: none; }
+      .search-form { display: flex; gap: 8px; max-width: 900px; margin: 0 0 22px; }
+      .search-form input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; outline: 0; }
+      .search-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(90,176,255,.15); }
+      .search-results { list-style: none; margin: 0; padding: 0; max-width: 900px; }
+      .search-result { padding: 14px 18px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+      .search-result h2 { margin: 0 0 2px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .search-result > .meta { margin: 0 0 8px; }
+      .search-hits { list-style: none; margin: 0; padding: 0; }
+      .search-hits li { padding: 8px 0; border-top: 1px solid var(--border); }
+      .search-hits a { color: var(--text); font-weight: 600; }
+      .search-hits .num { color: var(--muted); font: 600 12px var(--mono); margin-right: 4px; }
+      .snippet { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; }
+      mark { background: var(--mark); color: var(--warn); border-radius: 3px; padding: 0 2px; }
+      .steps-list li:target { background: var(--mark); }
       .lib-filter { position: relative; display: flex; align-items: center; margin: 0 4px 14px; }
       .lib-filter > svg { position: absolute; left: 10px; color: var(--muted); pointer-events: none; }
       .lib-filter > kbd { position: absolute; right: 8px; opacity: .7; }
@@ -314,6 +333,7 @@ module Runsheets
         .rs-header { grid-template-columns: auto 1fr; height: auto; padding: 8px 12px; row-gap: 6px; }
         .brand-tag, .nav-btn span { display: none; }
         .actions { grid-column: 1 / -1; flex-wrap: wrap; }
+        .rs-search { flex: 1 1 100%; } .rs-search input { width: 100%; }
         .rs-shell { grid-template-columns: 1fr; }
         .rs-sidebar { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
         .rs-main { padding: 20px 16px 48px; }
@@ -422,7 +442,7 @@ module Runsheets
             data.log ? 'log ' + data.log : null,
             verdict
           ].filter(Boolean).join(' · ');
-          if (button) button.disabled = false;
+          enable(button);
           if (stop) stop.hidden = true;
           return false;
         };
@@ -444,8 +464,11 @@ module Runsheets
           status.className = 'rs-status failed'; status.textContent = label;
           block.querySelector('.rs-result').hidden = false;
           block.querySelector('[data-role="exit"]').textContent = String(err.message || err);
-          block.querySelectorAll('[data-action="execute"], [data-action="acknowledge"]').forEach(b => b.disabled = false);
+          block.querySelectorAll('[data-action="execute"], [data-action="acknowledge"]').forEach(enable);
         };
+
+        // Re-enable a button unless the server locked it (no run, or not allowed in this run).
+        const enable = b => { if (b) b.disabled = b.hasAttribute('data-locked'); };
 
         const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -475,7 +498,7 @@ module Runsheets
             let { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute');
             if (res.status === 428 && data.challenge) {
               const typed = prompt('This block is destructive. Type the code ' + data.challenge + ' to run it.');
-              if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; button.disabled = false; return null; }
+              if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; enable(button); return null; }
               ({ res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { confirm: typed.trim() }));
             }
             if (!res.ok) throw new Error(data.error || res.statusText);
@@ -525,7 +548,7 @@ module Runsheets
             const { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/acknowledge', { note });
             if (!res.ok) throw new Error(data.error || res.statusText);
             showAck(block, data);
-            button.disabled = false;
+            enable(button);
           } catch (err) {
             fail(block, 'not confirmed', err);
           }
@@ -655,6 +678,7 @@ module Runsheets
             }
           }
           switch (e.key) {
+            case 'f': { const box = document.getElementById('rs-search'); if (box) { e.preventDefault(); box.focus(); box.select(); } break; }
             case 'h': go('h'); break;
             case 'r': go('r'); break;
             case 'ArrowLeft':  go('←'); break;

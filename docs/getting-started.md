@@ -76,14 +76,19 @@ runsheets --open ..                      # all the examples, pick one
 ### 1. The landing page
 
 The landing page shows what the authoring guidance says every runbook needs
-before the first step: when to use it, prerequisites, the blast radius,
-escalation, and the date it was last verified. Below that is the **Start a
-run** panel with one field per declared input, pre-filled from defaults and
-your environment.
+before the first step: when to use it, prerequisites, the blast radius and
+escalation. Below that is the **Start a run** panel with one field per
+declared input, pre-filled from defaults and your environment.
 
 Nothing can be executed yet. Step pages are readable, and blocks can be
-copied, but the Run buttons are inert until a run exists. That is
-deliberate: every execution belongs to a run record.
+copied, but the Run buttons are greyed out until a run exists; hovering one
+says "Start a run to execute blocks". That is deliberate: every execution belongs
+to a run record.
+
+Starting a run does not commit you to the whole runbook. Once a run is
+active you can open any step, in any order, and run only that step's
+blocks, then click **Abandon** once you have done what you came for.
+See [A run is a record, not a sequence](concepts/runs.md#a-run-is-a-record-not-a-sequence).
 
 ### 2. Start a run
 
@@ -159,10 +164,10 @@ ran and how many steps are done. **Finish run** marks the record
 `completed`; **Abandon run** marks it `abandoned`. Either way the run is
 closed and the record is final.
 
-The landing page now lists it under **Previous runs**, with its verdict,
+The landing page now lists it under **Previous runs**, with its status,
 duration, and a link to the rendered transcript.
 
-### 8. Verify on its own, and stamp the date
+### 8. Verify on its own
 
 Step 6, *Check the greeting*, is a `verify` step, and `verify.md` holds
 whole-procedure checks. Click **Verify only** next to Start run: this
@@ -170,11 +175,8 @@ starts a verification run and lands on the **Checks** page with both
 documents on it. Click **Run all**; three checks run in order and the
 status line reports the tally.
 
-**Finish verification** on the home page. Because every check ran and
-none is failing, the landing page offers to **Stamp runbook.md** with
-today's date as `last_verified`. Click it: the front-matter line changes,
-the header shows the new date, and the run record notes the stamp. That
-is the only change runsheets ever makes to a runbook, and only when asked.
+**Finish verification** on the home page. The run appears under
+**Previous runs** with a `verify` badge and the number of checks that ran.
 
 Now edit `steps/010-say-hello.md`, change the greeting, and open the
 earlier run from **Previous runs**: a **Runbook changed since this run**
@@ -192,7 +194,9 @@ For the shape of a real one, read `examples/staging-teardown` (a
 directory, every block kind, a blast radius and a rollback) and
 `examples/db-maintenance.md` (a single file whose `sql run` blocks go
 through `psql`). Neither runs against your machine as written; they are
-there to copy from.
+there to copy from. `examples/disk-space-triage.md` is safe to run, and
+shows a runbook linking to plain markdown documents, which the library
+leaves out of its tree.
 
 ### 7. Read the record
 

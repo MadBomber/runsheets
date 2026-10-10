@@ -15,7 +15,6 @@ blast_radius: >
   gone for good. Production is untouched: a different account, a different
   profile.
 escalation: The platform on-call engineer, via the #platform-oncall channel.
-last_verified: 2026-10-01
 tags: [aws, ecs, rds, staging, destructive]
 inputs:
   - name: AWS_PROFILE

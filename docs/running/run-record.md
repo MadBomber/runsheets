@@ -79,13 +79,11 @@ Hello, smoke!
 - 2026-10-07T17:33:55.120-05:00 `020-inspect-ruby-3` (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter
 
 - 2026-10-07T17:33:58.448-05:00 step **010-say-hello** marked done — smoke ok
-
-- 2026-10-07T17:34:10.001-05:00 runbook.md stamped `last_verified: 2026-10-07`
 ```
 
 Events appear in the order they happened: executions, terminal
-confirmations, step marks and the stamp interleaved, so jumping around is
-visible rather than hidden. Output longer than 64 KB is trimmed to its tail in the
+confirmations and step marks interleaved, so jumping around is visible
+rather than hidden. Output longer than 64 KB is trimmed to its tail in the
 transcript with a marker; the `.out` file is complete.
 
 The verdict after the block id is one of `ok`, `exit N`, `timed out`,
@@ -161,7 +159,7 @@ mark a `background` execution and a destructive one that was `confirmed`.
 
 ### Events
 
-Four types:
+Three types:
 
 - `execute`: `at`, `step`, `block`, and the `execution` id to look up in
   `executions`. `confirmed: true` when the block was destructive and the
@@ -170,18 +168,6 @@ Four types:
   confirmed they ran a `terminal` block themselves.
 - `step`: `at`, `step`, `status` (`done` or `skipped`), and `note` when one
   was given.
-- `stamp`: `at` and `last_verified`, the date written into `runbook.md`.
-  Added after the run finished, which is why a stamped record is written
-  once more.
-
-### Verdict
-
-A record is **verified** when its status is `completed`, no block's most
-recent execution is a failure (an earlier failure that was re-run
-successfully does not count), and either every step of the runbook is
-marked done (kind `run`) or at least one check ran (kind `verify`). The
-history list shows `verified` in place of `completed` for such runs, and
-only such runs are offered the `last_verified` stamp.
 
 ### Executions
 

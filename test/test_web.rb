@@ -40,6 +40,87 @@ class TestWeb < Minitest::Test
     assert_includes last_response.body, '<meta name="rs-token" content="tok">'
   end
 
+  def test_run_buttons_are_disabled_without_an_active_run
+    get "/steps/010-say-hello"
+    assert_includes last_response.body, 'data-action="execute" data-locked disabled title="Start a run to execute blocks"'
+    get "/steps/020-inspect-ruby"
+    assert_includes last_response.body, 'data-action="acknowledge" data-locked disabled title="Start a run to confirm terminal blocks"'
+
+    post "/run", { "_token" => "tok" }
+    get "/steps/010-say-hello"
+    assert_includes last_response.body, 'data-action="execute"'
+    refute_includes last_response.body, "data-locked disabled"
+  end
+
+  def test_verification_run_disables_run_buttons_outside_verify_documents
+    post "/run", { "_token" => "tok", "kind" => "verify" }
+    get "/steps/010-say-hello"
+    assert_includes last_response.body, 'data-locked disabled title="A verification run only executes verify steps and verify.md"'
+    get "/steps/045-check-the-greeting"
+    refute_includes last_response.body, 'data-action="execute" data-locked'
+  end
+
+  def with_linked_document
+    files = {
+      "runbook.md" => "---\ntitle: Linked\n---\nSee the [glossary](docs/glossary.md) and [step one](steps/010-a.md).\n",
+      "steps/010-a.md" => "---\ntitle: A\nkind: manual\n---\nBack to the [glossary](../docs/glossary.md#terms).\n",
+      "docs/glossary.md" => "# Glossary\n\n```bash run\nrm -rf /\n```\n\n![diagram](flow.svg)\n",
+      "docs/flow.svg" => "<svg/>",
+      "notes.txt" => "plain"
+    }
+    with_runbook(files) do |rb|
+      Runsheets::Web.configure_for(Runsheets::Session.new(runbook: rb, runs_root: @runs_root, token: "tok"))
+      yield rb
+    end
+  end
+
+  def test_links_to_plain_markdown_render_it_as_a_document
+    with_linked_document do
+      get "/"
+      assert_includes last_response.body, 'href="/docs/docs/glossary.md"'
+      get "/steps/010-a"
+      assert_includes last_response.body, 'href="/docs/docs/glossary.md#terms"'
+
+      get "/docs/docs/glossary.md"
+      assert last_response.ok?
+      body = last_response.body
+      assert_includes body, "<title>Glossary · Linked</title>"
+      assert_includes body, "nothing here executes"
+      refute_match(/<button[^>]*data-action="execute"/, body, "a document has no Run buttons")
+      assert_includes body, 'src="/files/docs/flow.svg"', "its own relative links resolve from its folder"
+    end
+  end
+
+  def test_a_link_to_one_of_the_runbooks_own_files_goes_to_its_page
+    with_linked_document do
+      get "/docs/steps/010-a.md"
+      assert_equal 302, last_response.status
+      assert_match %r{/steps/010-a\z}, last_response.location
+      get "/docs/runbook.md"
+      assert_equal 302, last_response.status
+      assert_match %r{://[^/]+/\z}, last_response.location
+    end
+  end
+
+  def test_docs_route_serves_only_markdown_inside_the_runbook
+    with_linked_document do
+      get "/docs/notes.txt"
+      assert_equal 404, last_response.status
+      get "/docs/../../etc/passwd.md"
+      assert_equal 404, last_response.status
+      get "/docs/missing.md"
+      assert_equal 404, last_response.status
+    end
+  end
+
+  def test_search_on_a_single_runbook_searches_that_runbook
+    get "/search", "q" => "greeting"
+    assert last_response.ok?
+    assert_includes last_response.body, "1 runbook match"
+    assert_includes last_response.body, 'href="/steps/045-check-the-greeting"'
+    assert_includes last_response.body, 'class="rs-search"', "the header has the search box"
+  end
+
   def test_extras_and_rollback_sidebar
     get "/steps/020-inspect-ruby"
     assert_includes last_response.body, "<summary>Rollback</summary>"
@@ -252,47 +333,8 @@ class TestWeb < Minitest::Test
 
     post "/run/finish", { "_token" => "tok" }
     get "/"
-    assert_includes last_response.body, "Record the verification"
-    assert_includes last_response.body, 'action="/run/stamp"'
     assert_includes last_response.body, "<span class=\"badge verify\">verify</span>"
-    assert_includes last_response.body, "verified"
-  end
-
-  def test_stamp_writes_runbook_md_and_dismiss_hides_the_offer
-    Dir.mktmpdir("runsheets-stamp") do |dir|
-      FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
-      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
-      Runsheets::Web.configure_for(@session)
-
-      post "/run/stamp", { "_token" => "tok" }
-      assert_equal 409, last_response.status
-
-      post "/run", { "_token" => "tok", "kind" => "verify" }
-      with_token
-      post "/blocks/verify-1/execute"
-      id = JSON.parse(last_response.body)["id"]
-      wait_for do
-        get "/executions/#{id}"
-        JSON.parse(last_response.body)["state"] != "running"
-      end
-      post "/run/finish", { "_token" => "tok" }
-
-      post "/run/stamp/dismiss", { "_token" => "tok" }
-      assert_equal 302, last_response.status
-      get "/"
-      refute_includes last_response.body, "Record the verification"
-      assert_includes File.read(File.join(dir, "runbook.md")), "last_verified: 2026-10-07"
-
-      @session.instance_variable_set(:@stamp_dismissed, false)
-      post "/run/stamp", { "_token" => "tok" }
-      assert_equal 302, last_response.status
-      assert_includes File.read(File.join(dir, "runbook.md")), "last_verified: #{Date.today}"
-      get "/"
-      assert_includes last_response.body, "last verified #{Date.today}"
-      assert_includes last_response.body, "stamped"
-      get "/runs/#{@session.run.id}"
-      assert_includes last_response.body, "stamped"
-    end
+    refute_includes last_response.body, "/run/stamp"
   end
 
   def test_run_page_shows_drift_when_the_runbook_changed

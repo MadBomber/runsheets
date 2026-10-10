@@ -20,7 +20,7 @@ execution endpoints and an HTML error page elsewhere.
 
 The `Host` header must be `localhost`, `127.0.0.1`, `::1` or the bind
 address, or the request gets **403** before routing. (For a wildcard bind
-the check is off; see [the CLI page](../running/cli.md#about---bind).)
+the check is off; see [the CLI page](../running/cli.md#about-bind).)
 
 Every HTML page is sent with `Cache-Control: no-store` and a
 `Content-Security-Policy` whose script and style sources are a nonce unique
@@ -40,7 +40,9 @@ TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 | `GET /verify` | The Checks page: every verify step and `verify.md`. 404 if the runbook has none. |
 | `GET /run` | The active run's transcript, or the most recent run's, with the drift panel for a finished run. 404 if there has never been a run. |
 | `GET /runs/:id` | A previous run's transcript. The id must match `[\w.-]+`. |
-| `GET /files/*path` | A regular, non-hidden file inside the runbook directory, with its content type. 404 otherwise. |
+| `GET /files/*path` | A regular, non-hidden file under the directory runsheets was started on, with its content type. 404 otherwise. |
+| `GET /docs/*path` | A markdown file under that directory, rendered as a page with nothing executable. One of the open runbook's own files redirects to its page; another runbook in the library redirects to its library page. 404 for anything that is not a `.md` file. |
+| `GET /search?q=` | Full-text search over every runbook in the library (or the one runbook), best first. Works before a runbook is open. An empty `q` shows the search form. |
 
 ### The library
 
@@ -81,19 +83,6 @@ Form fields: `_token`, `status` (`completed`, default, or `abandoned`).
 Anything still running is stopped first. Responds **303** to the landing
 page; **422** for another status, checked before anything is stopped;
 **409** with no active run.
-
-### `POST /run/stamp`
-
-Writes `last_verified` into `runbook.md` with the last run's start date,
-when that run qualifies (completed; every step done for a full run, or
-every check run for a verification; no block left failing; the runbook's
-current `last_verified` is older). Form field: `_token`. Responds **303**
-to the landing page, or **409** when the last run cannot stamp.
-
-### `POST /run/stamp/dismiss`
-
-Hides the stamp offer for the last run. Form field: `_token`. Responds
-**303** to the landing page.
 
 ### `POST /steps/:slug/mark`
 

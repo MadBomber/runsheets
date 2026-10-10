@@ -26,7 +26,6 @@ runbook.when_to_use     # String or nil
 runbook.prerequisites   # Array of String
 runbook.blast_radius    # String or nil
 runbook.escalation      # String or nil
-runbook.last_verified   # Date or nil
 runbook.tags            # Array of String
 runbook.destructive?    # true if a blast radius is declared or any step is destructive
 runbook.inputs          # Array of Runbook::Input (name, prompt, default, secret?)
@@ -94,19 +93,13 @@ block.referenced_variables   # ["AWS_PROFILE", "CLUSTER"]
 block.to_h
 ```
 
-### Stamping `last_verified`
+### Verification and reloading
 
 ```ruby
-Runsheets::Runbook.stamp_last_verified("ops/runbooks/staging-teardown/runbook.md", Date.today)
-runbook.stamp_last_verified(Date.today)   # the same, for a loaded runbook
-runbook.verify_documents                  # verify-kind steps, then verify.md
-runbook.verify_blocks                     # their executable blocks
-runbook.stale?                            # a source file changed since load
+runbook.verify_documents   # verify-kind steps, then verify.md
+runbook.verify_blocks      # their executable blocks
+runbook.stale?             # a source file changed since load
 ```
-
-The stamp replaces the `last_verified:` line of the front matter, or adds
-one before the closing `---`, and leaves every other byte alone. It raises
-`RunbookError` when the file has no front matter.
 
 ## Validating in CI
 
@@ -177,11 +170,6 @@ session.token                   # the session token the web layer requires
 
 session.start_verification(inputs:)   # start_run(kind: "verify"): only verify documents execute
 session.verifying?
-session.stamp_candidate         # the finished run that could stamp last_verified, or nil
-session.stampable?
-session.stamp_date              # the date a stamp would write: the run's start date
-session.stamp!                  # write last_verified, note it in the record, reload the runbook
-session.dismiss_stamp!
 session.reload_runbook!         # re-read the runbook directory
 session.refresh_runbook!        # reload only if a source file changed on disk
 ```
@@ -277,11 +265,9 @@ run.step_status     # { "010-..." => "done" }
 run.acks            # { "020-...-3" => { at:, step:, note: } } terminal confirmations
 run.kind            # "run" or "verify"
 run.verify?
-run.verified?(steps: runbook.steps.size)   # completed, nothing left failing, all steps done or checks ran
 run.latest_executions      # block id => its most recent execution Hash
 run.unresolved_failures    # latest executions that are failures
 run.last_step              # the step of the latest event, or nil
-run.stamped?
 run.drift(runbook)         # [{ block_id:, status: :changed, diff: [Diff::Line...] }, { status: :missing, ... }]
 run.steps_done
 run.failed_executions
@@ -292,6 +278,26 @@ run.to_h            # the run.json data
 
 `RunRecord.load(dir)` reads one directory. Records that cannot be parsed are
 skipped by `list`.
+
+## Searching
+
+```ruby
+library  = Runsheets::Library.load("ops/runbooks")
+runbooks = library.entries.select(&:ok?).map { [it.slug, it.runbook] }
+
+results = Runsheets::Search.run(runbooks, 'vacuum "worst table"')
+results.each do |result|
+  result.slug     # "database/maintenance"
+  result.score    # higher is better; results come best first
+  result.hits.each { puts "#{it.title}: #{it.snippet}" }
+end
+
+Runsheets::Search.terms('Stop "the pipeline"')   # => ["stop", "the pipeline"]
+```
+
+Every term must appear somewhere in a runbook for it to match. The
+pieces (`terms`, `text_of`, `count`, `snippet`, `highlight`) are module
+functions and can be called on their own.
 
 ## Rendering markdown
 

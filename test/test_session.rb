@@ -177,7 +177,6 @@ class TestSession < Minitest::Test
       assert s.execute("verify-1").wait.success?
       s.finish_run
       refute s.verifying?
-      assert s.run.verified?(steps: s.runbook.steps.size)
     end
   end
 
@@ -187,68 +186,6 @@ class TestSession < Minitest::Test
         s = Runsheets::Session.new(runbook: rb, runs_root: root)
         assert_raises(Runsheets::RunError) { s.start_verification }
         refute s.active?
-      end
-    end
-  end
-
-  def test_stamp_offer_after_a_clean_verification_and_write_back
-    files = {
-      "runbook.md" => "---\ntitle: T\nlast_verified: 2020-01-01\n---\n",
-      "steps/010-a.md" => "---\nkind: verify\n---\n```bash run\necho ok\n```\n"
-    }
-    with_runbook(files) do |rb|
-      with_runs_dir do |root|
-        s = Runsheets::Session.new(runbook: rb, runs_root: root)
-        refute s.stampable?
-        s.start_verification
-        refute s.stampable?, "not while active"
-        s.execute("010-a-1").wait
-        s.finish_run
-        assert s.stampable?
-        assert_equal Date.today, s.stamp_date
-
-        date = s.stamp!
-        assert_equal Date.today, date
-        assert_equal "last_verified: #{Date.today}", File.read(File.join(rb.dir, "runbook.md"))[/^last_verified:.*$/]
-        assert_equal Date.today.to_s, s.runbook.last_verified.to_s, "runbook reloaded"
-        assert s.run.stamped?
-        refute s.stampable?, "already stamped"
-        assert_raises(Runsheets::RunError) { s.stamp! }
-      end
-    end
-  end
-
-  def test_stamp_offer_after_a_full_run_needs_every_step_done
-    with_runs_dir do |root|
-      s = session(root)
-      s.start_run
-      s.runbook.steps.each { s.mark_step(it.slug, status: "done") }
-      s.finish_run
-      assert s.stampable?, "example last_verified 2026-10-07 is older than today"
-      s.dismiss_stamp!
-      refute s.stampable?
-
-      s.start_run
-      s.runbook.steps.each { s.mark_step(it.slug, status: "done") }
-      s.finish_run(status: "abandoned")
-      refute s.stampable?
-
-      s.start_run
-      s.runbook.steps[0..-2].each { s.mark_step(it.slug, status: "done") }
-      s.finish_run
-      refute s.stampable?, "one step not done"
-    end
-  end
-
-  def test_stamp_is_not_offered_when_last_verified_is_not_older
-    files = { "runbook.md" => "---\ntitle: T\nlast_verified: #{Date.today}\n---\n", "steps/010-a.md" => "---\nkind: manual\n---\ndo it\n" }
-    with_runbook(files) do |rb|
-      with_runs_dir do |root|
-        s = Runsheets::Session.new(runbook: rb, runs_root: root)
-        s.start_run
-        s.mark_step("010-a", status: "done")
-        s.finish_run
-        refute s.stampable?
       end
     end
   end
@@ -277,10 +214,10 @@ class TestSession < Minitest::Test
     end
   end
 
-  def test_single_file_runbook_reloads_and_stamps_from_its_own_file
+  def test_single_file_runbook_reloads_from_its_own_file
     Dir.mktmpdir("runsheets-single") do |dir|
       path = File.join(dir, "refresh.md")
-      File.write(path, "---\ntitle: One\nlast_verified: 2020-01-01\n---\n\n## Check\n<!-- kind: verify -->\n\n```bash run\necho ok\n```\n")
+      File.write(path, "---\ntitle: One\n---\n\n## Check\n<!-- kind: verify -->\n\n```bash run\necho ok\n```\n")
       with_runs_dir do |root|
         s = Runsheets::Session.new(runbook: Runsheets::Runbook.load(path), runs_root: root)
         assert s.runbook.single_file?
@@ -291,11 +228,8 @@ class TestSession < Minitest::Test
         assert s.runbook.single_file?
 
         s.start_verification
-        s.execute("010-check-1").wait
+        assert s.execute("010-check-1").wait.success?
         s.finish_run
-        assert_equal Date.today, s.stamp!
-        assert_equal Date.today.to_s, s.runbook.last_verified.to_s, "reloaded after the stamp"
-        assert_includes File.read(path), "last_verified: #{Date.today}"
       end
     end
   end

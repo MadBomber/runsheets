@@ -57,23 +57,30 @@ module Runsheets
 
       # +selected+ is the slug of a runbook or a folder, or nil for the root.
       def page(library, session, token, nonce: nil, selected: nil)
-        node       = library.node(selected.to_s) || library.root
-        view       = View.new(library:, session:, token:, node:)
+        node  = library.node(selected.to_s) || library.root
+        view  = View.new(library:, session:, token:, node:)
+        title = node.folder? && node.root? ? "Runbooks" : node.title
+        main  = node.folder? ? folder_pane(view, node) : runbook_pane(view.listing(node))
+        frame(view, title:, main:, nonce:)
+      end
+
+      # The library's page around +main+: header, the tree, and the footer.
+      # +query+ fills the header's search box.
+      def frame(view, title:, main:, nonce: nil, query: "")
+        library    = view.library
         nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
-        title      = node.folder? && node.root? ? "Runbooks" : node.title
-        main       = node.folder? ? folder_pane(view, node) : runbook_pane(view.listing(node))
         <<~HTML
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta name="rs-token" content="#{h token}">
+            <meta name="rs-token" content="#{h view.token}">
             <title>#{h title} · #{h APP_NAME}</title>
             <style#{nonce_attr}>#{Assets.stylesheet}</style>
           </head>
           <body class="kind-library">
-            #{header(view)}
+            #{header(view, query:)}
             <div class="rs-shell">
               #{Tree.pane(view)}
               <main class="rs-main lib-main">
@@ -82,7 +89,7 @@ module Runsheets
             </div>
             <footer class="rs-footer">
               <span>#{h APP_NAME} · #{h APP_FULL} · #{h library.dir}</span>
-              <span class="keys"><kbd>/</kbd> filter <kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> select <kbd>o</kbd> open <kbd>s</kbd> tree</span>
+              <span class="keys"><kbd>f</kbd> search <kbd>/</kbd> filter <kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> select <kbd>o</kbd> open <kbd>s</kbd> tree</span>
             </footer>
             <script#{nonce_attr}>#{Assets.javascript}</script>
           </body>
@@ -90,7 +97,7 @@ module Runsheets
         HTML
       end
 
-      def header(view)
+      def header(view, query: "")
         library = view.library
         session = view.session
         <<~HTML
@@ -105,6 +112,7 @@ module Runsheets
             </div>
             <nav class="crumbs" aria-label="Breadcrumb">#{crumbs(library, view.node).join('<span class="sep">/</span>')}</nav>
             <nav class="actions">
+              #{Pages.search_box(query)}
               #{Pages.nav_button('Back to runbook', '/', :next, key: 'b', title: session.runbook.title) if session}
               #{pill(session)}
             </nav>
@@ -293,7 +301,7 @@ module Runsheets
           badges << '<span class="badge destructive">destructive</span>' if step.destructive?
           blocks = step.executable_blocks.size
           <<~LI
-            <li>
+            <li id="step-#{h step.slug}">
               <span class="num">#{h(step.number || step.position)}</span>
               <span class="title">#{h step.title}<small>#{count(blocks, 'executable block')}</small></span>
               <span class="badges">#{badges.join}</span>
@@ -319,13 +327,13 @@ module Runsheets
         total = listing.entry.steps
         rows  = runs.first(5).map do |run|
           s       = run.summary
-          verdict = Pages.history_verdict(run, s, total)
+          verdict = s[:status]
           kind    = run.verify? ? "verify" : "run"
           <<~LI
             <li class="#{h verdict}">
               <span>#{h s[:id]}</span>
               <span class="badge #{kind}">#{kind}</span>
-              <span class="meta verdict">#{h verdict}#{' · stamped' if s[:stamped]}</span>
+              <span class="meta verdict">#{h verdict}</span>
               <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h Pages.duration_text(s[:duration])}</span>
               <span class="meta">#{h Pages.history_progress(run, s, total)}</span>
               <span></span>
@@ -353,13 +361,12 @@ module Runsheets
         list.reject(&:empty?)
       end
 
-      # "6 steps · 2 warnings · last verified 2026-10-01", or the error.
+      # "6 steps · 2 warnings", or the error.
       def detail(entry)
         return "does not load" unless entry.ok?
 
         parts = [count(entry.steps, "step")]
         parts << count(entry.warnings.size, "warning") unless entry.warnings.empty?
-        parts << "last verified #{h entry.runbook.last_verified}" if entry.runbook.last_verified
         parts.join(" · ")
       end
 

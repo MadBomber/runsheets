@@ -170,14 +170,12 @@ class TestSingleFile < Minitest::Test
     end
   end
 
-  def test_stale_and_stamp_work_on_the_single_file
+  def test_stale_works_on_the_single_file
     with_single_file do |rb, path|
       refute rb.stale?
       sleep 0.01
-      rb.stamp_last_verified(Date.new(2026, 10, 8))
-      assert_includes File.read(path), "last_verified: 2026-10-08\n---"
+      File.write(path, File.read(path).sub("\n---", "\ntags: [x]\n---"))
       assert rb.stale?
-      assert_equal "2026-10-08", Runsheets::Runbook.load(path).last_verified.to_s
     end
   end
 

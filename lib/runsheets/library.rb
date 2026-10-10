@@ -1,14 +1,17 @@
 # frozen_string_literal: true
 
 module Runsheets
-  # A directory tree of runbooks. Every markdown file is a single-file
-  # runbook and every directory holding runbook.md is a runbook directory;
-  # any other directory is a folder, searched the same way, to any depth.
+  # A directory tree of runbooks. Every markdown file that starts with
+  # front matter holding a title is a single-file runbook, and every
+  # directory holding runbook.md is a runbook directory; other markdown
+  # files are plain documents and stay out of the tree. Any other directory
+  # is a folder, searched the same way, to any depth.
   # The web page shows the tree for the operator to choose from.
   #
   #   ops/                      <- the library
   #     README.md               <- describes the folder, not a runbook
   #     deploy.md               <- runbook "deploy"
+  #     glossary.md             <- no front matter: a document, not listed
   #     database/
   #       backup/runbook.md     <- runbook "database/backup"
   #       restore.md            <- runbook "database/restore"
@@ -79,7 +82,7 @@ module Runsheets
       raise RunbookError, "no such directory: #{@dir}" unless File.directory?(@dir)
 
       scan!
-      raise RunbookError, "no runbooks in #{@dir}: expected .md files or directories holding #{Runbook::MAIN_FILE}" if entries.empty?
+      raise RunbookError, "no runbooks in #{@dir}: expected .md files with a front matter title, or directories holding #{Runbook::MAIN_FILE}" if entries.empty?
     end
 
     # The runbook with this slug, or nil.
@@ -107,15 +110,27 @@ module Runsheets
     # Load the runbook an entry stands for, afresh, carrying its library slug.
     def runbook(slug)
       entry = find(slug) or raise RunbookError, "no runbook named #{slug} in #{dir}"
-      Runbook.load(entry.path, slug: entry.slug)
+      Runbook.load(entry.path, slug: entry.slug, root: dir)
+    end
+
+    # The runbook whose files include +path+: a single-file runbook that is
+    # that file, or a runbook directory holding it. nil for anything else.
+    def entry_at(path)
+      real = Runbook.real_path(path)
+      entries.find do |entry|
+        base = Runbook.real_path(entry.path)
+        entry.single_file? ? base == real : real.start_with?("#{base}/")
+      end
     end
 
     def size = entries.size
 
-    # True once a folder has gained or lost a child, or a runbook's files
-    # have changed, since the last scan.
+    # True once a folder has gained or lost a child, or a runbook's or a
+    # plain document's files have changed, since the last scan. A document
+    # edited into a runbook joins the tree.
     def stale?
       return true if [root, *folders].any? { folder_mtime(it.path) != it.mtime }
+      return true if @documents.any? { changed_since_scan?(it) }
 
       entries.any? { entry_stale?(it) }
     end
@@ -130,6 +145,7 @@ module Runsheets
 
     def scan!
       @scanned_at = Time.now
+      @documents  = []
       root        = scan_folder(dir, slug: "", visited: [File.realpath(dir)])
       @root       = root
       @folders    = root.subfolders.sort_by(&:slug).freeze
@@ -151,6 +167,8 @@ module Runsheets
           node = scan_directory(found, visited:)
           (node.is_a?(Folder) ? folders : entries) << node if node
         elsif name.end_with?(".md") && !name.casecmp?(README)
+          next @documents << found.path unless runbook_file?(found.path)
+
           entries << entry_for(found.with(name: File.basename(name, ".md"), slug: found.slug.delete_suffix(".md")), single_file: true)
         end
       end
@@ -173,7 +191,7 @@ module Runsheets
     end
 
     def entry_for(found, single_file:)
-      runbook = Runbook.load(found.path, slug: found.slug)
+      runbook = Runbook.load(found.path, slug: found.slug, root: dir)
       Entry.new(**found.to_h, single_file:, runbook:, error: nil)
     rescue RunbookError => e
       Entry.new(**found.to_h, single_file:, runbook: nil, error: e.message)
@@ -186,6 +204,18 @@ module Runsheets
       file && Renderer.render_plain(File.read(File.join(path, file), encoding: "UTF-8"))
     rescue SystemCallError
       nil
+    end
+
+    def runbook_file?(path)
+      Runbook.runbook_file?(path)
+    rescue SystemCallError
+      false
+    end
+
+    def changed_since_scan?(path)
+      !File.file?(path) || File.mtime(path) > scanned_at
+    rescue SystemCallError
+      true
     end
 
     def folder_mtime(path)

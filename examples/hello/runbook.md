@@ -7,7 +7,6 @@ prerequisites:
   - A shell with bash and ruby on the PATH
   - Nothing else; every command here is harmless
 escalation: There is nobody to call. Read the step again.
-last_verified: 2026-10-07
 tags: [example, safe]
 inputs:
   - name: NAME
@@ -35,3 +34,7 @@ hello/
 ```
 
 Start a run from the panel above, then walk the steps in the sidebar.
+
+This runbook sits in a directory of examples. [About these
+examples](../about-the-examples.md) is a plain document one level up,
+linked like any other markdown file.

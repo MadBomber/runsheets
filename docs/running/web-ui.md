@@ -13,6 +13,7 @@ a footer with the keyboard shortcuts.
   active. The green pill links to the live run record.
 - **Runbooks** appears when the server was started on a directory of
   runbooks, and leads back to the chooser.
+- **Search runbooks**, a search box on every page; see [Search](#search).
 
 ## Sidebar
 
@@ -46,10 +47,11 @@ the record.
 ## Choosing a runbook
 
 Started on a directory of runbooks (`runsheets ops/runbooks`), the server
-opens on the library at `/library`. Every markdown file in the directory
-is a single-file runbook, every directory holding `runbook.md` is a runbook
-directory, and every other directory is a folder, searched the same way to
-any depth. Folders that hold no runbooks are left out, as are hidden
+opens on the library at `/library`. A markdown file whose front matter
+has a `title` is a single-file runbook, every directory holding `runbook.md`
+is a runbook directory, and every other directory is a folder, searched the
+same way to any depth. Markdown files without that front matter are plain
+documents: they stay out of the tree, and a runbook can link to them. Folders that hold no runbooks are left out, as are hidden
 entries. Every other page redirects to the library until a runbook is open.
 
 The page has two panes:
@@ -65,11 +67,10 @@ The page has two panes:
   A folder shows its `README.md` (rendered, if it has one) and a card for
   each folder and runbook it holds directly; the root folder is what
   `/library` shows. A runbook shows its `when_to_use` text beside the
-  **Open** button, then its prerequisites, blast radius, escalation and
-  last-verified date, its inputs with their defaults, its steps with kind
-  badges, its previous runs, and its preamble. The URL is the runbook's
-  path in the library (`/library/platform/database/backup`), so it can be
-  bookmarked.
+  **Open** button, then its prerequisites, blast radius and escalation, its
+  inputs with their defaults, its steps with kind badges, its previous
+  runs, and its preamble. The URL is the runbook's path in the library
+  (`/library/platform/database/backup`), so it can be bookmarked.
 
 **Open** serves that runbook and goes to its landing page; the header
 breadcrumbs there lead back through the folders to the library, and the
@@ -84,25 +85,21 @@ the server is up appear on the next visit to the library.
 
 In order:
 
-1. **Title, step count, last-verified date, tags.** A red `destructive` badge
-   appears when the runbook declares a blast radius or any step is
-   destructive.
+1. **Title, step count, tags.** A red `destructive` badge appears when the
+   runbook declares a blast radius or any step is destructive.
 2. **Authoring warnings**, if any, in an amber banner. Fix them in the
    markdown; the page updates on reload.
 3. **Metadata table**: when to use, prerequisites, blast radius,
-   escalation, last verified.
-4. **Record the verification** offer, after a run that verified the
-   runbook (see below).
-5. **Start a run** form, or the **Active run** panel.
-6. **Step list** with kind badges, destructive badges, the number of
+   escalation.
+4. **Start a run** form, or the **Active run** panel.
+5. **Step list** with kind badges, destructive badges, the number of
    executable blocks, and status marks.
-7. **Previous runs**, newest first. Each row shows the run id (linking to
-   the transcript), a `run` or `verify` badge, the verdict (`verified`,
-   `completed`, `abandoned` or `running`, plus `stamped` if the run stamped
-   the runbook), start time and duration, execution and failure counts,
-   and either steps done with the step it stopped at, or checks run and how
-   many are still failing.
-8. The **preamble** from `runbook.md`.
+6. **Previous runs**, newest first. Each row shows the run id (linking to
+   the transcript), a `run` or `verify` badge, the status (`completed`,
+   `abandoned` or `running`), start time and duration, execution and
+   failure counts, and either steps done with the step it stopped at, or
+   checks run and how many are still failing.
+7. The **preamble** from `runbook.md`.
 
 ### Verification runs
 
@@ -118,22 +115,18 @@ suffix in its id.
 The Checks page is also reachable from the sidebar at any time; without an
 active run it is read-only.
 
-### Record the verification
-
-After **Finish** on a full run with every step marked done, or on a
-verification that ran at least one check, with no block left in a failed
-state (a failure that was re-run successfully does not count), the landing
-page offers to stamp the run's date into `runbook.md` as `last_verified`.
-**Stamp runbook.md** rewrites that one front-matter line, notes a `stamp`
-event in the run record, and reloads the runbook. **Not now** hides the
-offer for that run. The offer is not made when the runbook's
-`last_verified` is already that date or later.
-
 ### Starting a run
 
 The form has one field per declared input, pre-filled from the environment
 and the defaults. Secret inputs are password fields. Submitting creates the
 run directory and redirects to the first step.
+
+No block executes until a run is started, not even one on a step page opened
+directly: until then its Run button is disabled, and hovering it says why.
+During a verification run the same goes for blocks outside the verify
+documents. Starting a run does not fix the order: any step can be opened and
+run on its own, and the rest left untouched. See
+[A run is a record, not a sequence](../concepts/runs.md#a-run-is-a-record-not-a-sequence).
 
 ### The active run panel
 
@@ -234,10 +227,34 @@ runbook, with a line diff from what ran to what is there now, or when a
 block is gone. The record itself is never changed; this is the runbook
 drifting away from it.
 
+## Search
+
+The search box in the header searches the full text of every runbook in
+the directory runsheets was started on, or of the one runbook when it was
+started on one. It works before any runbook is open. Press ++f++ to jump
+to it.
+
+- **What is searched**: each runbook's title, its front matter prose
+  (when to use, prerequisites, blast radius, escalation, tags, input
+  names and prompts), its preamble, and every step, `verify.md` and
+  `rollback.md`: titles, prose and code alike. Plain markdown documents
+  are not searched.
+- **How it matches**: case-insensitive. Separate words must all appear
+  somewhere in a runbook, not necessarily together; `"a quoted phrase"`
+  must appear as written.
+- **Results**: one card per matching runbook, best first. A match in the
+  title counts most, then the front matter, then step titles, then the
+  text. Under each runbook are the documents that matched, each with a
+  snippet and the words highlighted.
+- **Where results lead**: a step of the runbook open now goes straight to
+  its page. Any other runbook opens in the library with the matching
+  step highlighted in its step list; open it from there to run it.
+
 ## Keyboard shortcuts
 
 | Key | Action |
 | --- | --- |
+| ++f++ | Focus the search box |
 | ++h++ | Home |
 | ++r++ | Runbooks (the library, when started on a directory of runbooks) |
 | ++arrow-left++ / ++arrow-right++ | Previous / next step |

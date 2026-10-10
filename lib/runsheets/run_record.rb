@@ -144,15 +144,6 @@ module Runsheets
       write!
     end
 
-    # Record that runbook.md was stamped with this run's date. The run is
-    # already finished; the record is rewritten with the extra event.
-    def stamp!(date, at: Time.now)
-      events << { type: "stamp", at: at.iso8601(3), last_verified: date.to_s }
-      write!
-    end
-
-    def stamped? = events.any? { it[:type] == "stamp" }
-
     def failed_executions = executions.select { RunRecord.failure?(it) }
     def steps_done        = step_status.count { |_, s| s == "done" }
 
@@ -165,15 +156,6 @@ module Runsheets
 
     # The step the run was last working on: the step of the latest event.
     def last_step = events.reverse_each.find { it[:step] }&.[](:step)
-
-    # Does this run show the runbook works? A completed procedure with every
-    # one of +steps+ marked done, or a completed verification that ran at
-    # least one check, with no block left in a failed state.
-    def verified?(steps:)
-      return false unless completed? && unresolved_failures.empty?
-
-      verify? ? executions.any? : steps_done >= steps
-    end
 
     # How the runbook has drifted since this run: for the latest execution
     # of each block, whether the block's code is still what ran. Returns
@@ -219,7 +201,7 @@ module Runsheets
     def summary
       { id:, kind:, started_at:, finished_at:, status:, duration:, executions: executions.size,
         failures: failed_executions.size, unresolved: unresolved_failures.size, steps_done:,
-        last_step:, stamped: stamped? }
+        last_step: }
     end
 
     # The human-readable run.md.
@@ -252,7 +234,6 @@ module Runsheets
       when "execute" then execution_transcript(event)
       when "step"    then ["- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{note_suffix(event)}", ""]
       when "ack"     then ["- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{note_suffix(event)}", ""]
-      when "stamp"   then ["- #{event[:at]} runbook.md stamped `last_verified: #{event[:last_verified]}`", ""]
       else []
       end
     end

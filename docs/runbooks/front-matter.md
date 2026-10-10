@@ -20,7 +20,6 @@ blast_radius: >
   Destroys the staging database, container images, and DNS. Irreversible
   once step 050 starts.
 escalation: Stop and contact the platform owner if any stack delete fails twice.
-last_verified: 2026-09-12
 tags: [aws, staging, destructive]
 inputs:
   - name: AWS_PROFILE
@@ -36,12 +35,11 @@ interpreters:
 
 | Key | Type | Default | Used for |
 | --- | --- | --- | --- |
-| `title` | string | the directory name | Page titles, the header, the run record. Missing titles are an authoring warning. |
+| `title` | string | required | Page titles, the header, the run record. A `runbook.md`, or a single-file runbook, without one is not a runbook: it does not load, and in a library it is a plain document. |
 | `when_to_use` | string | none | Landing page metadata table. |
 | `prerequisites` | list of strings | `[]` | Landing page metadata table. |
 | `blast_radius` | string | none | Landing page table, and the red banner on every destructive step. Its presence marks the whole runbook destructive. |
 | `escalation` | string | none | Landing page table and the destructive banner. |
-| `last_verified` | date | none | Landing page and Checks page. A YAML date (`2026-09-12`) parses as a `Date`. The only key runsheets ever writes: after a run that verified the runbook, the landing page offers to stamp the run's date here. |
 | `tags` | list of strings | `[]` | Badges on the landing page. |
 | `inputs` | list of mappings | `[]` | The start-run form. See [Inputs and Secrets](inputs.md). |
 | `interpreters` | mapping of language to command | see below | How executable blocks of each language are run. See [Executable Blocks](blocks.md#interpreters). |

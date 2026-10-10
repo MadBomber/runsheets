@@ -16,9 +16,8 @@ operator's acknowledgements of the manual steps.
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
 Status: all four milestones of the [plan](PLAN.md) are built. Every block
-kind in the convention below is live, verify steps run on their own, a
-verified run can stamp `last_verified` into the runbook, and a runbook can
-be a directory or a single markdown file. Vocabulary: the document is the
+kind in the convention below is live, verify steps run on their own, and
+a runbook can be a directory or a single markdown file. Vocabulary: the document is the
 *runbook*; the record of one run is the *runsheet*.
 
 ## Install
@@ -45,17 +44,22 @@ The argument is one of three things: a runbook directory, a single
 all-in-one markdown file whose `##` headings are the steps (see
 [Single-file runbooks](docs/runbooks/structure.md#single-file-runbooks)),
 or a directory holding several of either, in folders nested as deep as
-you like. Started on such a library, the browser opens on a folder tree in
+you like. A markdown file is a runbook only when it starts with YAML front
+matter that has a `title`; any other markdown file is a plain document that
+a runbook can link to (see
+[Runbooks and Documents](docs/concepts/runbooks.md)). Started on such a library, the browser opens on a folder tree in
 the left pane; selecting a runbook shows its description, prerequisites,
 inputs, steps and previous runs in the main pane, with an **Open** button.
-A `README.md` in a folder is shown as that folder's description. Try the
+A `README.md` in a folder is shown as that folder's description. The
+search box in the header searches the full text of every runbook. Try the
 bundled examples:
 
 ```bash
-runsheets --open examples                      # all three, pick one in the browser
+runsheets --open examples                      # all four, pick one in the browser
 runsheets --open examples/hello                # safe to run: every block kind
 runsheets --check examples/staging-teardown    # a realistic AWS teardown
 runsheets --open examples/db-maintenance.md    # a single all-in-one file, sql blocks via psql
+runsheets --open examples/disk-space-triage.md # links to plain documents, kept out of the tree
 ```
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
@@ -67,6 +71,13 @@ the runbook, ...), which beat `./config/runsheets.yml` (or the file `--config` o
 `RUNSHEETS_CONFIG` names), which beats `~/.config/runsheets/runsheets.yml`,
 which beats the defaults bundled in `lib/runsheets/config/defaults.yml`. See
 [docs/running/cli.md](docs/running/cli.md#settings).
+
+Nothing executes until you start a run from the runbook's landing page; until
+then the Run buttons are disabled. Starting a run does not commit
+you to the whole runbook. With a run active, open any step, in any order,
+run just that step's blocks, and click **Abandon** when you are done. A run
+is the record that executions are written to, not an order you have to
+follow (see [docs/concepts/runs.md](docs/concepts/runs.md#a-run-is-a-record-not-a-sequence)).
 
 ## A runbook is a directory
 
@@ -98,7 +109,6 @@ prerequisites:
 blast_radius: >
   Destroys the staging database, container images, and DNS.
 escalation: Stop and contact the platform owner if any stack delete fails twice.
-last_verified: 2026-09-12
 tags: [aws, staging, destructive]
 inputs:
   - name: AWS_PROFILE
@@ -201,9 +211,7 @@ docs in a repository. The landing page lists previous runs.
 - Secret inputs reach the child process but never the run record. Captured
   output is redacted before it is written; plain string replacement, so an
   encoded secret is not caught.
-- The tool writes nothing inside the runbook directory, except the
-  `last_verified` line of `runbook.md`, offered after a run that verified
-  the runbook and written only when asked.
+- The tool writes nothing inside the runbook directory.
 - Stopping the server ends an active run as abandoned and stops whatever it
   left running.
 

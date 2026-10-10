@@ -9,8 +9,8 @@ module Runsheets
 
     attr_reader :slug, :path, :position, :data, :body, :html, :blocks, :warnings
 
-    # Load a markdown file. +root+ is the runbook directory, used to resolve
-    # relative links; +position+ is the 1-based order among the steps.
+    # Load a markdown file. +root+ is the directory relative links resolve
+    # against (see Runbook.load); +position+ is the 1-based order among the steps.
     def self.load(path, root:, position: nil, interpreters: Block::INTERPRETERS)
       new(slug: File.basename(path, ".*"), text: File.read(path, encoding: "UTF-8"), path:, root:, position:, interpreters:)
     end

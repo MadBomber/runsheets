@@ -127,12 +127,9 @@ state out of reach.
 
 ### No writes to the runbook
 
-runsheets writes nothing inside the runbook directory, with one exception:
-the `last_verified` stamp. It is offered only after a run that verified the
-runbook, applied only when the operator clicks **Stamp runbook.md**, and it
-replaces exactly one front-matter line (adding it if absent). The write is
-recorded as a `stamp` event in the run record. Nothing else in the
-directory is ever touched.
+runsheets writes nothing inside the runbook directory. Run records,
+captured output and everything else it produces go to the runs directory
+outside it; the runbook's files are only ever read.
 
 ## What is deliberately not done
 

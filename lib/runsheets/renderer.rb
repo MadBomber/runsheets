@@ -153,19 +153,26 @@ module Runsheets
     def self.title_of(markdown) = markdown[/^\#[ \t]+(.+?)[ \t#]*$/, 1]
 
     # Point relative <img src> and <a href> values at the /files/ route so
-    # assets that sit next to a markdown file resolve. base_dir is the file's
+    # assets that sit next to a markdown file resolve, and links to markdown
+    # files at the /docs/ route, which renders them. base_dir is the file's
     # directory relative to the runbook root ('' for the root).
     def self.rewrite_relative_urls(html, base_dir, prefix: "/files")
-      html.gsub(/(<(?:img|a)\b[^>]*\b(?:src|href)=")([^"]*)(")/) do
-        before, url, after = Regexp.last_match.captures
+      html.gsub(/(<(img|a)\b[^>]*\b(?:src|href)=")([^"]*)(")/) do
+        before, tag, url, after = Regexp.last_match.captures
         if url.match?(%r{\A([a-z][a-z0-9+.-]*:|/|#|\?)}i)
           "#{before}#{url}#{after}"
         else
           joined = join_relative(base_dir, url)
-          "#{before}#{joined ? "#{prefix}/#{joined}" : url}#{after}"
+          "#{before}#{joined ? "#{route_for(tag, joined, prefix)}/#{joined}" : url}#{after}"
         end
       end
     end
+
+    # The route a relative URL is served from: a link to a markdown file is
+    # a document to render, anything else a file to send as it is.
+    def self.route_for(tag, path, files_prefix) = tag == "a" && markdown_path?(path) ? "/docs" : files_prefix
+
+    def self.markdown_path?(path) = path.match?(/\.md(?:[#?]|\z)/i)
 
     # Join a relative href onto a base directory, resolving '.' and '..'.
     # Returns nil if the href climbs above the root.

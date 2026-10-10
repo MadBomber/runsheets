@@ -173,7 +173,7 @@ class TestCLI < Minitest::Test
 
   def test_check_mode_reports_warnings_and_fails
     Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "runbook.md"), "no front matter\n")
+      File.write(File.join(dir, "runbook.md"), "---\ntitle: T\n---\nno steps\n")
       out = StringIO.new
       err = StringIO.new
       assert_equal 1, CLI.run(["--check", dir], out:, err:)
@@ -242,8 +242,9 @@ class TestCLI < Minitest::Test
     err = StringIO.new
     assert_equal 0, CLI.run(["--check", File.expand_path("../examples", __dir__)], out:, err:)
     lines = out.string.lines.map(&:chomp)
-    assert_equal 3, lines.size
+    assert_equal 4, lines.size
     assert_includes lines, "Hello, runsheets: 6 steps, 0 warnings"
+    assert_includes lines, "Disk space triage: 3 steps, 0 warnings"
     assert_includes lines, "Monthly PostgreSQL maintenance: 5 steps, 0 warnings"
     assert_empty err.string
   end
@@ -257,7 +258,7 @@ class TestCLI < Minitest::Test
       err = StringIO.new
       assert_equal 1, CLI.run(["--check", dir], out:, err:)
       assert_includes out.string, "Fine: 1 steps, 0 warnings"
-      assert_includes err.string, "runsheets: warning: bad: no steps found"
+      assert_includes err.string, "runsheets: error: bad: runbook.md is not a runbook: it needs YAML front matter with a title"
     end
   end
 
