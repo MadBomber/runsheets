@@ -34,7 +34,7 @@ Gem::Specification.new do |spec|
   spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true).reject do |f|
       (f == gemspec) ||
-        f.start_with?(*%w[Gemfile .gitignore test/ PLAN.md])
+        f.start_with?(*%w[Gemfile . test/ docs/ site/ PLAN.md Rakefile mkdocs.yml]) || f.end_with?("_output.txt")
     end
   end
 
@@ -51,4 +51,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "kramdown-parser-gfm",  "~> 1.1"
   spec.add_dependency "rouge",                ">= 4.0"
   spec.add_dependency "myway_config",         "~> 0.1"
+  spec.add_dependency "logger" # a bundled gem since Ruby 3.5; the session log uses it
 end

@@ -108,7 +108,7 @@ module Runsheets
       if library
         runbooks = library.entries.select(&:ok?).map { [it.slug, it.runbook] }
         main     = SearchPage.main(Search.run(runbooks, query), query, open_slug:)
-        view     = Chooser::View.new(library:, session:, token:, node: library.root)
+        view     = Chooser::View.new(library:, session:, token:, node: library.root, crumb: "Search")
         Chooser.frame(view, title: "Search", main:, nonce:, query:)
       else
         main = SearchPage.main(Search.run([[open_slug, session.runbook]], query), query, open_slug:)

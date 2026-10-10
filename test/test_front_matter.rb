@@ -5,6 +5,16 @@ require "test_helper"
 class TestFrontMatter < Minitest::Test
   FM = Runsheets::FrontMatter
 
+  def test_a_byte_order_mark_does_not_hide_the_front_matter
+    assert_equal "Hi", FM.parse("﻿---\ntitle: Hi\n---\nbody\n").data["title"]
+  end
+
+  def test_unreadable_yaml_is_a_runbook_error
+    assert_raises(Runsheets::RunbookError) { FM.parse("---\ntitle: !ruby/object:Object {}\n---\n") }
+    assert_raises(Runsheets::RunbookError) { FM.parse("---\na: &x [1]\nb: *x\n---\n") }
+    assert_equal "na�ve", FM.parse("---\ntitle: na\xEFve\n---\n".b.force_encoding("UTF-8")).data["title"], "invalid bytes are replaced, not fatal"
+  end
+
   def test_splits_data_and_body
     result = FM.parse("---\ntitle: Hi\nupdated: 2026-09-12\n---\n# Body\n")
     assert_equal "Hi", result.data["title"]

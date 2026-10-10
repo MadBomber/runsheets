@@ -51,7 +51,7 @@ module Runsheets
     # Is the markdown file at +path+ a runbook rather than a plain document?
     # A file that cannot be read is neither, and is left out.
     def self.runbook_file?(path)
-      runbook_text?(File.read(path, encoding: "UTF-8"))
+      runbook_text?(File.read(path, encoding: "BOM|UTF-8"))
     rescue SystemCallError
       false
     end
@@ -87,7 +87,7 @@ module Runsheets
       raise RunbookError, "#{MAIN_FILE} not found in #{dir}" unless File.file?(main_path)
 
       @loaded_at = Time.now
-      parsed     = FrontMatter.parse(File.read(main_path, encoding: "UTF-8"))
+      parsed     = FrontMatter.parse(File.read(main_path, encoding: "BOM|UTF-8"))
       @data      = parsed.data
       raise RunbookError, "#{File.basename(main_path)} is not a runbook: it needs YAML front matter with a title" if data["title"].to_s.strip.empty?
       @section_warnings = []
@@ -126,9 +126,9 @@ module Runsheets
 
     def verify_blocks = verify_documents.flat_map(&:executable_blocks)
 
-    # The markdown files this runbook was built from.
+    # The markdown files this runbook was built from (those that exist).
     def source_files
-      return [main_path] if single_file?
+      return [main_path].select { File.file?(it) } if single_file?
 
       [main_path, *Dir.glob(File.join(dir, STEPS_DIR, "*.md")), *EXTRAS.map { File.join(dir, "#{it}.md") }].select { File.file?(it) }
     end
@@ -140,6 +140,16 @@ module Runsheets
       return true if files.size != @source_count
 
       files.any? { File.mtime(it) > loaded_at }
+    rescue SystemCallError # a file vanished between listing and reading
+      true
+    end
+
+    # A reload was tried and failed: count the files as seen, so the next
+    # attempt waits for another edit rather than retrying on every page.
+    def checked!
+      @loaded_at    = Time.now
+      @source_count = source_files.size rescue @source_count
+      self
     end
 
     # Every document that can be shown as a page, keyed by slug.
@@ -257,6 +267,7 @@ module Runsheets
       inputs.reject(&:valid?).each { warnings << "input name '#{it.name}' is not a valid environment variable name" }
       dupes = steps.map(&:slug).tally.select { |_, n| n > 1 }.keys
       warnings << "duplicate step slugs: #{dupes.join(', ')}" if dupes.any?
+      steps.map(&:slug).intersection(%w[runbook verify rollback]).each { warnings << "step #{it} has the name of a special document; give it a number" }
       warnings.concat(@section_warnings)
       documents.each_value do |step|
         step.warnings.each { warnings << "#{step.slug}: #{it}" }

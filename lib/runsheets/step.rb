@@ -12,7 +12,9 @@ module Runsheets
     # Load a markdown file. +root+ is the directory relative links resolve
     # against (see Runbook.load); +position+ is the 1-based order among the steps.
     def self.load(path, root:, position: nil, interpreters: Block::INTERPRETERS)
-      new(slug: File.basename(path, ".*"), text: File.read(path, encoding: "UTF-8"), path:, root:, position:, interpreters:)
+      new(slug: File.basename(path, ".*"), text: File.read(path, encoding: "BOM|UTF-8"), path:, root:, position:, interpreters:)
+    rescue RunbookError => e
+      raise RunbookError, "#{File.basename(path)}: #{e.message}" # say which step
     end
 
     # +data+ is merged over the front matter parsed from +text+; a

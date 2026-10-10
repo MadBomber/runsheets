@@ -7,6 +7,13 @@ class TestRedactor < Minitest::Test
 
   Redactor = Runsheets::Redactor
 
+  def test_a_secret_whose_end_repeats_its_start_is_still_caught
+    r = Runsheets::Redactor.new("S" => "s3cr3ts")
+    assert_equal "x [redacted S]", r.feed("x s3cr3ts") + r.flush
+    r = Runsheets::Redactor.new("S" => "s3cr3ts")
+    assert_equal "[redacted S] y", r.feed("s3cr3") + r.feed("ts y") + r.flush
+  end
+
   def test_empty_redactor_passes_text_through
     r = Redactor.new({})
     assert r.empty?

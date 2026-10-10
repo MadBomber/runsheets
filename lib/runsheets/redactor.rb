@@ -44,7 +44,7 @@ module Runsheets
       return chunk if empty?
 
       @pending << chunk.b
-      keep = partial_secret_length(@pending)
+      keep = [partial_secret_length(@pending), @pending.bytesize - last_match_end(@pending)].min
       safe = @pending.byteslice(0, @pending.bytesize - keep)
       @pending = @pending.byteslice(@pending.bytesize - keep, keep) || +"".b
       redact(safe)
@@ -55,6 +55,16 @@ module Runsheets
       out = redact(@pending)
       @pending = +"".b
       out
+    end
+
+    # Where the last whole secret in +text+ ends, or 0. Nothing up to there
+    # may be held back: a tail that both ends a whole secret and starts
+    # another would otherwise keep the whole one out of #redact.
+    def last_match_end(text)
+      @values.filter_map do |_, value|
+        at = text.rindex(value)
+        at && (at + value.bytesize)
+      end.max || 0
     end
 
     # Length of the longest suffix of +text+ that is a proper prefix of

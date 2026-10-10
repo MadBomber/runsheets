@@ -24,6 +24,14 @@ class TestSearch < Minitest::Test
     assert_equal ["db-maintenance"], Search.run(examples, "VACUUM psql").map(&:slug), "case-insensitive, across documents and front matter"
   end
 
+  def test_a_phrase_matches_across_a_wrapped_line
+    assert_includes Search.run(examples, '"kept elsewhere in the examples directory"').map(&:slug), "disk-space-triage"
+  end
+
+  def test_a_stray_quote_is_not_part_of_a_word
+    assert_equal ["disk"], Search.terms('"disk')
+  end
+
   def test_code_in_blocks_is_searched
     assert_includes Search.run(examples, "du -sh").map(&:slug), "disk-space-triage"
   end

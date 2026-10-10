@@ -117,3 +117,13 @@ cwd: .                   # working directory, relative to the runbook
 
 YAML parses unquoted `2026-09-12` as a date and `2026-09-12 10:00:00` as a
 time. Both are permitted. Quote the value if you want it kept as text.
+
+## What front matter may not hold
+
+Front matter is read with YAML's safe loader. YAML aliases (`&anchor` and
+`*anchor`) are refused, and so is any tag or class other than a date or a
+time. Either makes the file fail to load with an error saying which, for
+example `front matter may not use YAML aliases (& and *)`; for a step file
+the message starts with the file's name. A UTF-8 byte order mark at the
+start of the file is accepted, and bytes that are not valid UTF-8 are
+replaced rather than failing the load.

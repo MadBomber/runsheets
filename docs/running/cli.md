@@ -21,16 +21,16 @@ or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `-c`, `--config FILE` | `./config/runsheets.yml` | Config file to read in place of the project config; see [Settings](#settings). A file named here must exist. |
-| `-p`, `--port PORT` | `4567` | Port to listen on. |
+| `-p`, `--port PORT` | `4567` | Port to listen on, from 1 to 65535. |
 | `-b`, `--bind HOST` | `127.0.0.1` | Address to bind to. See the note below before changing it. |
 | `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where session records, logs and run records are written. |
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
-| `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. `--no-check` turns it off. |
+| `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. See [Checking runbooks](#checking-runbooks). `--no-check` turns it off. |
 | `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. `--no-init` turns it off. |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-e`, `--engineer NAME` | ask | Who is starting the session. Without it the start page asks, pre-filled from `git config user.name`, else `$USER`. See [The session](#the-session). |
 | `-w`, `--why TEXT` | ask | Why the session is being started: its first note. With `--engineer` too, the session starts at once and the start page is skipped. |
-| `--log-level LEVEL` | `info` | The session log's level: `debug`, `info`, `warn`, `error` or `fatal`. See [The session log](#the-session-log). |
+| `--log-level LEVEL` | `info` | The session log's level: `debug`, `info`, `warn`, `error` or `fatal`, in any case. See [The session log](#the-session-log). |
 | `--verbose` | | The same as `--log-level debug`. |
 | `-q`, `--quiet` | off | Do not echo the session log to the terminal. `--no-quiet` turns it off. |
 | `-v`, `--version` | | Print the version and exit. |
@@ -79,6 +79,35 @@ as a whole):
 runsheets --check ops/runbooks
 ```
 
+## Checking runbooks
+
+`--check` loads the runbook, prints its authoring warnings to stderr
+prefixed `runsheets: warning:`, and prints one line to stdout:
+
+```text
+Hello, runsheets: 6 steps, 0 warnings
+```
+
+On a directory of runbooks every runbook gets that line with its slug in
+brackets, and each warning is prefixed with the slug:
+
+```text
+runsheets: warning: platform/deploy: 020-roll-out: automated step has no executable block
+Deploy [platform/deploy]: 4 steps, 1 warnings
+Backup [platform/database/backup]: 3 steps, 0 warnings
+```
+
+A runbook in the directory that cannot be read (an unreadable file, front
+matter that is not valid YAML, a clash of names) is never dropped from
+the check. It is reported as an error with its slug and no summary line:
+
+```text
+runsheets: error: platform/restore: front matter may not use YAML aliases (& and *)
+```
+
+The exit status is `1` if any runbook warned or could not be read, else
+`0`.
+
 ## What it prints
 
 ```text
@@ -100,9 +129,11 @@ the path of its log:
 Session: 20261010T141502, log /Users/you/.local/share/runsheets/runs/sessions/20261010T141502/session.log
 ```
 
-Authoring warnings are printed to stderr before the banner, prefixed
-`runsheets: warning:`. The server still starts; warnings mark blocks and
-steps in the page but do not block serving.
+Served on one runbook, its authoring warnings are printed to stderr
+before the banner, prefixed `runsheets: warning:`. The server still
+starts; warnings mark blocks and steps in the page but do not block
+serving. In a library, each runbook's warnings are on its pages and in
+`--check`.
 
 Puma then prints its own startup lines. From then on, unless `--quiet` is
 given, the session log is echoed to the terminal as it is written. Press
@@ -113,7 +144,7 @@ given, the session log is echoed to the terminal as it is written. Press
 | Status | When |
 | --- | --- |
 | `0` | Normal exit, or `--check` found no warnings. |
-| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, or `--check` found warnings. |
+| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, or `--check` found warnings or a runbook it could not read. |
 
 ## Settings
 
@@ -144,9 +175,15 @@ Config files are flat YAML, one key per setting. Paths may start with
 for `1`, `true`, `yes` or `on` (any case) and off for any other value, so
 `RUNSHEETS_OPEN=off` switches off an `open: true` in the file, and
 `--no-open` switches off either. A blank value (`RUNSHEETS_PORT=`) counts as
-unset. A port that is not a whole number, a log level that is not one of
-the five, or a named config file that does not exist, is reported and the
-command exits `1`.
+unset. A port that is not a whole number from 1 to 65535, a log level
+that is not one of the five (in any case: `WARN` is `warn`), a named
+config file that does not exist, a config file that is not valid YAML, a
+`--bind` host that does not resolve, or a runbook directory that cannot
+be read is reported in one line and the command exits `1`:
+
+```text
+runsheets: port must be between 1 and 65535, got 70000
+```
 
 ```yaml
 # ~/.config/runsheets/runsheets.yml
@@ -185,9 +222,9 @@ runsheets                                                  # now serves db-refre
 
 Redirect to `config/runsheets.yml` instead for a project config to commit
 with a repository. `dump` itself is never in the output, so a saved file
-cannot make every later run print and exit. Nor is `why`: the reason for a
-session belongs to that session, not to every later one. `engineer` is
-saved.
+cannot make every later run print and exit, and neither are `check` and
+`init`, for the same reason. Nor is `why`: the reason for a session
+belongs to that session, not to every later one. `engineer` is saved.
 
 ## About `--bind`
 

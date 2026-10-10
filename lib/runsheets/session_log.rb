@@ -25,21 +25,27 @@ module Runsheets
       def initialize(log, tags)
         @log     = log
         @tags    = tags
-        @pending = +""
+        @pending = +"".b
       end
 
+      # Bytes are kept as bytes until a line is complete, so a character
+      # split across two reads is decoded whole.
       def write(chunk)
-        @pending << chunk.to_s.dup.force_encoding("UTF-8").scrub
-        lines    = @pending.split("\n", -1)
-        @pending = lines.pop || +""
-        lines.each { @log.info("> #{it.chomp("\r")}", tags: @tags) }
+        @pending << chunk.to_s.b
+        lines    = @pending.split("\n".b, -1)
+        @pending = lines.pop || +"".b
+        lines.each { line(it) }
         chunk.to_s.bytesize
       end
 
       def close
-        @log.info("> #{@pending}", tags: @tags) unless @pending.empty?
-        @pending = +""
+        line(@pending) unless @pending.empty?
+        @pending = +"".b
       end
+
+      private
+
+      def line(bytes) = @log.info("> #{bytes.force_encoding('UTF-8').scrub.chomp("\r")}", tags: @tags)
     end
 
     attr_reader :path, :level
@@ -66,7 +72,7 @@ module Runsheets
 
     # The bracketed prefix for a list of tags: [a b #c], or [] dropped.
     def self.tag_text(tags)
-      words = Array(tags).compact.map(&:to_s).reject(&:empty?)
+      words = Array(tags).compact.map { it.to_s.gsub(/[[:cntrl:]]/, "?") }.reject(&:empty?)
       words.empty? ? "" : "[#{words.join(' ')}]"
     end
 

@@ -105,8 +105,9 @@ Most existing runbooks are one markdown file with `## Step` headings.
    session. Now the runbook has a `completed` record of its last
    verification that nobody had to date by hand.
 
-Single-file runbooks with headings as steps may be supported directly in a
-later milestone; see the [roadmap](../roadmap.md).
+An existing runbook that is one markdown file with a `##` heading per step
+needs no conversion at all: give it front matter with a `title` and serve it
+as a [single-file runbook](structure.md#single-file-runbooks).
 
 ## Checking your work
 
@@ -121,10 +122,15 @@ Reports, with the file and block they belong to:
 - `automated` steps with nothing executable, and unknown `kind` values
 - non-positive timeouts
 - missing `title`, invalid input names, duplicate step slugs
+- a step file in `steps/` named `runbook.md`, `verify.md` or `rollback.md`
+- in a single-file runbook, a code fence that is opened in a section and
+  never closed, which turns every later heading into part of that section
 - no steps at all
 
-It exits 1 when there are warnings, so it can gate a pull request in a
-repository of runbooks.
+Front matter that cannot be read (not valid YAML, a YAML alias, an
+unknown tag) is an error rather than a warning. It exits 1 when there are
+warnings or errors, so it can gate a pull request in a repository of
+runbooks. See [Checking runbooks](../running/cli.md#checking-runbooks).
 
 ## Things that look like they should work but do not
 

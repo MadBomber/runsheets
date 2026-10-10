@@ -70,6 +70,28 @@ elsewhere. A `<script>` in a step still renders as text in the HTML, and
 does nothing. Pages are also sent with `Cache-Control: no-store`, since
 they carry the token.
 
+A Content Security Policy cannot stop a `<meta http-equiv="refresh">`
+from navigating the page, so `<meta>` tags are removed from rendered
+markdown altogether, in runbooks and in plain documents alike. A runbook
+has no use for any other `<meta>`.
+
+### Nothing recorded becomes markup
+
+What the operator and the commands produce is shown on pages too, so it
+is escaped on the way:
+
+- **The runsheet.** `run.md` is rendered as markdown on the runsheet
+  page. Command output and code go in a code fence longer than any run of
+  backticks inside them, so they cannot close it; notes have their HTML
+  and markdown characters escaped; input values and step slugs are code
+  spans. Output cannot become live HTML on the runsheet page.
+- **Restored output.** A step page embeds the last execution of each
+  block as JSON for its script to restore. `<` is escaped in that JSON,
+  so output holding `</script>` or `<!--` cannot end the block early.
+- **The session log.** Tags (the runbook slug, the step, the execution
+  id) have control characters replaced with `?`, so a file name holding a
+  newline cannot forge a log line.
+
 ### Opt-in execution
 
 Only fenced blocks whose info string carries `run`, `destructive` or
@@ -92,13 +114,12 @@ Destructive blocks sit under a banner with the runbook's blast radius and
 escalation contact. The server refuses to run one until the request carries
 a four-character code it issued for that block (HTTP 428 carries the code;
 the page prompts for it). The code is random rather than the runbook slug
-so it cannot become muscle memory, it is checked server-side so a script
-driving the API from outside the page cannot skip it (script inside the
-page is kept out by the Content Security Policy), and it is retired once
-used. It is a guard
-against a reflexive click, not against a hostile operator, who could run
-the command in a terminal anyway. The record marks the execution as
-confirmed.
+so it cannot become muscle memory, and it is retired once used. Because
+the 428 response itself carries the code, anything that holds the session
+token can read it and send it back: the code guards against a slip, not
+against a script driving the API. It is no guard against a hostile
+operator either, who could run the command in a terminal anyway. The
+record marks the execution as confirmed.
 
 ### Blank inputs refused
 
@@ -109,10 +130,14 @@ before anything spawns. See [Inputs and Secrets](../runbooks/inputs.md).
 
 Inputs marked `secret` reach the child process and nothing else: not
 `run.json`, not `run.md`, not `session.json`, not the session log (which
-shows `NAME=[secret]`), and not the page. The Run open panel shows only
-that the secret is set, and the Change inputs form leaves secret fields
-empty, keeping the current value when one is left empty, so a secret is
-never sent back to the browser. A secret is never carried from one run to
+shows `NAME=[secret]`), and not the page. A secret's field on the start
+form is always empty, even when the environment or a default has a value
+for it; its placeholder says it will use `$NAME` from the environment or
+the default, and the server fills a blank secret from those when the run
+starts. The Run open panel shows only that the secret is set, and the
+Change inputs form leaves secret fields empty, keeping the current value
+when one is left empty. A secret is never sent to the browser. A secret
+is never carried from one run to
 another within a session. Output is redacted on its way from the child to the
 `.out` file and the session log, so a block that prints a secret records
 `[redacted NAME]` instead. This is exact string replacement and does not catch encoded or
@@ -132,17 +157,53 @@ running; the next start closes it as `interrupted`.
 
 ### File serving
 
-`/files/*` serves only regular files inside the runbook directory. Path
-components are normalised and checked against the real root, and symbolic
-links are resolved and must land inside it too; hidden entries (anything
-starting with `.`) are never served, which keeps `.git`, `.env` and editor
-state out of reach.
+`/files/*` serves only regular files inside the directory runsheets was
+started on. Path components are normalised and checked against the real
+root, and symbolic links are resolved and must land inside it too; hidden
+entries (anything starting with `.`) are never served, which keeps
+`.git`, `.env` and editor state out of reach.
+
+A served file is not a page. Every `/files/*` response carries
+
+```text
+Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox
+X-Content-Type-Options: nosniff
+```
+
+and only images, PDFs and plain text (`.png`, `.jpg`, `.jpeg`, `.gif`,
+`.webp`, `.svg`, `.pdf`, `.txt`) are served inline. Everything else is
+sent as a download (`Content-Disposition: attachment`). An HTML or XML
+file in a runbook directory can never become a page that runs script on
+this origin, where it could read the session token.
+
+### Front matter is data
+
+Front matter is read with YAML's safe loader. Aliases (`&` and `*`) are
+refused, so a small file cannot expand into a huge one, and so are tags
+and classes other than dates and times. Either is a load error with a
+message saying which: in a step file the message names the file; in a
+library the runbook shows as broken, and `--check` reports it as an
+error. A UTF-8 byte order mark is accepted, and bytes
+that are not valid UTF-8 are replaced rather than failing the load.
+
+### Bounded reads
+
+A page never reads a whole output file or log. Block output on a page
+and in the poll response is the last 256 KB of the execution's `.out`
+file; the session page's log tail reads the last 64 KB of `session.log`
+and shows its last 200 lines.
 
 ### No writes to the runbook
 
 runsheets writes nothing inside the runbook directory. Session records,
 the session log, run records, captured output and everything else it
 produces go to the runs directory outside it; the runbook's files are only ever read.
+
+Records (`run.json`, `run.md`, `session.json`) are written to a
+temporary file and renamed into place, so a reader or a crash never sees
+half a record. When the next start closes a killed session as
+`interrupted`, it touches only run directories under the runs directory,
+whatever the old `session.json` says.
 
 ## What is deliberately not done
 

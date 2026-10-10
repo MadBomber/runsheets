@@ -185,7 +185,6 @@ class TestNestedLibrary < Minitest::Test
       assert_equal "New", library.find("network/new").title
       refute library.stale?
 
-      sleep 0.01
       File.write(File.join(dir, "network", "new.md"), format(SINGLE, "Renamed", "x"))
       FileUtils.touch(File.join(dir, "network", "new.md"), mtime: Time.now + 2)
       assert library.stale?, "a runbook's file changed"
@@ -235,6 +234,27 @@ class TestNestedLibrary < Minitest::Test
       write(dir, "notes.md", "# Notes\n")
       assert_nil library.entry_at(File.join(dir, "notes.md"))
       assert_nil library.entry_at(File.join(dir, "database/backupx.md")), "a name sharing a prefix is not inside"
+    end
+  end
+
+  def test_clashing_slugs_are_reported_not_hidden
+    with_nested do |dir, _library|
+      write(dir, "deploy/runbook.md", "---\ntitle: Deploy dir\n---\n")
+      write(dir, "deploy/steps/010-go.md", "---\ntitle: Go\nkind: manual\n---\nGo.\n")
+      library = Library.load(dir)
+      clashes = library.entries.select { it.slug == "deploy" }
+      assert_equal 2, clashes.size
+      assert_equal 1, clashes.count(&:ok?), "the first keeps the slug"
+      assert_match(/already has the name deploy/, clashes.reject(&:ok?).first.error)
+    end
+  end
+
+  def test_a_runbook_added_to_a_folder_without_runbooks_is_found
+    with_nested do |dir, library|
+      write(dir, "empty/deeper/new.md", format(SINGLE, "New here", "x"))
+      FileUtils.touch(File.join(dir, "empty", "deeper"), mtime: Time.now + 2)
+      assert library.stale?
+      assert library.refresh!.find("empty/deeper/new")
     end
   end
 

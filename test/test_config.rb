@@ -139,14 +139,22 @@ class TestConfig < Minitest::Test
     end
   end
 
-  def test_to_config_yaml_holds_every_setting_but_dump_and_why
+  def test_to_config_yaml_holds_every_setting_but_the_one_shot_actions_and_why
     with_clean_home do
       text = Config.new({ port: 4590, open: "yes" }).to_config_yaml
       assert_match(/\A# runsheets settings, written by `runsheets --dump`/, text)
       loaded = YAML.safe_load(text)
-      assert_equal (Config.config_attributes - %i[dump why]).map(&:to_s).sort, loaded.keys.sort
+      assert_equal (Config.config_attributes - %i[dump check init why]).map(&:to_s).sort, loaded.keys.sort
       assert_equal 4590, loaded["port"]
       assert loaded["open"]
+    end
+  end
+
+  def test_port_must_be_a_real_port
+    with_clean_home do
+      assert_raises(Runsheets::ConfigError) { Config.new({ port: "0" }) }
+      assert_raises(Runsheets::ConfigError) { Config.new({ port: "70000" }) }
+      assert_equal 65_535, Config.new({ port: "65535" }).port
     end
   end
 end

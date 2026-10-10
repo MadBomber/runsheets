@@ -85,7 +85,7 @@ module Runsheets
     def self.session_flags(opts, options, defaults)
       opts.on("-e", "--engineer NAME", "Who is starting the session (default: ask) [RUNSHEETS_ENGINEER]") { options[:engineer] = it }
       opts.on("-w", "--why TEXT", "Why: the session's first note; with --engineer, skips the start page [RUNSHEETS_WHY]") { options[:why] = it }
-      opts.on("--log-level LEVEL", SessionLog::LEVELS, "Session log level: #{SessionLog::LEVELS.join(', ')} (default: #{defaults[:log_level]}) [RUNSHEETS_LOG_LEVEL]") { options[:log_level] = it }
+      opts.on("--log-level LEVEL", "Session log level: #{SessionLog::LEVELS.join(', ')} (default: #{defaults[:log_level]}) [RUNSHEETS_LOG_LEVEL]") { options[:log_level] = it }
       opts.on("--verbose", "Log page views, searches and polling too (--log-level debug)") { options[:log_level] = "debug" }
       opts.on("-q", "--[no-]quiet", "Do not echo the session log to the terminal [RUNSHEETS_QUIET]") { options[:quiet] = it }
     end
@@ -133,7 +133,8 @@ module Runsheets
     rescue Errno::EADDRINUSE
       err.puts "#{PROGRAM}: port #{config.port} on #{config.bind} is already in use; pick another with --port"
       1
-    rescue OptionParser::ParseError, RunbookError, ConfigError => e
+    rescue OptionParser::ParseError, RunbookError, ConfigError,
+           Psych::Exception, SocketError, SystemCallError => e # also a bad config file, an unknown host, an unreadable directory
       err.puts "#{PROGRAM}: #{e.message}"
       1
     end
@@ -141,19 +142,20 @@ module Runsheets
     # --check: report authoring warnings for a runbook, or for every runbook
     # in a library, one line each. Exit 1 when anything warned or failed.
     def self.check(target, out: $stdout, err: $stderr)
-      runbooks = target.is_a?(Library) ? target.entries.map { check_entry(it, err:) } : [target]
+      library  = target.is_a?(Library)
+      runbooks = library ? target.entries.map { check_entry(it, err:) } : [target]
       runbooks.compact.each do |runbook|
-        runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{runbook.slug}: #{it}" } if target.is_a?(Library)
-        runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{it}" } unless target.is_a?(Library)
-        out.puts "#{runbook.title}: #{runbook.steps.size} steps, #{runbook.warnings.size} warnings"
+        runbook.warnings.each { err.puts "#{PROGRAM}: warning: #{"#{runbook.slug}: " if library}#{it}" }
+        out.puts "#{runbook.title}#{" [#{runbook.slug}]" if library}: #{runbook.steps.size} steps, #{runbook.warnings.size} warnings"
       end
       clean = runbooks.all? { it && it.warnings.empty? }
       clean ? 0 : 1
     end
 
-    # One library entry's runbook, or nil (and a message) when it does not load.
+    # One library entry's runbook (as the library loaded it, with its slug),
+    # or nil and a message when it does not load.
     def self.check_entry(entry, err: $stderr)
-      return Runbook.load(entry.path) if entry.ok?
+      return entry.runbook if entry.ok?
 
       err.puts "#{PROGRAM}: error: #{entry.slug}: #{entry.error}"
       nil
@@ -173,6 +175,7 @@ module Runsheets
       Web.configure_for(session, bind:, port:, library:, runbook:).prepare_start(session_options: options, engineer: default_engineer(config))
       url = "http://#{bind}:#{port}/"
       err.puts bind_warning(bind) unless Web.loopback?(bind)
+      runbook&.warnings&.each { err.puts "#{PROGRAM}: warning: #{it}" }
 
       out.puts <<~INFO
         #{PROGRAM} #{VERSION}
@@ -323,7 +326,7 @@ module Runsheets
     def self.runbook_template(title)
       <<~MD
         ---
-        title: #{title}
+        title: #{title.to_json}
         when_to_use: >
           One or two sentences on the situation this runbook is for.
         prerequisites:
@@ -346,7 +349,7 @@ module Runsheets
     def self.single_file_template(title)
       <<~MD
         ---
-        title: #{title}
+        title: #{title.to_json}
         when_to_use: >
           One or two sentences on the situation this runbook is for.
         prerequisites:

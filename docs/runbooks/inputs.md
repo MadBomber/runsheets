@@ -60,7 +60,10 @@ When the start-run form is submitted, each input resolves in this order:
 5. Otherwise the empty string.
 
 The form is pre-filled with the result of steps 2 to 4, so the operator
-sees what will be used before starting. Selecting a runbook that already
+sees what will be used before starting. A secret's field is the exception:
+it is always empty, so a secret is never put in the page. Its placeholder
+says whether a blank will use `$NAME` from the environment or the default,
+and the server fills it from there when the run starts. Selecting a runbook that already
 has a run in the session returns to that run, and any inputs sent with it
 are ignored.
 
@@ -94,7 +97,7 @@ block's own business.
 
 A `secret: true` input:
 
-- is rendered as a password field,
+- is rendered as an empty password field, never pre-filled,
 - is passed to the child process like any other input,
 - is never written to `run.json`, `run.md`, `session.json` or the session
   log; the Run open panel shows only that it is set,

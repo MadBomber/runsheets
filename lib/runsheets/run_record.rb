@@ -33,7 +33,7 @@ module Runsheets
     # Create the run directory, named by the session, and write the initial
     # record. Secret inputs are never stored.
     def self.start(runs_root, runbook, session_id:, inputs: {}, now: Time.now)
-      dir = unique_dir(File.join(runs_root, runbook.slug, session_id))
+      dir = create_unique_dir(File.join(runs_root, runbook.slug, session_id))
       FileUtils.mkdir_p(File.join(dir, "blocks"))
       new(dir:, runbook_slug: runbook.slug, runbook_title: runbook.title, session_id:, started_at: now,
           inputs: visible_inputs(inputs, runbook)).write!
@@ -59,11 +59,30 @@ module Runsheets
 
     # Previous runs of a runbook, newest first.
     def self.list(runs_root, slug)
-      Dir.glob(File.join(runs_root, slug, "*", "run.json")).filter_map do |path|
+      dir = File.join(runs_root, slug)
+      return [] unless File.directory?(dir)
+
+      Dir.children(dir).map { File.join(dir, it, "run.json") }.select { File.file?(it) }.filter_map do |path|
         load(File.dirname(path))
-      rescue JSON::ParserError, ArgumentError, KeyError
+      rescue StandardError # a record that is not one: unreadable, or JSON of the wrong shape
         nil
       end.sort_by(&:started_at).reverse
+    end
+
+    # Create +dir+, or +dir+-2, -3, ... if it exists, and return the one
+    # created. Creating is the check, so two callers never share one.
+    def self.create_unique_dir(dir)
+      FileUtils.mkdir_p(File.dirname(dir))
+      candidate = dir
+      n = 1
+      begin
+        Dir.mkdir(candidate)
+        candidate
+      rescue Errno::EEXIST
+        n += 1
+        candidate = "#{dir}-#{n}"
+        retry
+      end
     end
 
     def self.unique_dir(dir)
@@ -73,6 +92,24 @@ module Runsheets
       n += 1 while File.exist?("#{dir}-#{n}")
       "#{dir}-#{n}"
     end
+
+    # A code fence longer than any run of backticks in +text+, so the text
+    # cannot close it.
+    def self.fence_for(text) = "`" * [3, (text.to_s.scan(/`+/).map(&:size).max || 0) + 1].max
+
+    # +text+ as an inline code span that no backtick inside can close.
+    def self.code_span(text)
+      text  = text.to_s.tr("\n", " ")
+      ticks = "`" * ((text.scan(/`+/).map(&:size).max || 0) + 1)
+      pad   = text.start_with?("`") || text.end_with?("`") ? " " : ""
+      "#{ticks}#{pad}#{text}#{pad}#{ticks}"
+    end
+
+    # +text+ (a note) as markdown that renders as itself: on one line, with
+    # the characters that make HTML or markdown escaped.
+    MARKUP = { "&" => "&amp;", "<" => "&lt;", ">" => "&gt;" }.freeze
+
+    def self.plain(text) = text.to_s.gsub(/\s*\n\s*/, " ").gsub(/[&<>`*_\[\]\\]/) { MARKUP[it] || "\\#{it}" }
 
     # Whether an execution hash (as stored in the record) counts as a
     # failure. A background process the operator stopped is not one.
@@ -221,8 +258,8 @@ module Runsheets
     def write!
       @lock.synchronize do
         refresh!
-        File.write(File.join(dir, "run.json"), JSON.pretty_generate(to_h))
-        File.write(File.join(dir, "run.md"), transcript)
+        Runsheets.write_atomic(File.join(dir, "run.json"), JSON.pretty_generate(to_h))
+        Runsheets.write_atomic(File.join(dir, "run.md"), transcript)
       end
       self
     end
@@ -262,7 +299,7 @@ module Runsheets
       return lines if inputs.empty?
 
       lines << "- Inputs:"
-      inputs.each { |k, v| lines << "  - `#{k}` = `#{v}`" }
+      inputs.each { |k, v| lines << "  - #{RunRecord.code_span(k)} = #{RunRecord.code_span(v)}" }
       lines
     end
 
@@ -270,21 +307,26 @@ module Runsheets
     def event_lines(event)
       case event[:type]
       when "execute" then execution_transcript(event)
-      when "step"    then ["- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{note_suffix(event)}", ""]
+      when "step"    then ["- #{event[:at]} step #{RunRecord.code_span(event[:step])} marked #{event[:status]}#{note_suffix(event)}", ""]
       when "ack"     then ["- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{note_suffix(event)}", ""]
-      when "inputs"  then ["- #{event[:at]} inputs changed: #{event[:inputs].map { |k, v| "`#{k}` = `#{v}`" }.join(', ')}", ""]
+      when "inputs"  then ["- #{event[:at]} inputs changed: #{event[:inputs].map do |k, v|
+        "#{RunRecord.code_span(k)} = #{RunRecord.code_span(v)}"
+      end.join(', ')}", ""]
       else []
       end
     end
 
-    def note_suffix(event) = event[:note] ? " — #{event[:note]}" : ""
+    def note_suffix(event) = event[:note] ? " — #{RunRecord.plain(event[:note])}" : ""
 
     def execution_transcript(event)
       hash  = executions.find { it[:id] == event[:execution] } || {}
       lines = [execution_title(event, hash), ""]
-      lines << "```#{command_lang(hash)}" << read_block_file(hash[:cmd]).chomp << "```" << ""
+      code = read_block_file(hash[:cmd]).chomp
+      fence = RunRecord.fence_for(code)
+      lines << "#{fence}#{command_lang(hash)}" << code << fence << ""
       output = read_block_file(hash[:log], tail: TRANSCRIPT_TAIL)
-      lines << "Output:" << "" << "```text" << output.chomp << "```" << "" unless output.empty?
+      fence  = RunRecord.fence_for(output)
+      lines << "Output:" << "" << "#{fence}text" << output.chomp << fence << "" unless output.empty?
       lines
     end
 
@@ -321,8 +363,9 @@ module Runsheets
       return "" unless File.file?(path)
 
       size = File.size(path)
-      text = tail && size > tail ? "[… #{size - tail} earlier bytes omitted]\n#{File.binread(path, tail, size - tail)}" : File.binread(path)
-      text.force_encoding("UTF-8").scrub
+      return File.binread(path).force_encoding("UTF-8").scrub unless tail && size > tail
+
+      "[… #{size - tail} earlier bytes omitted]\n#{File.binread(path, tail, size - tail).force_encoding('UTF-8').scrub}"
     end
   end
 end

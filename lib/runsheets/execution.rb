@@ -52,6 +52,8 @@ module Runsheets
     def wait(limit = nil)
       @thread&.join(limit)
       self
+    rescue StandardError # the reaper's own failure is already recorded as the state
+      self
     end
 
     # Captured stdout+stderr. With +tail+, only the last that many bytes.
@@ -128,8 +130,14 @@ module Runsheets
 
     private
 
+    # Each listener runs whatever the others do; one that raises is
+    # reported on stderr and skipped.
     def ended!
-      @on_end.each { it.call(self) }
+      @on_end.each do |listener|
+        listener.call(self)
+      rescue StandardError => e
+        warn "runsheets: execution #{id}: #{e.class}: #{e.message}"
+      end
       self
     end
   end

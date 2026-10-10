@@ -35,7 +35,7 @@ module Runsheets
 
       # How many times the terms occur in +text+, all together.
       def count(text)
-        haystack = text.to_s.downcase
+        haystack = Search.normalize(text)
         words.sum { haystack.scan(it).size }
       end
 
@@ -44,7 +44,7 @@ module Runsheets
       # matches.
       def snippet(text, context: CONTEXT)
         flat  = Search.plain(text).gsub(/\s+/, " ").strip
-        first = words.filter_map { flat.downcase.index(it) }.min
+        first = words.filter_map { flat =~ Regexp.new(Regexp.escape(it), Regexp::IGNORECASE) }.min
         return nil unless first
 
         from = [first - context, 0].max
@@ -69,7 +69,7 @@ module Runsheets
     # The terms of a query: "quoted phrases" whole, other words one by one,
     # lowercased, blanks and duplicates dropped.
     def terms(query)
-      query.to_s.scan(/"([^"]*)"|(\S+)/).map { |phrase, word| (phrase || word).strip.downcase }
+      query.to_s.scan(/"([^"]*)"|(\S+)/).map { |phrase, word| normalize(phrase || word.delete('"')).strip }
            .reject(&:empty?).uniq
     end
 
@@ -94,7 +94,7 @@ module Runsheets
 
     # Everything searchable in a runbook, lowercased, as one string.
     def text_of(runbook)
-      [runbook.title, meta_text(runbook), *runbook.documents.values.flat_map { [it.title, it.body] }].join("\n").downcase
+      normalize([runbook.title, meta_text(runbook), *runbook.documents.values.flat_map { [it.title, it.body] }].join("\n"))
     end
 
     # The runbook's front matter prose: what an engineer reads before the
@@ -114,6 +114,10 @@ module Runsheets
       end
       hits.sort_by { -it.score }
     end
+
+    # Text as search compares it: whitespace runs (line breaks included) as
+    # one space, case folded, so a phrase matches across a wrapped line.
+    def normalize(text) = text.to_s.gsub(/\s+/, " ").downcase(:fold)
 
     # Markdown reduced to the words a reader sees: link text without its
     # target, no fence lines, heading marks or HTML comments.

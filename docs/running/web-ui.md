@@ -35,7 +35,8 @@ starts when the server does and this page is never shown. See
   on pages that are not steps.
 - **Session pill**: the engineer, how long the session has been open, and
   how many runbooks have a run in it, as in `Pat · 12m 05s · 2 runbooks`.
-  It links to the [session page](#session-page).
+  The time keeps counting while the page is open (it is updated every 15
+  seconds). It links to the [session page](#session-page).
 - **Runbooks** appears when the server was started on a directory of
   runbooks, and leads back to the library.
 - **Search runbooks**, a search box on every page; see [Search](#search).
@@ -49,8 +50,9 @@ starts when the server does and this page is never shown. See
   something is running and keeps itself current.
 - **Steps**: every numbered step with its number, title and status mark.
   The current step is highlighted.
-- **Also**: **Checks**, `rollback` and any other extra documents, and,
-  once the runbook on screen has a run, its runsheet.
+- **Also**: **Checks**, `rollback` and any other extra documents, the
+  runsheet once the runbook on screen has a run, and **Session & notes**,
+  which leads to the [session page](#session-page).
 - **Rollback**: on step pages, a collapsible panel containing the whole
   rendered `rollback.md`.
 - **On this page**: an outline of the current page's headings.
@@ -72,6 +74,11 @@ A manual mark always wins over the execution-derived mark, so a step whose
 block failed but was then marked done shows `✓`. The failure is still in
 the record.
 
+The mark of the step on screen updates as soon as one of its blocks
+finishes, without a reload: `•` when it ran, `✗` when it failed. A step
+that has been marked done or skipped keeps its mark, and a `✗` is not
+turned back into `•` by a later block that succeeds.
+
 ## Choosing a runbook
 
 Started on a directory of runbooks (`runsheets ops/runbooks`), the session
@@ -87,7 +94,8 @@ the library.
 
 The page has two panes:
 
-- **The tree**, on the left. Folders fold and unfold; runbooks show their
+- **The tree**, on the left, under the **Running** panel when anything
+  in the session is running. Folders fold and unfold; runbooks show their
   title and step count. A runbook that does not load is struck through
   with a red `!`; the runbook on screen carries a green dot. The filter box
   at the top (++slash++ focuses it) narrows the tree to runbooks whose
@@ -126,7 +134,16 @@ folders to the library, and the **Runbooks** button (++r++) goes straight
 to it. A runbook's slug is its path inside the library
 (`platform/database/backup`), so two runbooks named alike in different
 folders keep separate run records. Runbooks added, removed or edited while
-the server is up appear on the next visit to the library.
+the server is up appear on the next visit to the library. That includes a
+runbook added to a folder that had none, a broken runbook directory once
+it is fixed, and an edited folder `README.md`.
+
+Two runbooks in one folder cannot share a slug. When they would
+(`deploy.md` beside `deploy/runbook.md`), or when a runbook has the name
+of a folder beside it (`backup.md` beside a folder `backup/`), the folder
+or the first runbook in name order keeps the name and the other is shown
+as a broken entry: "another runbook or a folder here already has the name
+deploy; rename one".
 
 ## Landing page
 
@@ -141,10 +158,10 @@ In order:
 4. The **Start a run** panel, or the **Run open** panel.
 5. **Step list** with kind badges, destructive badges, the number of
    executable blocks, and status marks.
-6. **Previous runs**, newest first. Each row shows the run id (linking to
-   the transcript), the status (`running`, `completed`, `partial`,
-   `opened`, `interrupted`, or `abandoned` in records from before
-   sessions), start time and duration, execution and failure counts, and
+6. **Previous runs**, newest first, leaving out the run that is open now.
+   Each row shows the run id (linking to the transcript), the status
+   (`running`, `completed`, `partial`, `opened`, `interrupted`, or
+   `abandoned` in records from before sessions), start time and duration, execution and failure counts, and
    steps done with the step it stopped at. A record of a verification run,
    from before sessions, carries a `verify` badge and shows checks run and
    how many are still failing.
@@ -155,10 +172,15 @@ In order:
 On a server started on one runbook, the landing page carries the **Start a
 run** panel until the runbook has a run. (In a library the same form is in
 the runbook pane.) It has one field per declared input; secret inputs are
-password fields. Each field is pre-filled with what the run would get if
-left alone: a non-secret value given for the same name earlier in the
+password fields. Each plain field is pre-filled with what the run would
+get if left alone: a value given for the same name earlier in the
 session, else the environment, else the default (see
-[Inputs and Secrets](../runbooks/inputs.md#where-values-come-from)).
+[Inputs and Secrets](../runbooks/inputs.md#where-values-come-from)). A
+secret field is always empty, so a secret is never put in the page. When
+the environment or the default has a value for it, its placeholder says
+"leave blank to use $NAME from the environment" or "leave blank to use
+the default", and a secret left blank is filled from there when the run
+starts.
 Submitting it creates the run directory and returns to the landing page,
 now showing the Run open panel.
 
@@ -228,7 +250,11 @@ Every fenced block with a language has a toolbar:
 - **Run** or **Run (destructive)** on `run` and `destructive` blocks,
   **Start** and **Stop** on `background` blocks, **I ran this** on
   `terminal` blocks,
-- a **status** area.
+- a **status** area, announced to screen readers as it changes
+  (`role="status"`, `aria-live="polite"`).
+
+Each Run, Start and I ran this button is labelled with its block id for
+screen readers ("Run 010-say-hello-1").
 
 Clicking Run posts to the server and starts polling. The status shows
 `running` with the elapsed time, and the output area below the code fills
@@ -272,6 +298,14 @@ Nothing re-runs on reload. The page restores the last execution of each
 block from the run record, including output, resumes polling if one is
 still running, and restores terminal confirmations.
 
+### Several tabs
+
+Every page says which runbook it shows, and what it posts carries that
+runbook: Run, Start, **I ran this** and the step's mark buttons send
+`runbook=<slug>`. A tab left open on runbook A keeps acting on A's run
+after another tab has put runbook B on screen. If A has no run in the
+session, the action is refused with 409.
+
 ## Runsheet page
 
 The record of a run is the *runsheet*; the page and the sidebar call it
@@ -295,23 +329,31 @@ drifting away from it.
 - **The heading**: the session id, the engineer, the host, the start time
   and how long it has been open.
 - **Notes**: every note with its time, the reason the session was started
-  first. **Add note** appends one; a blank note is refused. Notes are
-  written to `session.json` and the session log as they are added.
+  first. **Add note** appends one. A blank note shows the session page
+  again with "A note needs some text." (status 422). Notes are written to
+  `session.json` and the session log as they are added. ++n++ on any
+  page comes here with the note box focused.
 - **Runs**: each runbook selected in the session, in the order it was
   selected, with the status it would close with if the session ended now
-  (`partial so far`), its progress, and **Return to it**, or **On screen**
+  (`partial so far`), its progress, and **Return to it**, or **Go to it**
   for the runbook on screen.
-- **End the session**: the **End session** button.
+- **End the session**: the **End session** button. It asks first: "End
+  the session and stop runsheets?", adding "N processes still running
+  will be stopped." when anything is running.
 - **Session log**: the last 200 lines of `session.log`, with its path; run
   `tail -f` on it for the rest.
+- **Earlier sessions**: the last 10 sessions recorded under the runs
+  directory's `sessions/`, newest first, each with its engineer, id,
+  status, the reason it was started, and the slug and status of each of
+  its runs.
 
 In a library, before any runbook is selected, the session page sits in the
 main pane beside the tree.
 
 ## Ending the session
 
-**End session** on the session page, or Ctrl-C in the terminal that
-started `runsheets`, ends the session. Every run in it is closed with a
+**End session** on the session page (once you confirm), or Ctrl-C in the
+terminal that started `runsheets`, ends the session. Every run in it is closed with a
 status worked out from what was done:
 
 - `completed`: every numbered step was marked done or skipped;
@@ -342,9 +384,11 @@ to it.
   names and prompts), its preamble, and every step, `verify.md` and
   `rollback.md`: titles, prose and code alike. Plain markdown documents
   are not searched.
-- **How it matches**: case-insensitive. Separate words must all appear
-  somewhere in a runbook, not necessarily together; `"a quoted phrase"`
-  must appear as written.
+- **How it matches**: case is folded, and any run of whitespace, line
+  breaks included, counts as one space, so a phrase matches across a
+  wrapped line. Separate words must all appear somewhere in a runbook,
+  not necessarily together; `"a quoted phrase"` must appear as written. A
+  quote without a partner is ignored.
 - **Results**: one card per matching runbook, best first. A match in the
   title counts most, then the front matter, then step titles, then the
   text. Under each runbook are the documents that matched, each with a
@@ -359,10 +403,11 @@ to it.
 | Key | Action |
 | --- | --- |
 | ++f++ | Focus the search box |
+| ++n++ | The session page, with the note box focused |
 | ++h++ | Home |
 | ++r++ | Runbooks (the library, when started on a directory of runbooks) |
-| ++arrow-left++ / ++arrow-right++ | Previous / next step |
-| ++s++ | Toggle the sidebar |
+| ++arrow-left++ / ++arrow-right++ | Previous / next step, only when focus is on the page itself (not on a link or button) |
+| ++s++ | Toggle the sidebar, on pages that have one |
 | ++escape++ | Leave a text field |
 
 On the library page:
@@ -377,18 +422,27 @@ On the library page:
 | ++b++ | Back to the runbook on screen |
 | ++s++ | Toggle the tree |
 
-Shortcuts are ignored while typing in a field.
+The tree keys (arrows, ++j++ / ++k++, ++enter++, ++o++, ++b++, ++slash++)
+work only when focus is on the page itself or inside the tree, so they do
+not take over a link or button in the main pane. Shortcuts are ignored
+while typing in a field. The footer lists the keys, ++n++ among them.
 
 ## Errors
 
-A request that cannot be honoured gets a page (or JSON, for the execute and
-poll endpoints) with the reason:
+A request from the browser that cannot be honoured gets a page, not JSON
+(JSON is for the page's script: the execute, acknowledge, stop and poll
+endpoints, and any request that prefers `application/json`). The page has
+a heading saying in words what went wrong, the specific message under
+it, and links to **Home** and **Session**, plus **Runbooks** in a
+library. With a runbook on screen it sits in that runbook's frame; in a
+library with no runbook open it sits beside the tree.
 
-| Status | Typical cause |
-| --- | --- |
-| 403 | Missing session token on a POST, or a `Host` header that is not loopback. |
-| 404 | Unknown step, run, execution, file, or runbook slug. |
-| 409 | A POST before the session has started, no run for the runbook on screen, block not executable, blank input referenced, unknown execution to stop, acknowledging a block that is not `terminal`, a blank note. |
-| 410 | The session has ended. Only `GET /session` still answers. |
-| 422 | The start page with a blank name or reason, a step mark with a status other than `done` or `skipped`, or a mark on a document that is not a numbered step. |
-| 428 | A destructive block was asked to run without its confirmation code. The page handles this by prompting for the code. |
+| Status | Heading | Typical cause |
+| --- | --- | --- |
+| 403 | Not allowed | Missing session token on a POST, or a `Host` header that is not loopback. |
+| 404 | Not found | Unknown step, run, execution, file, or runbook slug. |
+| 409 | Not right now | A POST before the session has started, no run for the runbook the page acts on, block not executable, blank input referenced, unknown execution to stop, acknowledging a block that is not `terminal`. |
+| 410 | The session has ended | Only `GET /session` still answers. |
+| 422 | Check what you entered | A step mark with a status other than `done` or `skipped`, or a mark on a document that is not a numbered step. (A blank name or reason on the start page, or a blank note, shows that page again with a message instead.) |
+| 428 | | A destructive block was asked to run without its confirmation code. The page handles this by prompting for the code. |
+| 500 | Something went wrong | The runbook no longer loads, or an unexpected error. |

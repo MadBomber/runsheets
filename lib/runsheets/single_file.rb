@@ -22,7 +22,7 @@ module Runsheets
     end
 
     ROLES    = %w[verify rollback].freeze
-    HEADING  = /\A##[ \t]+(.+?)[ \t#]*\z/
+    HEADING  = /\A##[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*\z/
     # An attribute comment starts with a key; any other comment is prose.
     COMMENT  = /\A[ \t]*<!--([ \t]*[\w-]+[ \t]*:.*?)-->[ \t]*\z/
 
@@ -48,6 +48,7 @@ module Runsheets
         end
       end
 
+      current[:unclosed] = true if open && current
       ["#{preamble.join("\n")}\n", sections.map { build(it) }]
     end
 
@@ -56,6 +57,7 @@ module Runsheets
       body     = raw[:body].dup
       data     = {}
       warnings = []
+      warnings << "a code fence opened in this section is never closed, so every heading after it is part of it" if raw[:unclosed]
       body.shift while body.first&.strip&.empty?
       if body.first && (match = body.first.match(COMMENT))
         data, warning = parse_attributes(match[1])
@@ -72,11 +74,11 @@ module Runsheets
       inner = text.strip
       return [{}, nil] if inner.empty?
 
-      parsed = YAML.safe_load("{#{inner}}", permitted_classes: [Date], aliases: false)
+      parsed = YAML.safe_load("{#{inner}}", permitted_classes: [Date, Time], aliases: false)
       return [{}, "attribute comment is not a mapping: <!-- #{inner} -->"] unless parsed.is_a?(Hash)
 
       [parsed.transform_keys(&:to_s), nil]
-    rescue Psych::SyntaxError => e
+    rescue Psych::Exception => e
       [{}, "attribute comment could not be parsed (#{e.message.lines.first&.strip}): <!-- #{inner} -->"]
     end
 

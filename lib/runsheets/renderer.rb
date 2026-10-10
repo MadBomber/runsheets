@@ -80,12 +80,17 @@ module Runsheets
       converter = HtmlConverter.new(doc.root, options)
       converter.blocks = blocks
 
-      Result.new(html: converter.convert(doc.root), blocks:)
+      Result.new(html: strip_meta(converter.convert(doc.root)), blocks:)
     end
 
     # Render markdown as plain HTML: nothing is executable, so no block is
     # wrapped. For prose outside a runbook, such as a library folder's README.
-    def self.render_plain(markdown) = Kramdown::Document.new(markdown, **KRAMDOWN_OPTIONS).to_html
+    def self.render_plain(markdown) = strip_meta(Kramdown::Document.new(markdown, **KRAMDOWN_OPTIONS).to_html)
+
+    # Remove <meta> tags from rendered markdown. A meta refresh would
+    # navigate the page wherever the markdown says, and no Content-Security-
+    # Policy stops one; a runbook has no use for any other <meta>.
+    def self.strip_meta(html) = html.gsub(/<meta\b[^>]*>/i, "")
 
     def self.h(value) = CGI.escapeHTML(value.to_s)
 
@@ -136,21 +141,34 @@ module Runsheets
       end
       parts << '<span class="rs-spacer"></span>'
       parts << '<button type="button" class="rs-btn rs-copy" data-action="copy" title="Copy to clipboard">Copy</button>'
-      if block.background?
-        parts << '<button type="button" class="rs-btn rs-run" data-action="execute">Start</button>'
-        parts << '<button type="button" class="rs-btn rs-stop" data-action="stop" hidden>Stop</button>'
-      elsif block.executable?
-        label = block.destructive? ? "Run (destructive)" : "Run"
-        parts << "<button type=\"button\" class=\"rs-btn rs-run#{' rs-danger' if block.destructive?}\" data-action=\"execute\">#{label}</button>"
-      elsif block.acknowledgeable?
-        parts << '<button type="button" class="rs-btn rs-ack" data-action="acknowledge">I ran this</button>'
-      end
-      parts << '<span class="rs-status" data-role="status"></span>'
+      parts.concat(action_buttons(block))
+      parts << '<span class="rs-status" data-role="status" role="status" aria-live="polite"></span>'
       parts.join
     end
 
+    # The buttons that act on a block: Start and Stop, Run, or I ran this,
+    # each labelled with the block id for screen readers.
+    def self.action_buttons(block)
+      id = h(block.id)
+      if block.background?
+        [%(<button type="button" class="rs-btn rs-run" data-action="execute" aria-label="Start #{id}">Start</button>),
+         %(<button type="button" class="rs-btn rs-stop" data-action="stop" hidden>Stop</button>)]
+      elsif block.executable?
+        label = block.destructive? ? "Run (destructive)" : "Run"
+        style = block.destructive? ? "rs-btn rs-run rs-danger" : "rs-btn rs-run"
+        [%(<button type="button" class="#{style}" data-action="execute" aria-label="#{label} #{id}">#{label}</button>)]
+      elsif block.acknowledgeable?
+        [%(<button type="button" class="rs-btn rs-ack" data-action="acknowledge" aria-label="I ran #{id}">I ran this</button>)]
+      else
+        []
+      end
+    end
+
     # The first level-one heading of a markdown document, or nil.
-    def self.title_of(markdown) = markdown[/^\#[ \t]+(.+?)[ \t#]*$/, 1]
+    def self.title_of(markdown) = without_fences(markdown)[/^#[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*\r?$/, 1]
+
+    # Markdown with its fenced code blocks taken out.
+    def self.without_fences(markdown) = markdown.to_s.gsub(/^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1[`~]*[ \t]*\r?$/m, "")
 
     # Point relative <img src> and <a href> values at the /files/ route so
     # assets that sit next to a markdown file resolve, and links (not images)
@@ -178,7 +196,7 @@ module Runsheets
     def self.open_documents_in_new_tab(html, root)
       html.gsub(%r{(<a\b[^>]*\bhref="/docs/([^"#?]*)[^"]*")}) do
         link, path = Regexp.last_match.captures
-        Runbook.plain_document?(File.join(root, path), root) ? %(#{link} target="_blank" rel="noopener") : link
+        Runbook.plain_document?(File.join(root, CGI.unescapeURIComponent(path)), root) ? %(#{link} target="_blank" rel="noopener") : link
       end
     end
 

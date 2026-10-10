@@ -160,9 +160,10 @@ class TestRunbook < Minitest::Test
   def test_stale_when_a_source_file_changes_or_appears
     with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a") do |rb|
       refute rb.stale?
-      sleep 0.01
       File.write(File.join(rb.dir, "steps", "010-a.md"), "b")
+      FileUtils.touch(File.join(rb.dir, "steps", "010-a.md"), mtime: Time.now + 2) # newer than the load, on any file system
       assert rb.stale?
+      FileUtils.touch(File.join(rb.dir, "steps", "010-a.md"), mtime: Time.now - 2) # older than the next load
       fresh = Runsheets::Runbook.load(rb.dir)
       refute fresh.stale?
       File.write(File.join(rb.dir, "verify.md"), "v")

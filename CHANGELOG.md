@@ -6,6 +6,79 @@
 
 ### Fixed
 
+A review of the whole application found the following; each has a test.
+
+- Security:
+  - A runbook could make a page run its blocks with no click: a meta refresh
+    in its markdown led to an HTML file served from `/files/`, whose script
+    read the session token. Served files now carry a sandboxing CSP and
+    `nosniff`, and only images, PDFs and plain text are shown inline (anything
+    else downloads); `<meta>` tags are removed from rendered markdown.
+  - A secret whose last characters repeat its first (`s3cr3ts`) escaped the
+    redactor in full. Concurrent executions shared one redactor and could
+    swap output; each execution now has its own.
+  - Secret inputs were written into the start form from the environment or
+    the default; secret fields are now always empty in the page.
+  - Command output, notes and input values could become live HTML on the
+    runsheet page; `run.md` now fences and escapes them. The JSON a step page
+    embeds escapes `<`, so output containing `<!--<script>` no longer stops
+    the page's buttons working.
+  - Pages read only the end of a large output file or session log; YAML
+    aliases in front matter are refused; log tags cannot carry a newline;
+    interrupted-session cleanup stays inside the runs directory; run history
+    no longer expands glob characters in a slug.
+- Runs and sessions:
+  - `runsheets --engineer --why` failed to start after a killed session
+    (`Time.iso8601` without `require "time"`).
+  - Output over 64 KB with any non-ASCII character broke the record, so the
+    session could not end.
+  - A block started while the session was ending kept running afterwards; a
+    failure while closing one run stopped the others closing.
+  - A second tab that opened another runbook made the first tab's Run, I ran
+    this and Mark act on the wrong runbook; every action now names its
+    runbook.
+  - A double-click on Start run created two runs.
+  - Invalid UTF-8 or a NUL in an input broke the record; a deleted or broken
+    runbook made every page fail or retry; a character split across two reads
+    was mangled in the log; malformed session records stopped a start.
+  - Records are written to a temporary file and renamed into place.
+- Web page:
+  - Browsers were sent errors as raw JSON, and every 404 said only "not
+    found"; errors are now pages in words with the specific message and ways
+    back, in the library's frame when there is no runbook on screen.
+  - End session now asks first; a blank note keeps you on the session page
+    with a message; the elapsed time keeps counting; the library shows what
+    is running; a step's mark updates when its block finishes; "Previous runs"
+    leaves out the open run.
+  - Pages no longer scroll sideways at phone width (footer, notes, long
+    paths, history rows, a long engineer name).
+  - Keyboard shortcuts no longer steal arrows and Enter from links, buttons
+    and the page; block status is announced to screen readers; every page has
+    an icon.
+- Command line, loading and search:
+  - `--dump` saved `check:` and `init:`, so a saved config checked or
+    scaffolded on every later start.
+  - One malformed markdown file (an unknown YAML tag, Latin-1 text) crashed
+    `--check` and the library; it is now a broken entry with the reason. A
+    UTF-8 byte-order mark no longer hides the front matter.
+  - `--init` wrote titles like `null` or `yes` as YAML that read back wrong.
+  - In a library, `deploy.md` beside `deploy/runbook.md` hid one of them;
+    clashing names are now reported. A runbook added to a folder with none, a
+    fixed broken runbook, and an edited README are picked up while serving.
+  - `--check` on a library dropped unreadable runbooks and could not tell two
+    runbooks with the same name apart; lines now carry the slug.
+  - A step's title could come from a comment in its code; `## Upgrade to C#`
+    lost its `#`; an unclosed fence in a single-file runbook silently swallowed
+    the steps after it (now a warning); steps named `runbook`, `verify` or
+    `rollback` are warned about.
+  - Search phrases now match across line breaks and fold case; snippets
+    found the wrong place after characters whose lowercase is longer.
+  - Ports outside 1–65535, bad config YAML, an unknown bind host and an
+    unreadable directory give a one-line error instead of a stack trace;
+    `--log-level` accepts any case.
+  - The gem declares `logger` and leaves dotfiles, docs and quality outputs
+    out of the package.
+
 - Run, Start and "I ran this" buttons are disabled when they cannot work,
   with a tooltip saying why: until the runbook on screen has a run. Before,
   they looked live and a click only showed a small "not run" status.
@@ -38,6 +111,8 @@
 
 ### Added (milestone 5: sessions)
 
+- The session page lists earlier sessions; a "Session & notes" link sits in
+  every runbook's sidebar, and the `n` key goes to the note box.
 - Sessions: everything between starting runsheets and stopping it is one
   session (`Runsheets::Session`). It starts on a page asking who is
   starting it and why (`GET /session/new`, `POST /session`), or straight

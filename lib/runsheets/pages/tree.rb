@@ -16,6 +16,7 @@ module Runsheets
         node    = view.node
         <<~HTML
           <aside class="rs-sidebar lib-tree" aria-label="Runbook tree">
+            #{Pages.running_panel(view.session) if view.session}
             <div class="lib-filter">
               #{ICONS[:search]}
               <input type="search" id="lib-filter" placeholder="Filter runbooks" aria-label="Filter runbooks" autocomplete="off" spellcheck="false">

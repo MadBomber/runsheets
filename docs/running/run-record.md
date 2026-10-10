@@ -174,7 +174,7 @@ Hello, smoke!
 
 - 2026-10-07T17:33:55.120-05:00 `020-inspect-ruby-3` (020-inspect-ruby) confirmed run in the operator's terminal — pressed enter
 
-- 2026-10-07T17:33:58.448-05:00 step **010-say-hello** marked done — smoke ok
+- 2026-10-07T17:33:58.448-05:00 step `010-say-hello` marked done — smoke ok
 
 - 2026-10-07T17:34:02.310-05:00 inputs changed: `NAME` = `again`
 ```
@@ -183,6 +183,12 @@ Events appear in the order they happened: executions, terminal
 confirmations, step marks and input changes interleaved, so jumping around
 is visible rather than hidden. Output longer than 64 KB is trimmed to its
 tail in the transcript with a marker; the `.out` file is complete.
+
+The transcript is rendered as markdown on the runsheet page, so nothing
+recorded in it can become markup. Code and output sit in a fence longer
+than any run of backticks inside them; input values and step slugs are
+code spans; notes are kept on one line with their HTML and markdown
+characters escaped.
 
 The verdict after the block id is one of `ok`, `exit N`, `timed out`,
 `stopped`, `failed to start: <error>`, or the raw state if the record was

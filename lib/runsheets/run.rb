@@ -33,6 +33,7 @@ module Runsheets
       @executions = {}
       @challenges = {}
       @mutex      = Mutex.new
+      @closing    = false
       @inputs     = Run.resolve_inputs(runbook, inputs, carried: session.carried_inputs)
       @redactor   = Redactor.for(@inputs, runbook)
       @record     = RunRecord.start(session.runs_root, runbook, session_id: session.id, inputs: @inputs)
@@ -47,9 +48,12 @@ module Runsheets
       runbook.inputs.to_h do |input|
         name   = input.name
         values = [given[name], (carried[name] unless input.secret?), ENV[name], input.default]
-        [name, values.find { !it.to_s.empty? }.to_s]
+        [name, Run.clean(values.find { !it.to_s.empty? })]
       end
     end
+
+    # An input value as it can be exported and recorded: valid UTF-8, no NUL.
+    def self.clean(value) = value.to_s.dup.force_encoding("UTF-8").scrub.delete("\u0000")
 
     # +given+ with every blank secret filled from +current+.
     def self.keep_blank_secrets(runbook, given, current)
@@ -63,7 +67,7 @@ module Runsheets
 
     # Raise unless the run is still open.
     def ensure_open!
-      raise RunError, "the run for #{slug} has ended" unless open?
+      raise RunError, "the run for #{slug} has ended" if @closing || !open?
     end
 
     # The runbook reloaded from disk (see Session#refresh_runbook!).
@@ -106,7 +110,8 @@ module Runsheets
         @executions[execution.id] = execution
         log_execute(execution, step, block)
         execution.on_end { ended(it) }
-        session.executor.start(execution, code: block.code, env: environment_for(execution), cwd: working_directory(step), redactor: @redactor)
+        session.executor.start(execution, code: block.code, env: environment_for(execution), cwd: working_directory(step),
+redactor: Redactor.new(@redactor.secrets))
         record.write!
         execution
       end
@@ -199,6 +204,7 @@ module Runsheets
     # close the record with the status worked out from what was done.
     # Returns that status.
     def close!
+      @mutex.synchronize { @closing = true }
       stop_all
       status = record.closing_status(runbook.steps.map(&:slug))
       record.finish!(status:)
@@ -276,7 +282,17 @@ module Runsheets
       level, text = Run.ending(execution)
       log.add(level, text, tags: ["##{execution.id}"])
       record.write!
+    rescue StandardError => e
+      log.error("could not save the record after #{execution.id}: #{e.class}: #{e.message}", tags: [slug])
     end
+
+    public
+
+    # Ask everything still running to stop, without waiting: the session
+    # does this for every run before closing them, so they stop together.
+    def stop_running! = running_executions.each { session.executor.stop(it) }
+
+    private
 
     # Does +confirm+ match the code issued for this block? A match retires
     # the code.

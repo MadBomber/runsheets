@@ -28,7 +28,7 @@ to that response; the page's own inline script and stylesheet carry it.
 
 ```bash
 B=http://127.0.0.1:4567
-TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*//p')
+TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 ```
 
 `/session/new` is the one page that answers before the session has
@@ -47,7 +47,7 @@ valid token gets **409**. After it has ended, every request but
 | `GET /session/new` | The start page: who is starting the session, and why. Once the session has started, a **302** to `/session`. |
 | `POST /session` | Starts the session. Form fields: `_token`, `engineer`, `why`; `why` becomes the first note. Responds **303** to `/library` (or `/` for one runbook); **422** with the start page and a message if either is blank; **303** to `/session` if a session has already started. |
 | `GET /session` | The session page: engineer, host, start time, notes, runs, the end panel and the last 200 lines of `session.log`. |
-| `POST /session/notes` | Adds a timestamped note. Form fields: `_token`, `note`. Responds **303** to `/session#notes`; **409** for a blank note. |
+| `POST /session/notes` | Adds a timestamped note. Form fields: `_token`, `note`. Responds **303** to `/session#notes`; **422** with the session page and "A note needs some text." for a blank note. |
 | `POST /session/end` | Ends the session: every run is closed with its derived status, anything running is stopped, and the server stops half a second later. Responds **200** with the Session ended page. |
 
 ## Pages
@@ -59,7 +59,7 @@ valid token gets **409**. After it has ended, every request but
 | `GET /verify` | The Checks page: every verify step and `verify.md`. 404 if the runbook has none. |
 | `GET /run` | The transcript of the open run of the runbook on screen, or of its most recent run, with the drift panel for a closed run. 404 if the runbook has never had a run. |
 | `GET /runs/:id` | A transcript of the runbook on screen, by run id. The id must match `[\w.-]+`. |
-| `GET /files/*path` | A regular, non-hidden file under the directory runsheets was started on, with its content type. 404 otherwise. |
+| `GET /files/*path` | A regular, non-hidden file under the directory runsheets was started on, with its content type, `X-Content-Type-Options: nosniff` and a `Content-Security-Policy` that allows no script (see [File serving](security.md#file-serving)). `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.pdf` and `.txt` are served inline; anything else with `Content-Disposition: attachment`. 404 otherwise. |
 | `GET /docs/*path` | A markdown file under that directory, rendered as a page with nothing executable. One of the own files of the runbook on screen redirects to its page; another runbook in the library redirects to its library page. 404 for anything that is not a `.md` file. |
 | `GET /search?q=` | Full-text search over every runbook in the library (or the one runbook), best first. Works before a runbook is selected. An empty `q` shows the search form. |
 
@@ -103,20 +103,31 @@ curl -X POST --data-urlencode "_token=$TOKEN" --data-urlencode "slug=hello" \
 
 ### `POST /run/inputs`
 
-Changes the inputs of the run of the runbook on screen. Form fields:
-`_token` and `inputs[NAME]` for each input. A secret sent empty keeps its
+Changes the inputs of a run. Form fields: `_token`, `inputs[NAME]` for
+each input, and `runbook` (optional; see [Which run](#which-run)). A secret sent empty keeps its
 current value. The change is recorded as an `inputs` event and logged.
 Responds **303** to `/`; **409** when the runbook on screen has no run.
 
 ### `POST /steps/:slug/mark`
 
-Form fields: `_token`, `status` (`done` or `skipped`), `note` (optional).
-Responds **303** to the next step or the landing page; **422** for another
-status, or for a slug that is not a numbered step (the landing page,
-`verify` and `rollback` cannot be marked); **409** when the runbook on
-screen has no run.
+Form fields: `_token`, `status` (`done` or `skipped`), `note` (optional),
+and `runbook` (optional; see [Which run](#which-run)). Responds **303** to
+the next step or the landing page, with that runbook put on screen;
+**422** for another status, or for a slug that is not a numbered step (the
+landing page, `verify` and `rollback` cannot be marked); **409** when the
+runbook has no run.
 
 ## Execution
+
+### Which run
+
+Marking a step, executing a block, acknowledging one and changing inputs
+act on a run. The
+page says which with a `runbook` field, the slug of the runbook it shows,
+so a tab left on one runbook keeps acting on it after another tab has put
+a different one on screen. Without the field the request acts on the run
+of the runbook on screen. A `runbook` that has no run in the session gets
+**409**: `<slug> has no run in this session; start it first`.
 
 ### `POST /blocks/:id/execute`
 
@@ -162,7 +173,9 @@ without one is answered **428** with the code to type:
 
 Send it back as the `confirm` form field. The code is issued per block,
 stays the same until it is used, and is retired by the execution it
-confirmed. A wrong code gets the same 428 again.
+confirmed. A wrong code gets the same 428 again. Since the 428 hands the
+code to whoever asked, the code guards against a slip in the page, not
+against a script that holds the session token.
 
 ```bash
 CODE=$(curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/040-exercise-failure-1/execute | jq -r .challenge)
@@ -172,6 +185,7 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" -d "confirm=$CODE" $B/blocks/040-
 Errors are **409** with `{"error": "..."}`:
 
 - `start the run for <runbook title> before executing blocks`
+- `<slug> has no run in this session; start it first`
 - `unknown block <id>`
 - `block <id> is not executable (<kind>)`
 - `blank input referenced by block: NAME`
@@ -179,15 +193,16 @@ Errors are **409** with `{"error": "..."}`:
 ### `POST /blocks/:id/acknowledge`
 
 Records that the operator ran a `terminal` block in their own terminal.
-Form field `note` is optional. Responds **201** with the acknowledgement:
+Form fields `note` and `runbook` are optional. Responds **201** with the
+acknowledgement:
 
 ```json
 { "at": "2026-10-07T17:33:55.120-05:00", "step": "020-inspect-ruby",
   "note": "pressed enter", "block_id": "020-inspect-ruby-3" }
 ```
 
-**409** when the runbook on screen has no run, for an unknown block, or for
-a block that is not `terminal`.
+**409** when the runbook has no run, for an unknown block, or for a block
+that is not `terminal`.
 
 ### `GET /executions/:id`
 
@@ -222,15 +237,19 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e/stop
 | --- | --- |
 | 403 | Missing or invalid token on a non-GET request, or a non-loopback `Host`. |
 | 404 | Unknown step, run, execution, file or runbook slug. |
-| 409 | The operation is not allowed now (`Runsheets::RunError`): no session yet, no run for the runbook on screen, a blank note. Refusals are logged at `warn`. |
+| 409 | The operation is not allowed now (`Runsheets::RunError`): no session yet, no run for the runbook acted on. Refusals are logged at `warn`. |
 | 410 | The session has ended. Only `GET /session` still answers. |
-| 422 | A blank engineer or reason on `POST /session`, an invalid step status, or a mark on a document that is not a numbered step. |
+| 422 | A blank engineer or reason on `POST /session`, a blank note, an invalid step status, or a mark on a document that is not a numbered step. |
 | 428 | A destructive block needs its confirmation code (`Runsheets::Run::ConfirmationRequired`); the body carries `challenge`. |
 | 500 | The runbook failed to load (`Runsheets::RunbookError`), or an unexpected error. |
 
 JSON error bodies are `{"error": "message"}` on `/blocks/*` and
-`/executions/*`, or when the request accepts `application/json`. Everything
-else gets an HTML error page in the normal frame.
+`/executions/*`, or when the request prefers `application/json`. Everything
+else gets an HTML error page: a heading in words (Not allowed, Not found,
+Not right now, The session has ended, Check what you entered, Something
+went wrong), the message, and links to Home, Session and, in a library,
+Runbooks. It sits in the runbook's frame, or beside the library tree when
+no runbook is open.
 
 ## Driving a whole session from the shell
 

@@ -37,7 +37,7 @@ module Runsheets
       pump = Thread.new { pump(reader, log, redactor || Redactor.new({}), execution.tee) }
       execution.started!(pid, at: clock.now)
       execution.attach(Thread.new { reap(execution, pid, pump) })
-    rescue SystemCallError => e
+    rescue SystemCallError, ArgumentError => e # ArgumentError: a NUL in the environment or command
       writer&.close
       reader&.close
       log&.close
@@ -78,18 +78,25 @@ module Runsheets
     private
 
     def reap(execution, pid, pump)
-      deadline = execution.timeout && (monotonic + execution.timeout)
+      status, how = outcome(execution, pid)
+    rescue SystemCallError => e
+      execution.failed!("#{e.class}: #{e.message}", at: clock.now)
+    else
+      finish(execution, pump, status, **how)
+    end
 
+    # Wait for the process to end on its own, be stopped, or time out.
+    # Returns [status, how it ended].
+    def outcome(execution, pid)
+      deadline = execution.timeout && (monotonic + execution.timeout)
       loop do
         _, status = Process.wait2(pid, Process::WNOHANG)
-        return finish(execution, pump, status) if status
-        return finish(execution, pump, end_group(pid), stopped: true) if execution.stop_requested?
-        return finish(execution, pump, end_group(pid), timed_out: true) if deadline && monotonic > deadline
+        return [status, {}] if status
+        return [end_group(pid), { stopped: true }] if execution.stop_requested?
+        return [end_group(pid), { timed_out: true }] if deadline && monotonic > deadline
 
         sleep POLL
       end
-    rescue SystemCallError => e
-      execution.failed!("#{e.class}: #{e.message}", at: clock.now)
     end
 
     # Let the pump drain, then record how the process ended.

@@ -104,6 +104,23 @@ class TestRenderer < Minitest::Test
     end
   end
 
+  def test_title_comes_from_prose_not_from_a_comment_in_code
+    assert_nil Renderer.title_of("```bash run\n# install deps first\nmake\n```\n")
+    assert_equal "Deploy", Renderer.title_of("```bash\n# not this\n```\n\n# Deploy\r\n")
+    assert_equal "Upgrade to C#", Renderer.title_of("# Upgrade to C#\n")
+    assert_equal "Closed", Renderer.title_of("# Closed ##\n")
+  end
+
+  def test_a_fence_is_closed_only_by_its_own_kind_of_fence
+    md = "```bash\n# no\n~~~\n# still code\n```\n\n# Yes\n"
+    assert_equal "Yes", Renderer.title_of(md)
+  end
+
+  def test_meta_tags_are_removed_from_rendered_markdown
+    html = Renderer.render_plain("hi\n\n<meta http-equiv=\"refresh\" content=\"0;url=/x\">\n")
+    refute_includes html, "<meta"
+  end
+
   def test_relative_url_escaping_root_is_left_alone
     out = Renderer.rewrite_relative_urls('<img src="../../etc/passwd">', "steps")
     assert_includes out, 'src="../../etc/passwd"'

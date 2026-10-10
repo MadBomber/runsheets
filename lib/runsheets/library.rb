@@ -63,6 +63,35 @@ module Runsheets
       def size = runbooks.size
     end
 
+    # Putting a folder's contents in order, and noticing a README edit.
+    module Tidy
+      module_function
+
+      # Has the README in +dir+ been edited since +time+? (A folder's mtime
+      # does not change when a file in it is edited in place.)
+      def readme_changed?(dir, time)
+        file = Dir.children(dir).find { it.casecmp?(README) }
+        file ? File.mtime(File.join(dir, file)) > time : false
+      rescue SystemCallError
+        true
+      end
+
+      # Folders or entries in title order, then by name.
+      def by_title(nodes) = nodes.sort_by { [it.title.downcase, it.name] }.freeze
+
+      # Runbooks in one folder whose slugs clash, with each other (deploy.md
+      # beside deploy/runbook.md) or with a folder (backup.md beside backup/),
+      # become broken entries saying so; the first of a clash keeps the slug.
+      def unclash(entries, folder_slugs)
+        seen = folder_slugs.to_set
+        entries.map do |entry|
+          clash = seen.include?(entry.slug)
+          seen << entry.slug
+          clash ? entry.with(runbook: nil, error: "another runbook or a folder here already has the name #{entry.slug}; rename one") : entry
+        end
+      end
+    end
+
     # Something found while scanning: where it is, its slug and name, and
     # the slug of the folder holding it. Becomes an Entry or a Folder.
     Found = Data.define(:slug, :name, :folder, :path)
@@ -80,6 +109,7 @@ module Runsheets
     def initialize(dir)
       @dir       = File.expand_path(dir)
       @documents = []
+      @scanned   = {}
       raise RunbookError, "no such directory: #{@dir}" unless File.directory?(@dir)
 
       scan!
@@ -130,8 +160,9 @@ module Runsheets
     # plain document's files have changed, since the last scan. A document
     # edited into a runbook joins the tree.
     def stale?
-      return true if [root, *folders].any? { folder_mtime(it.path) != it.mtime }
+      return true if @scanned.any? { |path, mtime| folder_mtime(path) != mtime }
       return true if @documents.any? { changed_since_scan?(it) }
+      return true if [root, *folders].any? { Tidy.readme_changed?(it.path, scanned_at) }
 
       entries.any? { entry_stale?(it) }
     end
@@ -147,6 +178,7 @@ module Runsheets
     def scan!
       @scanned_at = Time.now
       @documents  = []
+      @scanned    = {}
       root        = scan_folder(dir, slug: "", visited: [File.realpath(dir)])
       @root       = root
       @folders    = root.subfolders.sort_by(&:slug).freeze
@@ -156,24 +188,33 @@ module Runsheets
     # One folder: its direct runbooks and the folders beneath that hold
     # any, each sorted by title. visited holds the real paths above, so a
     # symlink cycle ends here instead of recursing forever.
+    # What one child of a folder is: a Folder, an Entry, or nil (a plain
+    # document, recorded for staleness, or anything else).
+    def scan_child(found, visited:)
+      return scan_directory(found, visited:) if File.directory?(found.path)
+
+      name = found.name
+      return nil unless name.end_with?(".md") && !name.casecmp?(README)
+      return (@documents << found.path) && nil unless Runbook.runbook_file?(found.path)
+
+      entry_for(found.with(name: File.basename(name, ".md"), slug: found.slug.delete_suffix(".md")), single_file: true)
+    end
+
     def scan_folder(path, slug:, visited:)
-      mtime   = folder_mtime(path)
+      mtime = folder_mtime(path)
+      @scanned[path] = mtime # every directory looked in, runbooks or not
       entries = []
       folders = []
       Dir.children(path).sort.each do |name|
         next if name.start_with?(".")
 
         found = Found.new(slug: slug.empty? ? name : "#{slug}/#{name}", name:, folder: slug, path: File.join(path, name))
-        if File.directory?(found.path)
-          node = scan_directory(found, visited:)
-          (node.is_a?(Folder) ? folders : entries) << node if node
-        elsif name.end_with?(".md") && !name.casecmp?(README)
-          next @documents << found.path unless Runbook.runbook_file?(found.path)
-
-          entries << entry_for(found.with(name: File.basename(name, ".md"), slug: found.slug.delete_suffix(".md")), single_file: true)
-        end
+        node  = scan_child(found, visited:)
+        (node.is_a?(Folder) ? folders : entries) << node if node
       end
-      Folder.new(slug:, name: File.basename(path), path:, folders: by_title(folders), entries: by_title(entries), readme_html: readme_html(path), mtime:)
+      entries = Tidy.unclash(entries, folders.map(&:slug))
+      Folder.new(slug:, name: File.basename(path), path:, folders: Tidy.by_title(folders), entries: Tidy.by_title(entries), readme_html: readme_html(path),
+                 mtime:)
     end
 
     # A directory is a runbook when it holds runbook.md, a folder when any
@@ -194,11 +235,9 @@ module Runsheets
     def entry_for(found, single_file:)
       runbook = Runbook.load(found.path, slug: found.slug, root: dir)
       Entry.new(**found.to_h, single_file:, runbook:, error: nil)
-    rescue RunbookError => e
+    rescue RunbookError, SystemCallError => e # an unreadable file is shown as broken, not dropped
       Entry.new(**found.to_h, single_file:, runbook: nil, error: e.message)
     end
-
-    def by_title(nodes) = nodes.sort_by { [it.title.downcase, it.name] }.freeze
 
     def readme_html(path)
       file = Dir.children(path).find { it.casecmp?(README) }
@@ -220,7 +259,10 @@ module Runsheets
     end
 
     def entry_stale?(entry)
-      entry.ok? ? entry.runbook.stale? : changed_since_scan?(entry.main_path)
+      return entry.runbook.stale? if entry.ok?
+
+      files = entry.single_file? ? [entry.path] : Dir.glob(File.join(entry.path, "**", "*.md"))
+      files.empty? || files.any? { changed_since_scan?(it) }
     end
   end
 end

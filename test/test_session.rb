@@ -146,13 +146,12 @@ class TestSession < Minitest::Test
         s = start_session(root, runbook: rb)
         s.open(rb)
         assert_same rb, s.refresh_runbook!
-        sleep 0.01
         File.write(File.join(rb.dir, "steps", "010-a.md"), "---\ntitle: Two\n---\n")
+        FileUtils.touch(File.join(rb.dir, "steps", "010-a.md"), mtime: Time.now + 2) # newer than the load, on any file system
         refute_same rb, s.refresh_runbook!
         assert_equal "Two", s.runbook.steps.first.title
         assert_same s.runbook, s.current.runbook, "the run carries on with the reloaded runbook"
         kept = s.runbook
-        sleep 0.01
         File.delete(File.join(rb.dir, "runbook.md"))
         assert_same kept, s.refresh_runbook!, "a runbook that no longer loads is kept"
         assert_match(/ERROR \[session\] \S+ no longer loads/, File.read(s.log.path))
@@ -166,8 +165,8 @@ class TestSession < Minitest::Test
       File.write(path, "---\ntitle: One\n---\n\n## Check\n<!-- kind: verify -->\n\n```bash run\necho ok\n```\n")
       with_runs_dir do |root|
         s = start_session(root, runbook: Runsheets::Runbook.load(path))
-        sleep 0.01
         File.write(path, File.read(path).sub("title: One", "title: Two"))
+        FileUtils.touch(path, mtime: Time.now + 2) # newer than the load, on any file system
         assert_equal "Two", s.refresh_runbook!.title, "an edited single file is reloaded"
         assert s.runbook.single_file?
         s.open(s.runbook)

@@ -42,8 +42,8 @@ module Runsheets
       @notes      = []
       @runs       = {}
       @mutex      = Mutex.new
-      @dir        = RunRecord.unique_dir(File.join(Session.root(runs_root), now.strftime(RunRecord::TIMESTAMP)))
-      FileUtils.mkdir_p(@dir)
+      @ending     = false
+      @dir        = RunRecord.create_unique_dir(File.join(Session.root(runs_root), now.strftime(RunRecord::TIMESTAMP)))
       @log = SessionLog.new(File.join(@dir, "session.log"), level: log_level, echo:)
       start(why, Session.close_interrupted(runs_root, except: @dir))
       show(runbook) if runbook
@@ -60,29 +60,50 @@ module Runsheets
       paths = Dir.glob(File.join(root(runs_root), "*", "session.json")) - [File.join(except.to_s, "session.json")]
       paths.filter_map do |path|
         data = JSON.parse(File.read(path))
-        next if data["status"] != "running" || running_here?(data)
+        next unless data.is_a?(Hash) && data["status"] == "running" && !running_here?(data)
 
-        interrupt(File.dirname(path), data)
+        interrupt(File.dirname(path), data, runs_root:)
         data["id"]
-      rescue JSON::ParserError, SystemCallError
+      rescue StandardError # unreadable, or not a session record: leave it
         nil
       end
     end
 
     # Mark a killed session, and the runs it lists, interrupted. The end
     # time is the last write to its log.
-    def self.interrupt(dir, data)
+    def self.interrupt(dir, data, runs_root:)
+      root    = File.expand_path(runs_root)
       log     = File.join(dir, "session.log")
       ended   = File.file?(log) ? File.mtime(log) : Time.now
-      runs    = data["runs"] || []
+      runs    = Array(data["runs"]).grep(Hash)
       runs.each do |run|
+        next unless File.expand_path(run["dir"].to_s).start_with?("#{root}/")
+
         record = RunRecord.load(run["dir"])
         record.finish!(status: "interrupted", at: ended) if record.active?
         run["status"] = record.status
-      rescue SystemCallError, JSON::ParserError
+      rescue StandardError
         next
       end
-      File.write(File.join(dir, "session.json"), JSON.pretty_generate(data.merge("status" => "interrupted", "ended_at" => ended.iso8601(3), "runs" => runs)))
+      Runsheets.write_atomic(File.join(dir, "session.json"),
+                             JSON.pretty_generate(data.merge("status" => "interrupted", "ended_at" => ended.iso8601(3), "runs" => runs)))
+    end
+
+    # The records of the sessions kept under +runs_root+, newest first,
+    # leaving out the one at +except+; unreadable ones are skipped. The
+    # first note (the why) is copied into each as "why".
+    def self.past(runs_root, except: nil)
+      sessions = Dir.glob(File.join(root(runs_root), "*", "session.json")).filter_map do |path|
+        next if File.dirname(path) == except
+
+        data = JSON.parse(File.read(path))
+        next unless data.is_a?(Hash)
+
+        data.merge("why" => Array(data["notes"]).grep(Hash).first&.fetch("text", nil))
+      rescue StandardError
+        nil
+      end
+      sessions.sort_by { it["started_at"].to_s }.reverse
     end
 
     # Is the session in +data+ still being written by a live process on
@@ -143,18 +164,17 @@ module Runsheets
     # Select a runbook: put it on screen and establish its run with
     # +inputs+, or return to the run it already has. Returns the Run.
     def open(runbook, inputs: {})
-      raise RunError, "this session has ended" if ended?
-
       show(runbook)
-      existing = @runs[runbook.slug]
-      return existing if existing
-
-      run = Run.new(session: self, runbook:, inputs:)
       @mutex.synchronize do
-        @runs[runbook.slug] = run
+        raise RunError, "this session is ending" if @ending || ended?
+
+        existing = @runs[runbook.slug]
+        return existing if existing
+
+        run = @runs[runbook.slug] = Run.new(session: self, runbook:, inputs:)
         write!
+        run
       end
-      run
     end
 
     # Non-secret input values given earlier in the session, by name. A run
@@ -173,8 +193,9 @@ module Runsheets
 
       log.debug("reloaded #{runbook.slug}: its files changed", tags: ["session"])
       show(Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug, root: runbook.root))
-    rescue RunbookError => e
+    rescue RunbookError, SystemCallError => e
       log.error("#{runbook.slug} no longer loads: #{e.message}", tags: ["session"])
+      runbook.checked!
       runbook
     end
 
@@ -221,9 +242,10 @@ module Runsheets
     # the status its work earns, and write the record. +how+ says what ended
     # it, for the log. Ending twice does nothing.
     def end!(how, at: Time.now)
-      return self if ended?
+      return self unless begin_ending
 
-      closed = runs.map { "#{it.slug} #{it.close!}" }
+      runs.each(&:stop_running!)
+      closed = runs.map { "#{it.slug} #{close_run(it)}" }
       @mutex.synchronize do
         @ended_at = at
         write!
@@ -243,11 +265,29 @@ module Runsheets
     end
 
     def write!
-      File.write(File.join(dir, "session.json"), JSON.pretty_generate(to_h))
+      Runsheets.write_atomic(File.join(dir, "session.json"), JSON.pretty_generate(to_h))
       self
     end
 
     private
+
+    # Claim the ending: true for the first caller only. From here on no run
+    # is opened.
+    def begin_ending
+      @mutex.synchronize do
+        return false if @ending || ended?
+
+        @ending = true
+      end
+    end
+
+    # Close a run, and say what became of it even when closing fails.
+    def close_run(run)
+      run.close!
+    rescue StandardError => e
+      log.error("could not close #{run.slug}: #{e.class}: #{e.message}", tags: ["session"])
+      "error"
+    end
 
     def start(why, interrupted)
       where = library ? "library=#{library.dir}" : nil

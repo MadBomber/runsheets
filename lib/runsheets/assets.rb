@@ -69,7 +69,7 @@ module Runsheets
       .rs-sidebar .num { color: var(--muted); font: 600 11px var(--mono); }
       .rs-sidebar .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .rs-sidebar .mark { font: 700 11px var(--mono); }
-      .mark.done { color: var(--ok); } .mark.skipped { color: var(--warn); } .mark.failed { color: var(--danger); } .mark.ran { color: var(--accent); } .mark.pending { color: var(--border); }
+      .mark.done { color: var(--ok); } .mark.skipped { color: var(--warn); } .mark.failed { color: var(--danger); } .mark.ran { color: var(--accent); } .mark.pending { color: var(--muted); opacity: .6; }
       .rs-sidebar details { margin: 0 8px; }
       .rs-sidebar summary { cursor: pointer; color: var(--warn); font-weight: 600; }
       .rs-sidebar .rollback-body { font-size: 13px; color: var(--muted); max-height: 40vh; overflow: auto; padding: 6px 0; }
@@ -79,6 +79,7 @@ module Runsheets
       #outline li.active a { color: var(--text); background: var(--panel-2); }
 
       .rs-main { min-width: 0; padding: 32px 40px 64px; }
+      .rs-footer span { min-width: 0; overflow-wrap: anywhere; }
       .rs-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; background: var(--panel); }
       kbd { display: inline-block; min-width: 1.4em; margin: 0 2px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel-2); font: 11px var(--mono); text-align: center; color: var(--text); }
 
@@ -209,6 +210,11 @@ module Runsheets
       .history li.partial .verdict { color: var(--accent-2); } .history li.opened .verdict { color: var(--muted); }
       .session-runs li { grid-template-columns: 1fr auto auto auto; }
       .notes { list-style: none; margin: 0 0 14px; padding: 0; }
+      .notes li > div { min-width: 0; overflow-wrap: anywhere; }
+      .panel .meta code, .panel p code { overflow-wrap: anywhere; }
+      .panel[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
+      .run-pill { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .error-head .btn-row { margin-top: 14px; }
       .notes li { display: grid; grid-template-columns: 5.5em 1fr; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
       .notes li:first-child { border-top: 0; }
       .notes time { color: var(--muted); font: 600 12px var(--mono); padding-top: 3px; }
@@ -350,6 +356,9 @@ module Runsheets
         .rs-sidebar { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
         .rs-main { padding: 20px 16px 48px; }
         .rs-footer .keys { display: none; }
+        .rs-footer { flex-direction: column; align-items: flex-start; }
+        .history li, .session-runs li { grid-template-columns: 1fr auto; gap: 4px 12px; }
+        .history li > .meta { grid-column: 1 / -1; }
         .field { grid-template-columns: 1fr; }
       }
     CSS
@@ -396,8 +405,9 @@ module Runsheets
           catch (e) { return { executions: {}, acks: {} }; }
         })();
         const headers = { 'X-Runsheets-Token': token, 'Accept': 'application/json' };
+        const runbookSlug = document.querySelector('meta[name="rs-runbook"]')?.content || '';
         const post = async (path, fields) => {
-          const body = fields ? new URLSearchParams(fields) : null;
+          const body = new URLSearchParams(Object.assign({}, fields || {}, runbookSlug ? { runbook: runbookSlug } : {}));
           const res  = await fetch(path, { method: 'POST', headers, body });
           const data = await res.json();
           return { res, data };
@@ -420,6 +430,14 @@ module Runsheets
           return match ? 'matches expected' : 'differs from expected';
         };
 
+        // The sidebar mark of the step this page shows, unless the operator marked it.
+        const markStep = state => {
+          const mark = document.querySelector('.steps li.active .mark');
+          if (!state || !mark || mark.classList.contains('done') || mark.classList.contains('skipped')) return;
+          if (state === 'ran' && mark.classList.contains('failed')) return;
+          mark.className = 'mark ' + state; mark.title = state;
+          mark.textContent = state === 'ran' ? '•' : '✗';
+        };
         const show = (block, data) => {
           const status  = block.querySelector('[data-role="status"]');
           const result  = block.querySelector('.rs-result');
@@ -456,6 +474,7 @@ module Runsheets
           ].filter(Boolean).join(' · ');
           enable(button);
           if (stop) stop.hidden = true;
+          markStep(ok ? 'ran' : stopped ? null : 'failed');
           return false;
         };
 
@@ -492,7 +511,7 @@ module Runsheets
               const data = await res.json();
               if (!res.ok) throw new Error(data.error || res.statusText);
               if (!show(block, data)) return data;
-              await sleep(500);
+              await sleep(document.hidden ? 3000 : 500);
             }
           } catch (err) {
             fail(block, 'poll failed', err);
@@ -677,14 +696,15 @@ module Runsheets
           if (e.metaKey || e.ctrlKey || e.altKey) return;
           const tag = e.target.tagName;
           if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
-          if (lib) {
+          const free = e.target === body || e.target === document.documentElement;
+          if (lib && (free || e.target.closest?.('.lib-tree'))) {
             switch (e.key) {
               case '/': e.preventDefault(); lib.filter.focus(); lib.filter.select(); return;
               case 'ArrowDown': case 'j': e.preventDefault(); lib.move(1); return;
               case 'ArrowUp':   case 'k': e.preventDefault(); lib.move(-1); return;
               case 'ArrowRight': lib.toggle(true); return;
               case 'ArrowLeft':  lib.toggle(false); return;
-              case 'Enter': lib.select(); return;
+              case 'Enter': if (e.target.closest?.('a, button')) return; lib.select(); return;
               case 'o': press('o'); return;
               case 'b': go('b'); return;
             }
@@ -693,11 +713,29 @@ module Runsheets
             case 'f': { const box = document.getElementById('rs-search'); if (box) { e.preventDefault(); box.focus(); box.select(); } break; }
             case 'h': go('h'); break;
             case 'r': go('r'); break;
-            case 'ArrowLeft':  go('←'); break;
-            case 'ArrowRight': go('→'); break;
-            case 's': toggleSidebar(); break;
+            case 'ArrowLeft':  if (free) go('←'); break;
+            case 'ArrowRight': if (free) go('→'); break;
+            case 's': if (document.querySelector('.rs-sidebar')) toggleSidebar(); break;
+            case 'n': e.preventDefault(); location.href = '/session#notes'; break;
           }
         });
+
+        // Confirm before a form that cannot be undone (End session).
+        document.querySelectorAll('form[data-confirm]').forEach(form => form.addEventListener('submit', e => {
+          if (!confirm(form.dataset.confirm)) e.preventDefault();
+        }));
+
+        // Elapsed times keep counting.
+        const since = [...document.querySelectorAll('[data-since]')];
+        const span  = s => s < 10 ? s.toFixed(1) + 's' : s < 60 ? Math.round(s) + 's'
+          : s < 3600 ? Math.floor(s / 60) + 'm ' + String(Math.floor(s % 60)).padStart(2, '0') + 's'
+          : Math.floor(s / 3600) + 'h ' + String(Math.floor((s % 3600) / 60)).padStart(2, '0') + 'm';
+        const tick  = () => since.forEach(el => { el.textContent = span((Date.now() - Date.parse(el.dataset.since)) / 1000); });
+        if (since.length) { tick(); setInterval(tick, 15000); }
+
+        // The session log tail opens at its newest line; #notes focuses the note box.
+        document.querySelectorAll('.session-log').forEach(pre => { pre.scrollTop = pre.scrollHeight; });
+        if (location.hash === '#notes') document.getElementById('note-text')?.focus();
       })();
     JS
   end

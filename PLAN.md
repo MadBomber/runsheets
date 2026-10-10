@@ -912,3 +912,17 @@ is committed. Next: use it against a real runbook and let the convention take th
   page; secret fields there are now empty and an empty one keeps the value.
 - Reek: one exclusion added (`Session#initialize`'s keyword list, like
   `Pages.layout`); everything else was fixed in the code.
+
+**Review, same day.** Four parallel reviews (security, model correctness and
+concurrency, the web UI in a real browser, and the CLI/loading/rendering layer)
+found about seventy problems. The serious ones: a runbook could drive its own
+blocks through an HTML file served from `/files/` (now sandboxed, and `<meta>`
+stripped from markdown); a secret ending in its own prefix escaped redaction;
+output over 64 KB with non-ASCII text broke the record and the session's end;
+`require "time"` was missing outside the web layer; one redactor was shared by
+concurrent executions; a second tab could make the first act on the wrong
+runbook (actions now name their runbook). All fixed with regression tests in
+`test/test_hardening.rb` and alongside; 287 tests, the quality gate passes. Left
+for later: incremental output polling (`?since=`), warning on fences hidden in
+HTML blocks, a collapsed sidebar by default on phones, and the tree highlighting
+"All runbooks" on the session and search pages.

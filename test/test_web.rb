@@ -203,7 +203,7 @@ class TestWeb < Minitest::Test
     assert_includes last_response.body, "marked done"
 
     get "/"
-    assert_includes last_response.body, "Previous runs"
+    refute_includes last_response.body, "Previous runs", "the open run is not history yet"
     get "/runs/#{@session.run.id}"
     assert last_response.ok?
     assert_includes last_response.body, "running"
@@ -464,7 +464,8 @@ class TestWeb < Minitest::Test
     post "/session/notes", { "_token" => "tok", "note" => "found the cause" }
     assert_equal 302, last_response.status
     post "/session/notes", { "_token" => "tok", "note" => "  " }
-    assert_equal 409, last_response.status
+    assert_equal 422, last_response.status
+    assert_includes last_response.body, "A note needs some text.", "the session page again, with the error"
     post "/runs", { "_token" => "tok" }
     get "/session"
     assert_includes last_response.body, "found the cause"

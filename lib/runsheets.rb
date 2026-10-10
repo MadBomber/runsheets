@@ -5,6 +5,7 @@ require "json"
 require "pathname"
 require "securerandom"
 require "shellwords"
+require "time"
 require "yaml"
 
 require_relative "runsheets/version"
@@ -45,6 +46,25 @@ module Runsheets
     # Where run records are written: an explicit assignment, else the
     # configured runs_dir (--runs-dir, RUNSHEETS_RUNS_DIR, config file).
     def runs_dir = @runs_dir || config.runs_dir
+
+    # Write +text+ to +path+ through a temporary file renamed into place, so
+    # a reader (or a crash) never sees half a record.
+    def write_atomic(path, text)
+      tmp = "#{path}.#{Process.pid}.#{Thread.current.object_id}.tmp"
+      File.write(tmp, text)
+      File.rename(tmp, path)
+    ensure
+      File.delete(tmp) if tmp && File.exist?(tmp)
+    end
+
+    # The last +bytes+ of a file as UTF-8 text ("" when it is missing), so a
+    # page never reads a whole multi-gigabyte output or log.
+    def read_tail(path, bytes)
+      return "" unless path && File.file?(path)
+
+      size = File.size(path)
+      File.binread(path, [bytes, size].min, [size - bytes, 0].max).force_encoding("UTF-8").scrub
+    end
   end
 end
 

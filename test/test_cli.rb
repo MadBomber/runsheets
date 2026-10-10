@@ -211,7 +211,39 @@ class TestCLI < Minitest::Test
       assert_equal "testing", config.why
       loud = CLI.configure(CLI.parse(%w[--log-level warn]))
       assert_equal({ runs_root: Runsheets.runs_dir, log_level: "warn", echo: out }, CLI.session_options(loud, out:))
-      assert_raises(OptionParser::ParseError) { CLI.parse(%w[--log-level chatty]) }
+      assert_equal "warn", CLI.configure(CLI.parse(%w[--log-level WARN])).log_level, "any case, as RUNSHEETS_LOG_LEVEL"
+      assert_raises(Runsheets::ConfigError) { CLI.configure(CLI.parse(%w[--log-level chatty])) }
+    end
+  end
+
+  def test_dump_never_saves_a_one_shot_action
+    with_clean_home do
+      out = StringIO.new
+      assert_equal 0, CLI.run(%w[--dump --check --init x], out:)
+      saved = YAML.safe_load(out.string)
+      refute saved.key?("check")
+      refute saved.key?("init")
+    end
+  end
+
+  def test_init_quotes_titles_that_yaml_would_misread
+    Dir.mktmpdir do |dir|
+      %w[null.md yes.md].each do |name|
+        path = File.join(dir, name)
+        assert_equal 0, CLI.run(["--init", path], out: StringIO.new)
+        assert_equal name.delete_suffix(".md").capitalize, Runsheets::Runbook.load(path).title
+      end
+    end
+  end
+
+  def test_check_reports_bad_files_instead_of_crashing
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "good.md"), "---\ntitle: Good\n---\n\n## Go\n<!-- kind: manual -->\n\nGo.\n")
+      File.write(File.join(dir, "tagged.md"), "---\ntitle: !ruby/object:Object {}\n---\n")
+      File.write(File.join(dir, "latin.md"), "---\ntitle: na\xEFve\n---\n\n## Go\n<!-- kind: manual -->\n\nGo.\n".b)
+      err = StringIO.new
+      assert_equal 1, CLI.run(["--check", dir], out: StringIO.new, err:)
+      assert_includes err.string, "error: tagged: front matter could not be read"
     end
   end
 
@@ -253,9 +285,9 @@ class TestCLI < Minitest::Test
     assert_equal 0, CLI.run(["--check", File.expand_path("../examples", __dir__)], out:, err:)
     lines = out.string.lines.map(&:chomp)
     assert_equal 4, lines.size
-    assert_includes lines, "Hello, runsheets: 6 steps, 0 warnings"
-    assert_includes lines, "Disk space triage: 3 steps, 0 warnings"
-    assert_includes lines, "Monthly PostgreSQL maintenance: 5 steps, 0 warnings"
+    assert_includes lines, "Hello, runsheets [hello]: 6 steps, 0 warnings", "a library's lines name the slug"
+    assert_includes lines, "Disk space triage [disk-space-triage]: 3 steps, 0 warnings"
+    assert_includes lines, "Monthly PostgreSQL maintenance [db-maintenance]: 5 steps, 0 warnings"
     assert_empty err.string
   end
 
@@ -267,7 +299,7 @@ class TestCLI < Minitest::Test
       out = StringIO.new
       err = StringIO.new
       assert_equal 1, CLI.run(["--check", dir], out:, err:)
-      assert_includes out.string, "Fine: 1 steps, 0 warnings"
+      assert_includes out.string, "Fine [fine]: 1 steps, 0 warnings"
       assert_includes err.string, "runsheets: error: bad: runbook.md is not a runbook: it needs YAML front matter with a title"
     end
   end

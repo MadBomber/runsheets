@@ -25,8 +25,11 @@ module Runsheets
       }.freeze
 
       # What the page is drawn for: the library, the session (nil when no
-      # runbook is open), the CSRF token, and the selected node.
-      View = Data.define(:library, :session, :token, :node) do
+      # runbook is open), the CSRF token, the selected node, and the crumb
+      # naming a page that is not a node of the tree (Search, Session).
+      View = Data.define(:library, :session, :token, :node, :crumb) do
+        def initialize(library:, session:, token:, node:, crumb: nil) = super
+
         def listing(entry) = Listing.new(entry:, session:, token:)
       end
 
@@ -76,6 +79,7 @@ module Runsheets
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="rs-token" content="#{h view.token}">
+          #{Pages::FAVICON}
             <title>#{h title} · #{h APP_NAME}</title>
             <style#{nonce_attr}>#{Assets.stylesheet}</style>
           </head>
@@ -89,7 +93,7 @@ module Runsheets
             </div>
             <footer class="rs-footer">
               <span>#{h APP_NAME} · #{h APP_FULL} · #{h library.dir}</span>
-              <span class="keys"><kbd>f</kbd> search <kbd>/</kbd> filter <kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> select <kbd>o</kbd> open <kbd>s</kbd> tree</span>
+              <span class="keys"><kbd>f</kbd> search <kbd>n</kbd> note <kbd>/</kbd> filter <kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> select <kbd>o</kbd> open <kbd>s</kbd> tree</span>
             </footer>
             <script#{nonce_attr}>#{Assets.javascript}</script>
           </body>
@@ -98,6 +102,7 @@ module Runsheets
       end
 
       def header(view, query: "")
+        crumb = view.crumb
         library = view.library
         session = view.session
         <<~HTML
@@ -110,7 +115,7 @@ module Runsheets
                 <span class="brand-tag">#{h File.basename(library.dir)}</span>
               </a>
             </div>
-            <nav class="crumbs" aria-label="Breadcrumb">#{crumbs(library, view.node).join('<span class="sep">/</span>')}</nav>
+            <nav class="crumbs" aria-label="Breadcrumb">#{(crumb ? ['<a href="/library">Runbooks</a>', "<span class=\"current\">#{h crumb}</span>"] : crumbs(library, view.node)).join('<span class="sep">/</span>')}</nav>
             <nav class="actions">
               #{Pages.search_box(query)}
               #{Pages.nav_button('Back to runbook', '/', :next, key: 'b', title: session.runbook.title) if session&.runbook}

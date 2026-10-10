@@ -33,7 +33,10 @@ module Runsheets
       def unless_blank(&convert) = ->(v) { blank?(v) ? nil : convert.call(v.to_s.strip) }
 
       def whole_number(text)
-        Integer(text, 10)
+        port = Integer(text, 10)
+        raise ConfigError, "port must be between 1 and 65535, got #{port}" unless (1..65_535).cover?(port)
+
+        port
       rescue ArgumentError
         raise ConfigError, "port must be a whole number, got #{text.inspect}"
       end
@@ -81,9 +84,10 @@ module Runsheets
 
     # The settings in force as the flat hash a config file holds. dump is
     # left out: it is an action for this run, and a saved `dump: true` would
-    # make every later run print and exit. why is left out too: it belongs to
-    # one session, and a saved one would start every later session with it.
-    def settings = (self.class.config_attributes - %i[dump why]).to_h { [it.to_s, public_send(it)] }
+    # make every later run print and exit; check and init likewise. why is
+    # left out too: it belongs to one session, and a saved one would start
+    # every later session with it.
+    def settings = (self.class.config_attributes - %i[dump check init why]).to_h { [it.to_s, public_send(it)] }
 
     # The settings in force as the text of a config file: a comment header,
     # then one key per setting. `runsheets --dump` prints this.

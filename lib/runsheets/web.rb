@@ -24,6 +24,8 @@ module Runsheets
     RUN_ID         = /\A[\w.-]+\z/
     LOOPBACK_HOSTS = ["localhost", IPAddr.new("127.0.0.1"), IPAddr.new("::1")].freeze
     WILDCARDS      = %w[0.0.0.0 :: [::]].freeze
+    # Served files run no script and load nothing, even inline.
+    FILE_CSP       = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 
     set :rs_session, nil
     set :static, false
@@ -136,6 +138,11 @@ module Runsheets
       nil
     end
 
+    # inline for an image, a PDF or plain text; attachment for anything
+    # else, so an HTML or XML file in a runbook directory can never become a
+    # page on this origin.
+    def self.disposition_for(path) = %w[.png .jpg .jpeg .gif .webp .svg .pdf .txt].include?(File.extname(path).downcase) ? "inline" : "attachment"
+
     # A fresh CSP nonce for one response.
     def self.nonce = SecureRandom.base64(16)
 
@@ -174,7 +181,11 @@ module Runsheets
       # one runbook's root.
       def content_root = library&.dir || runbook.root
 
-      def wants_json? = request.path_info.start_with?("/blocks/", "/executions/") || request.accept?("application/json")
+      # The page's script asks for JSON; a browser navigating asks for HTML
+      # (its Accept ends in */*, which matches JSON too, so ask which it prefers).
+      def wants_json?
+        request.path_info.start_with?("/blocks/", "/executions/") || request.preferred_type("text/html", "application/json") == "application/json"
+      end
 
       def json(data, status: 200)
         content_type :json
@@ -192,16 +203,25 @@ module Runsheets
         yield nonce
       end
 
-      # Without a runbook on screen there is no page to lay an error out
-      # around, so the error is plain text.
+      # An error as JSON for the page's script; otherwise as a page, in the
+      # runbook's layout, the library's frame, or alone.
       def fail_with(message, status)
+        env["runsheets.failed"] = true
         body = if wants_json?   then json({ error: message }, status:)
                elsif rs&.runbook then page { Pages.error(rs, message, status, nonce: it) }
-               else
-                 content_type :text
-                 "#{status}: #{message}\n"
+               else page { Pages.error_page(message, status, library:, session: rs, nonce: it) }
                end
         halt status, body
+      end
+
+      # The run an action from a page belongs to. A page says which runbook
+      # it shows (the runbook field), so a tab left on one runbook keeps
+      # acting on it after another tab has opened a different one.
+      def target_run
+        slug = params["runbook"].to_s
+        return rs.current! if slug.empty?
+
+        rs.run_for(slug) or raise RunError, "#{slug} has no run in this session; start it first"
       end
 
       def execution_json(execution)
@@ -270,8 +290,12 @@ module Runsheets
     end
 
     post "/session/notes" do
+      if params["note"].to_s.strip.empty?
+        status 422
+        next page { Pages.session(rs, library, settings.rs_token, error: "A note needs some text.", nonce: it) }
+      end
       rs.note!(params["note"])
-      redirect "/session#notes"
+      redirect(params["back"].to_s.start_with?("/") ? params["back"] : "/session#notes")
     end
 
     # End the session: every run closes with the status its work earns,
@@ -329,6 +353,8 @@ module Runsheets
     end
 
     not_found do
+      next if env["runsheets.failed"] # fail_with already said what was not found
+
       fail_with("not found: #{request.path_info}", 404)
     end
 
@@ -355,7 +381,8 @@ module Runsheets
 
     get "/files/*" do
       path = Web.resolve_file(content_root, params["splat"].first) or fail_with("no such file", 404)
-      send_file path
+      headers "Content-Security-Policy" => FILE_CSP, "X-Content-Type-Options" => "nosniff"
+      send_file path, disposition: Web.disposition_for(path)
     end
 
     # A markdown file the runbook links to. One of the runbook's own files
@@ -402,28 +429,30 @@ module Runsheets
 
     # Change the inputs of the run on screen partway.
     post "/run/inputs" do
-      rs.change_inputs(params["inputs"].is_a?(Hash) ? params["inputs"] : {})
+      target_run.change_inputs(params["inputs"].is_a?(Hash) ? params["inputs"] : {})
       redirect "/"
     end
 
     post "/steps/:slug/mark" do
-      step = runbook.step(params["slug"]) or fail_with("no step named #{params['slug']}", 404)
+      run  = target_run
+      step = run.runbook.step(params["slug"]) or fail_with("no step named #{params['slug']}", 404)
       fail_with("#{step.slug} is not a numbered step", 422) unless step.position
       status = params["status"]
       fail_with("status must be done or skipped", 422) unless %w[done skipped].include?(status)
-      rs.mark_step(step.slug, status:, note: params["note"])
+      run.mark_step(step.slug, status:, note: params["note"])
+      rs.show(run.runbook) unless run == rs.current
       redirect after_step_href(step)
     end
 
     # -- execution ------------------------------------------------------
 
     post "/blocks/:id/execute" do
-      execution = rs.execute(params["id"], confirm: params["confirm"])
+      execution = target_run.execute(params["id"], confirm: params["confirm"])
       json execution_json(execution), status: 202
     end
 
     post "/blocks/:id/acknowledge" do
-      ack = rs.acknowledge(params["id"], note: params["note"])
+      ack = target_run.acknowledge(params["id"], note: params["note"])
       json ack.merge(block_id: params["id"]), status: 201
     end
 

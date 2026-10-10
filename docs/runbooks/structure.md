@@ -38,7 +38,9 @@ number.
 The **step slug** is the filename without its extension, for example
 `020-stop-the-pipeline`. It is used in URLs (`/steps/020-stop-the-pipeline`),
 in block ids (`020-stop-the-pipeline-1`), and in the run record. Slugs must
-be unique; a duplicate is reported as an authoring warning.
+be unique; a duplicate is reported as an authoring warning. So is a step
+file named `runbook.md`, `verify.md` or `rollback.md` inside `steps/`: it
+has the name of a special document, so give it a number.
 
 The **step number** shown in the page is the leading digits of the slug, or
 the step's position when there are none.
@@ -66,8 +68,9 @@ running tasks.
 ```
 
 A step's title comes from its front matter, else from the first `# Heading`
-in the body, else from the slug with its number stripped and dashes turned
-into spaces.
+in the body's prose, else from the slug with its number stripped and dashes
+turned into spaces. A `# comment` line inside a fenced code block is never
+taken for the title.
 
 ## `verify.md` and `rollback.md`
 
@@ -101,6 +104,12 @@ own directory, so from `steps/020-x.md` the path above resolves to
 anywhere in the library; started on one runbook, only within it. A path
 that climbs out is left untouched and will 404. Hidden entries (names starting
 with `.`) are never served, which keeps `.git` and `.env` out of reach.
+
+Images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`), PDFs and `.txt`
+files open in the browser. Any other file is sent as a download, so an
+HTML or XML file linked from a runbook is saved rather than shown, and
+nothing served from `/files/` runs script. See
+[Security Posture](../reference/security.md#file-serving).
 
 A link to a markdown file is the exception. It goes to `/docs/`, which
 renders the file as a page: a link to one of the runbook's own files (a
@@ -157,6 +166,12 @@ The rules:
 - Every `##` heading starts a step, in document order. Headings inside
   fenced code blocks are ignored. Deeper headings (`###`) belong to the
   step they sit under.
+- The heading text is the step's title. A closing run of `#`s after a
+  space is dropped, as in markdown (`## Rollback ##`), but a `#` that is
+  part of the text stays: `## Upgrade to C#` is titled "Upgrade to C#".
+- A code fence opened in a section and never closed swallows every
+  heading after it, so it is reported as an authoring warning on that
+  section.
 - A step's attributes (`kind`, `timeout`, `destructive`, `cwd`) go in an
   HTML comment on the line after the heading, written as a YAML flow
   mapping: `<!-- kind: verify, timeout: 30 -->`. GitHub and every other
@@ -177,6 +192,18 @@ The rules:
 
 `runsheets --init name.md` writes a starter file in this shape. The bundled
 `examples/db-maintenance.md` is a complete one.
+
+## Several runbooks in one directory
+
+Started on a directory that is not itself a runbook, runsheets offers
+every runbook beneath it in a folder tree (see
+[Choosing a runbook](../running/web-ui.md#choosing-a-runbook)). A
+runbook's slug there is its path inside the directory, without `.md`, so
+two runbooks in one folder cannot share one. `deploy.md` beside
+`deploy/runbook.md`, or `backup.md` beside a folder `backup/`, is a
+clash: the folder, or the first runbook in name order, keeps the name and
+the other is shown as a broken entry saying "another runbook or a folder
+here already has the name …". Rename one.
 
 ## What runsheets does not read
 

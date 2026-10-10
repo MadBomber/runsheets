@@ -173,8 +173,8 @@ class TestSingleFile < Minitest::Test
   def test_stale_works_on_the_single_file
     with_single_file do |rb, path|
       refute rb.stale?
-      sleep 0.01
       File.write(path, File.read(path).sub("\n---", "\ntags: [x]\n---"))
+      FileUtils.touch(path, mtime: Time.now + 2) # newer than the load, on any file system
       assert rb.stale?
     end
   end
