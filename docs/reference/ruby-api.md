@@ -122,15 +122,18 @@ Or simply `runsheets --check DIR` per runbook.
 
 ## Running a runbook from a script
 
-`Session` is the same object the web page drives.
+`Session` is the same object the web page drives. A session needs an
+engineer and a reason, like the start page; it creates its directory and
+log under `runs_root` as soon as it is built.
 
 ```ruby
 runbook = Runsheets::Runbook.load("examples/hello")
-session = Runsheets::Session.new(runbook:, runs_root: "/tmp/runs")
+session = Runsheets::Session.new(engineer: "ci", why: "nightly check of the hello runbook",
+                                 runs_root: "/tmp/runs", runbook:)
 
-session.start_run(inputs: { "NAME" => "script" })
+session.open(runbook, inputs: { "NAME" => "script" })
 
-runbook.steps.each do |step|
+runbook.steps.first(2).each do |step|
   step.executable_blocks.each do |block|
     execution = session.execute(block.id).wait
     puts "#{block.id}: #{execution.state} #{execution.exit_status}"
@@ -140,44 +143,135 @@ runbook.steps.each do |step|
   session.mark_step(step.slug, status: "done", note: "run by script")
 end
 
-session.finish_run(status: "completed")
-puts session.run.dir
+session.note!("first two steps pass")
+session.end!("script finished")
+puts session.run.dir      # /tmp/runs/hello/20261010T012715
+puts session.run.status   # "partial": two of six steps marked
 ```
 
-`execute` returns immediately with a running `Execution`; `wait` blocks
-until it is reaped. It raises `Runsheets::RunError` when there is no active
-run, the block is unknown or not executable, or a referenced declared input
-is blank.
+`Session.new` takes `engineer:` and `why:` (both required; a blank one
+raises `Runsheets::RunError`), `runs_root:` (default `Runsheets.runs_dir`),
+`library:` or `runbook:` (the one runbook served, put on screen),
+`token:`, `executor:` (default `Executor.new`), `log_level:` (default
+`"info"`), `echo:` (an IO the log is echoed to, or `nil` for none) and
+`now:`. Building it also closes any earlier session in `runs_root` left
+running by a process that is gone.
+
+`open(runbook, inputs:)` puts the runbook on screen and establishes its
+run, or returns the run it already has (the inputs are then ignored). The
+methods that act on "this runbook" (`execute`, `acknowledge`,
+`mark_step`, `change_inputs`, `run`) go to the run of the runbook on
+screen. `execute` returns immediately with a running `Execution`; `wait`
+blocks until it is reaped. It raises `Runsheets::RunError` when the
+runbook on screen has no run, the block is unknown or not executable, or
+a referenced declared input is blank.
+
+`end!(how)` closes every run with its derived status (`completed`,
+`partial` or `opened`), stopping anything still running first, writes the
+records, and logs `how` as the reason. Ending twice does nothing.
 
 Other session methods:
 
 ```ruby
-session.active?
-session.run                     # the RunRecord, or nil
-session.resolve_inputs(given)   # what the inputs would be, without starting a run
-session.execution(id)           # a live Execution by id
-session.executions
-session.running_executions      # Executions whose process is still alive
-session.stop(execution_id)      # TERM then KILL its process group; state becomes :stopped
-session.challenge_for(block_id) # the confirmation code a destructive block currently expects
-session.execute(block_id, confirm: code)   # run a destructive block
+session.id                      # "20261010T012715", the directory name
+session.dir                     # <runs_root>/sessions/<id>
+session.engineer
+session.why                     # the first note's text
+session.notes                   # [{ at:, text: }, ...]
+session.host
+session.started_at
+session.ended_at                # nil until end!
+session.elapsed
+session.status                  # "running" or "ended"
+session.ended?
+session.log                     # the SessionLog
+session.token                   # the token the web layer requires
+
+session.show(runbook)           # put a runbook on screen without opening a run
+session.runbook                 # the runbook on screen
+session.runs                    # every Run, in the order their runbooks were selected
+session.run_for(slug)           # the Run of a runbook, or nil
+session.current                 # the Run of the runbook on screen, or nil
+session.run                     # current's RunRecord, or nil
+session.active?                 # the runbook on screen has an open run
+session.carried_inputs          # non-secret inputs given earlier in the session, by name
+session.resolve_inputs(given)   # what the inputs would be for the runbook on screen
+session.change_inputs(given)    # change the current run's inputs; a blank secret keeps its value
 session.acknowledge(block_id, note: "...")  # record that a terminal block was run by hand
 session.ack(block_id)           # the latest acknowledgement Hash, or nil
-session.secret_inputs_set       # names of secret inputs that have a value
 session.step_status(slug)       # "done", "skipped" or nil
-session.history                 # previous RunRecords, newest first
-session.token                   # the session token the web layer requires
+session.secret_inputs_set       # names of secret inputs that have a value
+session.history                 # previous RunRecords of the runbook on screen, newest first
+session.refresh_runbook!        # reload the runbook on screen if a source file changed
 
-session.start_verification(inputs:)   # start_run(kind: "verify"): only verify documents execute
-session.verifying?
-session.reload_runbook!         # re-read the runbook directory
-session.refresh_runbook!        # reload only if a source file changed on disk
+session.execution(id)           # a live Execution by id, in any run
+session.executions              # every Execution in the session
+session.running_executions      # those whose process is still alive
+session.running                 # [[run, execution], ...] for each one still running
+session.stop(execution_id)      # TERM then KILL its process group, whichever runbook started it
+
+session.write!                  # rewrite session.json
+session.to_h                    # the session.json data
+
+Runsheets::Session.close_interrupted(runs_root)   # close sessions left running by a dead process; returns their ids
 ```
 
 Executing a destructive block without the right `confirm` raises
-`Runsheets::Session::ConfirmationRequired`, a `RunError` whose `challenge`
-is the code to pass back. `finish_run` stops anything still running before
-it closes the record.
+`Runsheets::Run::ConfirmationRequired` (also reachable as
+`Runsheets::Session::ConfirmationRequired`), a `RunError` whose
+`challenge` is the code to pass back:
+
+```ruby
+begin
+  session.execute("040-exercise-failure-1")
+rescue Runsheets::Run::ConfirmationRequired => e
+  session.execute("040-exercise-failure-1", confirm: e.challenge)
+end
+```
+
+### Runs
+
+`Runsheets::Run` is one runbook's part of a session. `Session#open`
+builds them; scripts usually reach them through `session.current` or
+`session.run_for(slug)`.
+
+```ruby
+run = session.current
+run.runbook
+run.slug
+run.record                      # its RunRecord
+run.inputs                      # the inputs in force, secrets included (memory only)
+run.open?                       # until the session ends
+run.execute(block_id, confirm: nil)
+run.challenge_for(block_id)     # the code a destructive block currently expects
+run.stop(execution_id)
+run.acknowledge(block_id, note: nil)
+run.mark_step(step_slug, status: "done", note: nil)
+run.change_inputs(given)        # recorded as an inputs event and logged
+run.executions
+run.running_executions
+run.close!                      # stop what is running, close the record; returns the status
+
+Runsheets::Run.resolve_inputs(runbook, given, carried: {})
+# for each input: given, else carried (never a secret), else ENV, else the default
+```
+
+### The session log
+
+```ruby
+log = Runsheets::SessionLog.new("/tmp/session.log", level: "info", echo: $stdout, echo_level: "info")
+log.info("deployed", tags: ["release", "step-3"])
+# 2026-10-10 14:02:41.200 INFO  [release step-3] deployed
+log.debug(text, tags: [])       # also warn, error, fatal
+log.add("warn", text, tags: [])
+log.output_stream(["#1a2b"])    # a sink for output chunks: each complete line becomes "> line"
+log.path
+log.level
+log.close
+```
+
+Multi-line text becomes one log line per line, each with the same prefix.
+An unknown level raises `Runsheets::ConfigError`.
 
 ## Executions
 
@@ -240,7 +334,7 @@ Runsheets::Executor.new.run(execution, code: "echo $DB_PASSWORD\n", env: { "DB_P
 execution.output                       # => "[redacted DB_PASSWORD]\n"
 ```
 
-`Redactor.for(inputs, runbook)` builds the one a session uses: every
+`Redactor.for(inputs, runbook)` builds the one a run uses: every
 `secret` input that has a value. `feed(chunk)` and `flush` are the
 streaming form, which holds back a tail that could be the start of a
 secret until the next chunk settles it.
@@ -253,7 +347,8 @@ run  = runs.first
 
 run.id
 run.dir
-run.status          # "running", "completed", "abandoned"
+run.status          # "running", "completed", "partial", "opened", "interrupted" ("abandoned" in old records)
+run.session_id      # the session it belongs to, or nil in old records
 run.active?
 run.started_at
 run.finished_at
@@ -263,21 +358,26 @@ run.events          # Array of Hash with symbol keys
 run.executions      # Array of Hash with symbol keys
 run.step_status     # { "010-..." => "done" }
 run.acks            # { "020-...-3" => { at:, step:, note: } } terminal confirmations
-run.kind            # "run" or "verify"
+run.kind            # "run", or "verify" in records from before sessions
 run.verify?
+run.closing_status(step_slugs)   # the status it would close with now
 run.latest_executions      # block id => its most recent execution Hash
 run.unresolved_failures    # latest executions that are failures
 run.last_step              # the step of the latest event, or nil
 run.drift(runbook)         # [{ block_id:, status: :changed, diff: [Diff::Line...] }, { status: :missing, ... }]
 run.steps_done
 run.failed_executions
-run.summary         # { id:, started_at:, finished_at:, status:, duration:, executions:, failures:, steps_done: }
+run.summary         # { id:, kind:, started_at:, finished_at:, status:, duration:, executions:, failures:, unresolved:, steps_done:, last_step: }
 run.transcript      # the run.md text
 run.to_h            # the run.json data
 ```
 
 `RunRecord.load(dir)` reads one directory. Records that cannot be parsed are
-skipped by `list`.
+skipped by `list`. `RunRecord.start(runs_root, runbook, session_id:, inputs: {})`
+creates a run directory named by the session id and writes the first
+version; `Run` calls it. `change_inputs(inputs, runbook)` records an
+`inputs` event, and `finish!(status:)` closes the record with one of the
+final statuses.
 
 ## Searching
 
@@ -314,15 +414,31 @@ result.blocks   # Array of Block
 ## Serving
 
 ```ruby
-require "runsheets/web"
+require "runsheets"
 
-session = Runsheets::Session.new(runbook:)
-Runsheets::Web.configure_for(session, bind: "127.0.0.1", port: 4567)
+runbook = Runsheets::Runbook.load("examples/hello")
+options = { runs_root: Runsheets.runs_dir, log_level: "info", echo: $stdout }
+
+# With the engineer and the reason known, start the session now:
+session = Runsheets::Session.new(engineer: "Pat", why: "monthly checks", runbook:, **options)
+Runsheets::Web.configure_for(session, bind: "127.0.0.1", port: 4567, runbook:)
+
+# Or leave it to the start page:
+Runsheets::Web.configure_for(nil, bind: "127.0.0.1", port: 4567, runbook:)
+              .prepare_start(session_options: options, engineer: "Pat")
+
 Runsheets::Web.run!
+Runsheets::Web.session&.end!("server stopped")
 ```
 
-`configure_for` wires the session in and restricts permitted hosts to
-loopback plus the bind address. This is what `runsheets` does.
+`configure_for(session, bind:, port:, library:, runbook:)` wires in a
+library of runbooks or one runbook, and the session if it has started, and
+restricts permitted hosts to loopback plus the bind address.
+`prepare_start(session_options:, engineer:)` says what a session started
+from the start page is built with and who the page suggests.
+`Web.start_session(engineer:, why:)` is what the start page calls;
+`Web.session` is the session once it has started. This is what `runsheets`
+does, ending the session when the server stops.
 
 ## Configuration
 
@@ -343,8 +459,9 @@ class. Its layers, lowest to highest: `lib/runsheets/config/defaults.yml` in the
 `~/.config/runsheets/runsheets.yml`, the project config (`./config/runsheets.yml`,
 or the file `path:` or `RUNSHEETS_CONFIG` names), `RUNSHEETS_*`
 variables, then the overrides hash. A `Runsheets::ConfigError` is raised
-for a port that is not a whole number or a named config file that is
-missing.
+for a port that is not a whole number, an unknown log level, or a named
+config file that is missing. `engineer`, `why`, `log_level` and `quiet`
+are settings like the rest.
 
 ## Errors
 
@@ -352,4 +469,6 @@ missing.
 | --- | --- |
 | `Runsheets::Error` | Base class. |
 | `Runsheets::RunbookError` | A runbook cannot be loaded. |
-| `Runsheets::RunError` | A run operation is not allowed in the current state. |
+| `Runsheets::RunError` | A session or run operation is not allowed in the current state, or a session is started without an engineer or a reason. |
+| `Runsheets::Run::ConfirmationRequired` | A destructive block was executed without its code; a `RunError` carrying `challenge`. |
+| `Runsheets::ConfigError` | A setting is invalid: a port, a log level, a missing config file. |

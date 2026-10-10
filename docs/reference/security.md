@@ -5,15 +5,19 @@ page. Everything about its design follows from taking that seriously.
 
 ## The model
 
-- **One operator, one machine, one process.** The server is started by the
-  person who will run the commands and stops when they close it. There is
-  no login, no roles, and no multi-user story, and there should not be one.
+- **One operator, one machine, one process, one session.** The server is
+  started by the person who will run the commands and stops when they
+  close it. Everything in between is one session, recorded under the name
+  the operator gives on the start page or with `--engineer`. That name is
+  the operator's own statement, written into the record; it is not
+  authenticated. There is no login, no roles, and no multi-user story, and
+  there should not be one.
 - **The operator's environment is the execution environment.** Blocks run
   as the operator, with their shell environment, SSO sessions, tunnels and
   credentials. runsheets stores none of those and adds nothing.
 - **Nothing executes unless two people agreed.** The author opted the block
-  in with a flag in the markdown; the operator clicked Run during an active
-  run. Everything else is inert text.
+  in with a flag in the markdown; the operator clicked Run once the
+  runbook had a run. Everything else is inert text.
 
 ## Controls
 
@@ -73,11 +77,14 @@ Only fenced blocks whose info string carries `run`, `destructive` or
 flags and unrunnable languages are surfaced as warnings so a typo cannot
 quietly turn a block inert, or quietly make one runnable.
 
-### Active run required
+### A session and a run required
 
-A block cannot execute unless a run is active. Every execution therefore
-belongs to a record, and the record is written as it happens, not
-afterwards.
+Nothing can be posted until the session has started: until then every
+page redirects to the start page and every other request is refused. A
+block cannot execute until the runbook on screen has a run. Every
+execution therefore belongs to a record, and the record and the session
+log are written as it happens, not afterwards. Once the session has ended,
+every request but the session page is refused with 410.
 
 ### Destructive confirmation
 
@@ -101,21 +108,27 @@ before anything spawns. See [Inputs and Secrets](../runbooks/inputs.md).
 ### Secrets stay out of the record
 
 Inputs marked `secret` reach the child process and nothing else: not
-`run.json`, not `run.md`, not the active-run panel (which shows only that
-the secret is set). Output is redacted on its way from the child to the
-`.out` file, so a block that prints a secret records `[redacted NAME]`
-instead. This is exact string replacement and does not catch encoded or
+`run.json`, not `run.md`, not `session.json`, not the session log (which
+shows `NAME=[secret]`), and not the page. The Run open panel shows only
+that the secret is set, and the Change inputs form leaves secret fields
+empty, keeping the current value when one is left empty, so a secret is
+never sent back to the browser. A secret is never carried from one run to
+another within a session. Output is redacted on its way from the child to the
+`.out` file and the session log, so a block that prints a secret records
+`[redacted NAME]` instead. This is exact string replacement and does not catch encoded or
 transformed forms; see [Inputs and Secrets](../runbooks/inputs.md#redaction).
 
 ### Process groups, timeouts and stops
 
 Every execution is its own process group. Timeouts, operator stops and the
-end of the run kill the group, so a block cannot leave a child behind. The
-group is created at spawn, so nothing runsheets kills can reach the
-operator's shell or the server. When the server itself stops (Ctrl-C, or a
-crash on the way up), an active run is ended as `abandoned` and whatever it
-left running is stopped the same way, so a `background` block cannot
-outlive the tool.
+end of the session kill the group, so a block cannot leave a child behind.
+The group is created at spawn, so nothing runsheets kills can reach the
+operator's shell or the server. When the server stops (**End session**,
+Ctrl-C, or a crash on the way up), the session ends: every run is closed
+with the status its work earns and whatever is still running, in any
+runbook, is stopped the same way, so a `background` block cannot outlive
+the tool. A process that is killed outright leaves its session marked
+running; the next start closes it as `interrupted`.
 
 ### File serving
 
@@ -127,9 +140,9 @@ state out of reach.
 
 ### No writes to the runbook
 
-runsheets writes nothing inside the runbook directory. Run records,
-captured output and everything else it produces go to the runs directory
-outside it; the runbook's files are only ever read.
+runsheets writes nothing inside the runbook directory. Session records,
+the session log, run records, captured output and everything else it
+produces go to the runs directory outside it; the runbook's files are only ever read.
 
 ## What is deliberately not done
 

@@ -10,12 +10,30 @@ require "fileutils"
 require "yaml"
 
 module RunsheetsTest
+  # Stands in for the End session stopper: counts the calls.
+  StopCounter = Struct.new(:calls) do
+    def call = self.calls += 1
+  end
+
   EXAMPLE_DIR = File.expand_path("../examples/hello", __dir__)
 
   def example_runbook = Runsheets::Runbook.load(EXAMPLE_DIR)
 
   def with_runs_dir
     Dir.mktmpdir("runsheets-test") { yield it }
+  end
+
+  # A session for tests: a fixed engineer and why, no terminal echo, the
+  # token "tok", and +runbook+ on screen (the hello example by default).
+  def start_session(root, runbook: example_runbook, **)
+    Runsheets::Session.new(engineer: "Tester", why: "testing", runs_root: root, runbook:, token: "tok", echo: nil, **)
+  end
+
+  # A session with its runbook's run already open, given +inputs+.
+  def open_session(root, runbook: example_runbook, inputs: {}, **)
+    session = start_session(root, runbook:, **)
+    session.open(runbook, inputs:)
+    session
   end
 
   # Run the block with ENV changed (nil removes a variable), then restore it.

@@ -1,271 +1,260 @@
 # frozen_string_literal: true
 
+require "fileutils"
+require "socket"
+
 module Runsheets
-  # The operator's state for one runbook: the active run, the inputs it was
-  # started with (secrets included, in memory only), and the live executions.
-  # Web routes call into this; it knows nothing about HTTP.
+  # The engineering session: everything that happens between `runsheets`
+  # starting and stopping. It belongs to one engineer and opens with a note
+  # saying why. Selecting a runbook establishes that runbook's Run; the
+  # engineer can switch between runbooks freely, and every run stays open
+  # until the session ends.
+  #
+  #   <runs_root>/sessions/<session-id>/
+  #     session.json   engineer, host, times, status, notes, the runs
+  #     session.log    every action and its output, appended as it happens
+  #
+  # The runbook on screen is #runbook; the methods the pages and routes call
+  # for "this runbook" (execute, mark_step, run, ...) go to its run.
   class Session
-    # Raised when a destructive block is executed without the typed
-    # confirmation. Carries the code the operator has to type.
-    class ConfirmationRequired < RunError
-      attr_reader :challenge, :block_id
+    ConfirmationRequired = Run::ConfirmationRequired
 
-      def initialize(block_id, challenge)
-        @block_id  = block_id
-        @challenge = challenge
-        super("destructive block #{block_id} needs confirmation: type #{challenge}")
-      end
-    end
+    SESSIONS = "sessions"
+    STATUSES = %w[running ended interrupted].freeze
 
-    STOP_WAIT = Executor::GRACE + 1.0
+    attr_reader :engineer, :started_at, :ended_at, :notes, :runs_root, :library, :token, :executor, :log, :dir, :runbook
 
-    attr_reader :runbook, :runs_root, :executor, :run, :token, :library
+    # Start a session: create its directory and log, close any earlier
+    # session left running by a killed process, and record +why+ as the
+    # first note. +runbook+ is the one runbook served, when there is no
+    # library. +echo+ is the IO the log is echoed to (nil for none).
+    def initialize(engineer:, why:, runs_root: Runsheets.runs_dir, library: nil, runbook: nil, token: SecureRandom.hex(16),
+                   executor: Executor.new, log_level: "info", echo: nil, now: Time.now)
+      raise RunError, "who is starting the session? An engineer name is needed" if engineer.to_s.strip.empty?
+      raise RunError, "why is the session being started? A note is needed" if why.to_s.strip.empty?
 
-    # library: the Library this runbook was chosen from, when the server was
-    # started on a directory of runbooks; nil when it serves one runbook.
-    def initialize(runbook:, runs_root: Runsheets.runs_dir, executor: Executor.new, token: SecureRandom.hex(16), library: nil)
-      @runbook    = runbook
-      @library    = library
+      @engineer   = engineer.to_s.strip
       @runs_root  = runs_root
-      @executor   = executor
+      @library    = library
       @token      = token
-      @run        = nil
-      @inputs     = {}
-      @redactor   = Redactor.new({})
-      @executions = {}
-      @challenges = {}
-      @persisted  = Set.new
+      @executor   = executor
+      @started_at = now
+      @notes      = []
+      @runs       = {}
       @mutex      = Mutex.new
+      @dir        = RunRecord.unique_dir(File.join(Session.root(runs_root), now.strftime(RunRecord::TIMESTAMP)))
+      FileUtils.mkdir_p(@dir)
+      @log = SessionLog.new(File.join(@dir, "session.log"), level: log_level, echo:)
+      start(why, Session.close_interrupted(runs_root, except: @dir))
+      show(runbook) if runbook
     end
 
-    def active? = !run.nil? && run.active?
+    # Where sessions are kept under a runs directory.
+    def self.root(runs_root) = File.join(runs_root, SESSIONS)
 
-    # Inputs as they will be exported, with runbook defaults and the process
-    # environment filled in for anything the operator left blank.
-    def resolve_inputs(given = {})
-      given = given.to_h.transform_keys(&:to_s)
-      runbook.inputs.to_h do |input|
-        value = given[input.name]
-        value = ENV[input.name]  if value.nil? || value.empty?
-        value = input.default   if value.nil? || value.empty?
-        [input.name, value.to_s]
+    # Close every session (and its runs) still marked running whose process
+    # is gone: it was killed, so nothing closed it. A session whose process
+    # is still alive on this host is another runsheets, and is left alone,
+    # as is the session at +except+ (a directory). Returns the ids closed.
+    def self.close_interrupted(runs_root, except: nil)
+      paths = Dir.glob(File.join(root(runs_root), "*", "session.json")) - [File.join(except.to_s, "session.json")]
+      paths.filter_map do |path|
+        data = JSON.parse(File.read(path))
+        next if data["status"] != "running" || running_here?(data)
+
+        interrupt(File.dirname(path), data)
+        data["id"]
+      rescue JSON::ParserError, SystemCallError
+        nil
       end
     end
 
-    # Start a run. kind: "run" walks the whole procedure; "verify" may only
-    # execute the verify documents (verify-kind steps and verify.md).
-    def start_run(inputs: {}, kind: "run")
+    # Mark a killed session, and the runs it lists, interrupted. The end
+    # time is the last write to its log.
+    def self.interrupt(dir, data)
+      log     = File.join(dir, "session.log")
+      ended   = File.file?(log) ? File.mtime(log) : Time.now
+      runs    = data["runs"] || []
+      runs.each do |run|
+        record = RunRecord.load(run["dir"])
+        record.finish!(status: "interrupted", at: ended) if record.active?
+        run["status"] = record.status
+      rescue SystemCallError, JSON::ParserError
+        next
+      end
+      File.write(File.join(dir, "session.json"), JSON.pretty_generate(data.merge("status" => "interrupted", "ended_at" => ended.iso8601(3), "runs" => runs)))
+    end
+
+    # Is the session in +data+ still being written by a live process on
+    # this host?
+    def self.running_here?(data) = data["host"] == Socket.gethostname && alive?(data["pid"])
+
+    def self.alive?(pid)
+      return false unless pid.is_a?(Integer)
+
+      Process.kill(0, pid)
+      true
+    rescue Errno::ESRCH
+      false
+    rescue Errno::EPERM
+      true
+    end
+
+    def id     = File.basename(dir)
+    def host   = Socket.gethostname
+    def status = ended_at ? "ended" : "running"
+    def ended? = !ended_at.nil?
+    def why    = notes.first&.fetch(:text)
+    def elapsed(now = Time.now) = (ended_at || now) - started_at
+
+    # Add a timestamped note to the session.
+    def note!(text, at: Time.now)
+      text = text.to_s.strip
+      raise RunError, "a note needs some text" if text.empty?
+
       @mutex.synchronize do
-        raise RunError, "a run is already active (#{run.id}); finish it first" if active?
-        raise RunError, "this runbook has no verify steps or verify.md to run" if kind == "verify" && runbook.verify_documents.empty?
-
-        @inputs   = resolve_inputs(inputs)
-        @redactor = Redactor.for(@inputs, runbook)
-        @executions.clear
-        @challenges.clear
-        @run = RunRecord.start(runs_root, runbook, inputs: @inputs, kind:)
+        notes << { at:, text: }
+        write!
       end
-    end
-
-    def start_verification(inputs: {}) = start_run(inputs:, kind: "verify")
-
-    def verifying? = active? && run.verify?
-
-    # End the run. Anything still running is stopped first. The status is
-    # checked before anything is stopped, so a bad one changes nothing.
-    def finish_run(status: "completed")
-      @mutex.synchronize do
-        raise RunError, "no active run" unless active?
-        raise RunError, "status must be one of #{RunRecord::FINAL_STATUSES.join(', ')}" unless RunRecord::FINAL_STATUSES.include?(status)
-
-        stop_all
-        run.finish!(status:)
-      end
-    end
-
-    # Abandon the active run, if there is one, stopping whatever it left
-    # running. For shutdown paths; a no-op without an active run.
-    def abandon_if_active
-      finish_run(status: "abandoned") if active?
+      log.info("note: #{text}", tags: ["session"])
       self
     end
 
-    # Re-read the runbook from disk (its directory, or its one file) whenever
-    # the files change (see #refresh_runbook!).
-    def reload_runbook!
-      @runbook = Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug, root: runbook.root)
-    end
+    # --- runbooks and runs ---------------------------------------------
 
-    # Reload the runbook if any of its markdown files changed since it was
-    # loaded, so editing a runbook while the server is up is reflected on
-    # the next page. Block ids stay stable unless fences are added or
-    # removed, so an active run carries on. A runbook that no longer loads
-    # is kept as it was; the next successful load replaces it.
-    def refresh_runbook!
-      return runbook unless runbook.stale?
+    # The runs of this session, in the order their runbooks were selected.
+    def runs = @runs.values
 
-      reload_runbook!
-    rescue RunbookError
+    def run_for(slug) = @runs[slug]
+
+    # The run of the runbook on screen, if it has one.
+    def current = runbook && @runs[runbook.slug]
+
+    # Put +runbook+ on screen without establishing a run. The run it may
+    # already have takes the fresh copy.
+    def show(runbook)
+      @mutex.synchronize do
+        @runbook = runbook
+        @runs[runbook.slug]&.runbook = runbook
+      end
       runbook
     end
 
-    # Names of secret inputs that have a value, for display as "set".
-    def secret_inputs_set = runbook.inputs.select(&:secret?).map(&:name).reject { @inputs[it].to_s.empty? }
+    # Select a runbook: put it on screen and establish its run with
+    # +inputs+, or return to the run it already has. Returns the Run.
+    def open(runbook, inputs: {})
+      raise RunError, "this session has ended" if ended?
 
-    # Start executing a block. Returns the Execution.
-    #
-    # A destructive block needs +confirm+ to equal the challenge issued for
-    # it; the first attempt without one raises ConfirmationRequired carrying
-    # the challenge.
-    def execute(block_id, confirm: nil)
+      show(runbook)
+      existing = @runs[runbook.slug]
+      return existing if existing
+
+      run = Run.new(session: self, runbook:, inputs:)
       @mutex.synchronize do
-        step, block = executable_block!(block_id)
-        check_confirmation!(block, confirm) if block.destructive?
-
-        execution = build_execution(step, block)
-        run.record_execution(execution, step:, confirmed: block.destructive?)
-        @executions[execution.id] = execution
-        executor.start(execution, code: block.code, env: environment_for(execution), cwd: working_directory(step), redactor: @redactor)
-        run.write!
-        execution
+        @runs[runbook.slug] = run
+        write!
       end
+      run
     end
 
-    # The step and block for an id, or a RunError saying why it cannot run
-    # right now.
-    def executable_block!(block_id)
-      raise RunError, "start a run before executing blocks" unless active?
+    # Non-secret input values given earlier in the session, by name. A run
+    # opened later is offered them as defaults.
+    def carried_inputs = runs.map { it.record.inputs }.reduce({}, :merge)
 
-      step, block = runbook.find_block(block_id)
-      raise RunError, "unknown block #{block_id}" unless block
-      raise RunError, "block #{block_id} is not executable (#{block.kind})" unless block.executable?
-      if run.verify? && !runbook.verify_document?(step)
-        raise RunError, "a verification run only executes verify steps and verify.md; #{block_id} is in #{step.slug}"
-      end
+    # Inputs as the start form shows them for the runbook on screen.
+    def resolve_inputs(given = {}) = Run.resolve_inputs(runbook, given, carried: carried_inputs)
 
-      blank = blank_inputs(block)
-      raise RunError, "blank input#{'s' if blank.size > 1} referenced by block: #{blank.join(', ')}" if blank.any?
+    # Reload the runbook on screen if any of its markdown files changed,
+    # so an edit is reflected on the next page. Block ids stay stable unless
+    # fences are added or removed, so its run carries on. A runbook that no
+    # longer loads is kept as it was.
+    def refresh_runbook!
+      return runbook unless runbook&.stale?
 
-      [step, block]
+      log.debug("reloaded #{runbook.slug}: its files changed", tags: ["session"])
+      show(Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug, root: runbook.root))
+    rescue RunbookError => e
+      log.error("#{runbook.slug} no longer loads: #{e.message}", tags: ["session"])
+      runbook
     end
 
-    # A pending Execution for a block, with its files allocated in the run.
-    def build_execution(step, block)
-      cmd_path, log_path = run.paths_for(block)
-      Execution.new(
-        id: SecureRandom.hex(6), block_id: block.id, step_slug: step.slug,
-        command: runbook.interpreter_for(block.lang), cmd_path:, log_path:,
-        timeout: block.background? ? nil : step.timeout, background: block.background?
-      )
+    # --- the runbook on screen ------------------------------------------
+
+    def active? = !current.nil? && current.open?
+
+    # The record of the runbook on screen's run.
+    def run = current&.record
+
+    def execute(block_id, confirm: nil)        = current!.execute(block_id, confirm:)
+    def acknowledge(block_id, note: nil)       = current!.acknowledge(block_id, note:)
+    def mark_step(slug, status:, note: nil)    = current!.mark_step(slug, status:, note:)
+    def change_inputs(given)                   = current!.change_inputs(given)
+    def step_status(slug)                      = current&.step_status(slug)
+    def ack(block_id)                          = current&.ack(block_id)
+    def secret_inputs_set                      = current&.secret_inputs_set || []
+    def history                                = RunRecord.list(runs_root, runbook.slug)
+
+    # The run of the runbook on screen, or a RunError saying there is none.
+    def current!
+      current or raise RunError, "start the run for #{runbook&.title || 'a runbook'} before executing blocks"
     end
 
-    # The confirmation code currently expected for a destructive block,
-    # issuing one if none is outstanding.
-    def challenge_for(block_id) = @challenges[block_id] ||= SecureRandom.hex(2)
+    # --- executions across every run ------------------------------------
 
-    # Stop a running execution (a background process, or a run block that
-    # is taking too long). Returns the Execution; the state changes to
-    # :stopped once the reaper has ended the process group.
-    def stop(execution_id)
-      execution = @executions[execution_id] or raise RunError, "no execution #{execution_id}"
-      executor.stop(execution)
-      execution
-    end
-
-    # Record that the operator ran a terminal block themselves.
-    def acknowledge(block_id, note: nil)
-      @mutex.synchronize do
-        raise RunError, "start a run before acknowledging blocks" unless active?
-
-        step, block = runbook.find_block(block_id)
-        raise RunError, "unknown block #{block_id}" unless block
-        raise RunError, "block #{block_id} is not a terminal block (#{block.kind})" unless block.acknowledgeable?
-
-        run.acknowledge(block, step:, note: note.to_s.strip.empty? ? nil : note.strip)
-        run.write!
-        run.acks[block.id]
-      end
-    end
-
-    def ack(block_id) = run&.acks&.[](block_id)
-
-    # A live execution by id. Persists the record the first time a finished
-    # execution is observed.
-    def execution(id)
-      execution = @executions[id]
-      return nil unless execution
-
-      if execution.finished? && !@persisted.include?(id)
-        @mutex.synchronize do
-          @persisted << id
-          run&.write!
-        end
-      end
-      execution
-    end
-
-    def executions         = @executions.values
+    def executions         = runs.flat_map(&:executions)
     def running_executions = executions.select(&:running?)
 
-    # Only numbered steps can be marked: the landing page and the extra
-    # documents are not part of the procedure's progress.
-    def mark_step(slug, status:, note: nil)
+    # [run, execution] for each execution still running, in any runbook.
+    def running = runs.flat_map { |run| run.running_executions.map { [run, it] } }
+
+    def execution(id) = runs.lazy.filter_map { it.execution(id) }.first
+
+    # Stop an execution, whichever runbook started it.
+    def stop(execution_id)
+      run = runs.find { it.execution(execution_id) } or raise RunError, "no execution #{execution_id}"
+      run.stop(execution_id)
+    end
+
+    # --- ending ----------------------------------------------------------
+
+    # End the session: close every run (stopping what it left running) with
+    # the status its work earns, and write the record. +how+ says what ended
+    # it, for the log. Ending twice does nothing.
+    def end!(how, at: Time.now)
+      return self if ended?
+
+      closed = runs.map { "#{it.slug} #{it.close!}" }
       @mutex.synchronize do
-        raise RunError, "no active run" unless active?
-
-        step = runbook.step(slug) or raise RunError, "unknown step #{slug}"
-        raise RunError, "#{slug} is not a numbered step" unless step.position
-
-        run.mark_step(step, status:, note: note.to_s.strip.empty? ? nil : note.strip)
-        run.write!
+        @ended_at = at
+        write!
       end
+      log.info("ended (#{how}) after #{format('%.0f', elapsed)}s; runs: #{closed.empty? ? 'none' : closed.join(', ')}", tags: ["session"])
+      self
     end
 
-    def step_status(slug) = run&.step_status&.[](slug)
-
-    def history = RunRecord.list(runs_root, runbook.slug)
-
-    # Declared inputs the block refers to that have no value.
-    def blank_inputs(block)
-      declared = runbook.inputs.map(&:name)
-      (block.referenced_variables & declared).select { @inputs[it].to_s.empty? }
+    def to_h
+      {
+        id:, engineer:, host:, pid: Process.pid, runsheets: VERSION, status:,
+        started_at: started_at.iso8601(3), ended_at: ended_at&.iso8601(3),
+        library: library&.dir, log: log.path,
+        notes: notes.map { { at: it[:at].iso8601(3), text: it[:text] } },
+        runs: runs.map { { runbook: it.slug, title: it.runbook.title, dir: it.record.dir, status: it.record.status } }
+      }
     end
 
-    def environment_for(execution)
-      @inputs.merge(
-        "RUNSHEETS_RUN_ID"  => run.id,
-        "RUNSHEETS_RUN_DIR" => run.dir,
-        "RUNSHEETS_RUNBOOK" => runbook.slug,
-        "RUNSHEETS_STEP"    => execution.step_slug,
-        "RUNSHEETS_BLOCK"   => execution.block_id
-      )
-    end
-
-    def working_directory(step)
-      step.cwd ? File.expand_path(step.cwd, runbook.dir) : runbook.dir
+    def write!
+      File.write(File.join(dir, "session.json"), JSON.pretty_generate(to_h))
+      self
     end
 
     private
 
-    def check_confirmation!(block, confirm)
-      expected = challenge_for(block.id)
-      unless confirm.is_a?(String) && confirm.strip == expected
-        raise ConfirmationRequired.new(block.id, expected)
-      end
-
-      @challenges.delete(block.id)
-    end
-
-    # Stop every running execution and wait for the reapers, briefly.
-    def stop_all
-      running = running_executions
-      running.each { executor.stop(it) }
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + STOP_WAIT
-      running.each do |execution|
-        left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        execution.wait(left) if left.positive?
-      end
-      run.write!
+    def start(why, interrupted)
+      where = library ? "library=#{library.dir}" : nil
+      log.info(["started engineer=#{engineer.inspect} host=#{host} pid=#{Process.pid} runsheets=#{VERSION}", where, "log=#{log.path}"].compact.join(" "),
+               tags: ["session"])
+      interrupted.each { log.warn("earlier session #{it} was left running by a process that is gone; closed it as interrupted", tags: ["session"]) }
+      note!(why, at: started_at)
     end
   end
 end

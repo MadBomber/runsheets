@@ -104,8 +104,9 @@ the way it is.
 - **In a library**, plain documents are left out of the tree, wherever
   they sit in the directory `runsheets` was started on. Only runbooks are
   listed. `README.md` remains the description of its folder.
-- **Linked from a runbook**, a plain document opens as a page. Write an
-  ordinary relative link:
+- **Linked from a runbook**, a plain document opens as a page in a new
+  tab, so the runbook stays where you were. Write an ordinary relative
+  link:
 
     ```markdown
     Why we vacuum this table first: see [the bloat notes](docs/bloat.md).
@@ -116,7 +117,8 @@ the way it is.
     relative links and images resolve from its folder. A link to one of the
     runbook's own files, such as `steps/020-stop-the-pipeline.md`, opens
     that step's page instead, and a link to another runbook in the library
-    opens it in the library.
+    opens it in the library; both stay in the same tab. Inside a document
+    tab, links to other documents stay in that tab.
 
 Links resolve within the directory `runsheets` was started on, so a
 runbook can link to a document anywhere in it. A link that climbs out of

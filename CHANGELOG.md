@@ -7,9 +7,8 @@
 ### Fixed
 
 - Run, Start and "I ran this" buttons are disabled when they cannot work,
-  with a tooltip saying why: until a run is started, and, during a
-  verification run, on blocks outside the verify documents. Before, they
-  looked live and a click only showed a small "not run" status.
+  with a tooltip saying why: until the runbook on screen has a run. Before,
+  they looked live and a click only showed a small "not run" status.
 - Single-file runbooks are reloaded from their own file. Before, a session
   reloaded the containing directory, so edits to a single-file runbook were
   never picked up.
@@ -37,6 +36,41 @@
 - `Pages` requires `rack/utils` itself, so it works without `Web` loaded;
   `step.kind` is HTML-escaped in badges.
 
+### Added (milestone 5: sessions)
+
+- Sessions: everything between starting runsheets and stopping it is one
+  session (`Runsheets::Session`). It starts on a page asking who is
+  starting it and why (`GET /session/new`, `POST /session`), or straight
+  away with `--engineer` and `--why` (`RUNSHEETS_ENGINEER`,
+  `RUNSHEETS_WHY`, config `engineer:`); the engineer is prefilled from
+  config, `git config user.name`, then `$USER`. The why is the first note.
+- Selecting a runbook starts its run (`POST /runs`, `Runsheets::Run`): in a
+  library the runbook pane carries the inputs form and a Start run button;
+  on one runbook the landing page does. Selecting it again returns to the
+  same run, and switching between runbooks finishes nothing. Inputs given
+  earlier in the session are offered as defaults (never secrets).
+- A session page (`GET /session`) with timestamped notes
+  (`POST /session/notes`), the runs and their progress, the tail of the
+  session log, and an End session button (`POST /session/end`). The header
+  shows the session: engineer, elapsed time, runbooks.
+- Ending the session (the button, or Ctrl-C) closes every run with a status
+  worked out from what was done: `completed`, `partial` or `opened`. A
+  session left running by a killed process is closed as `interrupted` at
+  the next start, with its runs.
+- `session.log` (`Runsheets::SessionLog`, Ruby's Logger underneath): every
+  action and every line of output, timestamped, tagged and levelled like a
+  Rails log, written as it happens and echoed to the terminal. Secrets
+  never reach it. `--log-level`, `--verbose` (debug), `--quiet`,
+  `RUNSHEETS_LOG_LEVEL`, `RUNSHEETS_QUIET`.
+- Change a run's inputs partway (`POST /run/inputs`); a secret left blank
+  keeps its value and never comes back to the page. Recorded as an
+  `inputs` event.
+- The Running panel lists background processes from every runbook in the
+  session, each with Stop.
+- Records: `runs/sessions/<id>/session.json` and `session.log`; a run's
+  directory is named by its session id and its `run.json` names the
+  session. Blocks see `RUNSHEETS_SESSION_ID`.
+
 ### Added (milestone 4: packaging)
 
 - Full-text search (`GET /search`, `Runsheets::Search`): a search box in
@@ -49,8 +83,9 @@
 - A relative link to a markdown file opens it as a page (`/docs/*`): one of
   the runbook's own files goes to its step page, another runbook in the
   library to its library page, and any other renders as a plain document
-  with nothing executable. Links resolve within the directory `runsheets`
-  was started on, so a runbook in a library can link anywhere in it.
+  with nothing executable, in a new tab. Links resolve within the directory `runsheets`
+  was started on, so a runbook in a library can link anywhere in it, and
+  they work from the library pane before any runbook is opened.
 - Docs: a Concepts section (runbooks and plain documents, runs and
   runsheets).
 - A directory of runbooks (`Runsheets::Library`): `runsheets DIR` where DIR
@@ -101,6 +136,12 @@
 
 ### Changed
 
+- A run is no longer started, finished or abandoned by hand, and there are
+  no verification runs: `POST /run`, `POST /run/finish`,
+  `POST /library/open`, the Finish, Abandon and Verify only buttons, and
+  the rule that refused switching runbooks during a run are gone. The
+  Checks page and Run all work inside the runbook's run. Older records
+  still load.
 - The `last_verified` front matter key and the offer to stamp it into the
   runbook are gone, along with the `verified` history verdict. runsheets
   never writes inside a runbook directory.

@@ -26,7 +26,7 @@ class TestConfig < Minitest::Test
 
   def test_every_bundled_default_is_an_attribute_with_a_coercion
     schema = YAML.safe_load_file(Config.defaults_path, symbolize_names: true)
-    assert_equal %i[dir port bind runs_dir open check init dump], schema[:defaults].keys
+    assert_equal %i[dir port bind runs_dir open check init dump engineer why log_level quiet], schema[:defaults].keys
     assert_equal schema[:defaults].keys.sort, Config.config_attributes.sort
     assert_equal schema[:defaults].keys.sort, Config.coercion_mapping.keys.sort
   end
@@ -139,12 +139,12 @@ class TestConfig < Minitest::Test
     end
   end
 
-  def test_to_config_yaml_holds_every_setting_but_dump
+  def test_to_config_yaml_holds_every_setting_but_dump_and_why
     with_clean_home do
       text = Config.new({ port: 4590, open: "yes" }).to_config_yaml
       assert_match(/\A# runsheets settings, written by `runsheets --dump`/, text)
       loaded = YAML.safe_load(text)
-      assert_equal (Config.config_attributes - [:dump]).map(&:to_s).sort, loaded.keys.sort
+      assert_equal (Config.config_attributes - %i[dump why]).map(&:to_s).sort, loaded.keys.sort
       assert_equal 4590, loaded["port"]
       assert loaded["open"]
     end

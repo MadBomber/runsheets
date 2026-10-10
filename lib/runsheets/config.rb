@@ -16,7 +16,8 @@ module Runsheets
   #   5. the overrides hash, which the CLI fills from the command line
   #
   # Every key in defaults.yml is an attribute here (dir, port, bind, runs_dir,
-  # open, check, init, dump). Paths are expanded; flags accept 1/true/yes/on.
+  # open, check, init, dump, engineer, why, log_level, quiet). Paths are
+  # expanded; flags accept 1/true/yes/on.
   class Config < MywayConfig::Base
     config_name :runsheets
     env_prefix  :runsheets
@@ -59,8 +60,9 @@ module Runsheets
     PORT = unless_blank { whole_number(it) }
     FLAG = ->(v) { v == true || TRUE_WORDS.include?(v.to_s.strip.downcase) }
 
-    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :init, :dump
-    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, init: FLAG, dump: FLAG
+    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :init, :dump, :engineer, :why, :log_level, :quiet
+    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, init: FLAG, dump: FLAG,
+                 engineer: TEXT, why: TEXT, log_level: unless_blank { SessionLog.level_name(it) }, quiet: FLAG
 
     on_load :fill_blanks_from_defaults
 
@@ -79,8 +81,9 @@ module Runsheets
 
     # The settings in force as the flat hash a config file holds. dump is
     # left out: it is an action for this run, and a saved `dump: true` would
-    # make every later run print and exit.
-    def settings = (self.class.config_attributes - [:dump]).to_h { [it.to_s, public_send(it)] }
+    # make every later run print and exit. why is left out too: it belongs to
+    # one session, and a saved one would start every later session with it.
+    def settings = (self.class.config_attributes - %i[dump why]).to_h { [it.to_s, public_send(it)] }
 
     # The settings in force as the text of a config file: a comment header,
     # then one key per setting. `runsheets --dump` prints this.

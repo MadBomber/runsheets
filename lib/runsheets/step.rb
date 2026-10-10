@@ -29,6 +29,7 @@ module Runsheets
       result  = Renderer.render(@body, id_prefix: slug, interpreters:)
       @blocks = result.blocks
       @html   = Renderer.rewrite_relative_urls(result.html, relative_dir(path, root))
+      @html   = Renderer.open_documents_in_new_tab(@html, root) if root
       @warnings = validate.freeze
     end
 

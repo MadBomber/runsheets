@@ -182,13 +182,11 @@ class TestSingleFile < Minitest::Test
   def test_session_runs_a_single_file_runbook_end_to_end
     with_single_file do |rb, _|
       with_runs_dir do |root|
-        s = Runsheets::Session.new(runbook: rb, runs_root: root)
-        s.start_run(inputs: { "TARGET" => "qa" })
+        s = open_session(root, runbook: rb, inputs: { "TARGET" => "qa" })
         ex = s.execute("010-snapshot-the-database-1").wait
         assert ex.success?
         assert_equal "snapshot qa\n", ex.output
-        assert_equal rb.dir, s.working_directory(rb.steps.first)
-        s.finish_run
+        assert_equal rb.dir, s.current.working_directory(rb.steps.first)
         assert_equal 1, s.history.size
       end
     end

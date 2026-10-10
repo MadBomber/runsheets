@@ -6,10 +6,12 @@ module Runsheets
   class Execution
     STATES = %i[pending running finished timed_out stopped failed].freeze
 
-    attr_reader :id, :block_id, :step_slug, :command, :cmd_path, :log_path, :timeout,
+    # tee is where the output also goes as it arrives: the session log's
+    # stream for this execution (anything with #write and #close), or nil.
+    attr_reader :id, :block_id, :step_slug, :command, :cmd_path, :log_path, :timeout, :tee,
                 :state, :pid, :started_at, :finished_at, :exit_status, :signal, :error
 
-    def initialize(id:, block_id:, step_slug:, command:, cmd_path:, log_path:, timeout: nil, background: false)
+    def initialize(id:, block_id:, step_slug:, command:, cmd_path:, log_path:, timeout: nil, background: false, tee: nil)
       @id         = id
       @block_id   = block_id
       @step_slug  = step_slug
@@ -18,10 +20,12 @@ module Runsheets
       @log_path   = log_path
       @timeout    = timeout
       @background = background
+      @tee        = tee
       @state      = :pending
       @stop       = false
       @mutex      = Mutex.new
       @thread     = nil
+      @on_end     = []
     end
 
     def background? = @background
@@ -34,6 +38,13 @@ module Runsheets
     def failure?    = finished? && !success? && !stopped?
 
     def stop_requested? = @stop
+
+    # Call +block+ with this execution once it has ended, however it ended.
+    # Listeners run on the executor's reaper thread.
+    def on_end(&block)
+      @on_end << block
+      self
+    end
 
     def duration = started_at && finished_at ? finished_at - started_at : nil
 
@@ -103,7 +114,7 @@ module Runsheets
                        else :finished
                        end
       end
-      self
+      ended!
     end
 
     def failed!(message, at:)
@@ -112,6 +123,13 @@ module Runsheets
         @error       = message
         @state       = :failed
       end
+      ended!
+    end
+
+    private
+
+    def ended!
+      @on_end.each { it.call(self) }
       self
     end
   end

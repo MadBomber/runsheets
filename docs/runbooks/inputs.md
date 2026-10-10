@@ -50,14 +50,29 @@ puts ENV.fetch("AWS_PROFILE")
 When the start-run form is submitted, each input resolves in this order:
 
 1. What the operator typed in the form.
-2. If blank, the environment variable of the same name in the process that
-   started `runsheets`. A devcontainer with `AWS_PROFILE` already set needs no
-   typing.
-3. If still blank, the `default` from the front matter.
-4. Otherwise the empty string.
+2. If blank, a value given for an input of the same name by a runbook
+   selected earlier in the same session. Secrets are never carried from
+   one run to another.
+3. If still blank, the environment variable of the same name in the process
+   that started `runsheets`. A devcontainer with `AWS_PROFILE` already set
+   needs no typing.
+4. If still blank, the `default` from the front matter.
+5. Otherwise the empty string.
 
-The form is pre-filled with the result of steps 2 and 3, so the operator
-sees what will be used before starting.
+The form is pre-filled with the result of steps 2 to 4, so the operator
+sees what will be used before starting. Selecting a runbook that already
+has a run in the session returns to that run, and any inputs sent with it
+are ignored.
+
+### Changing inputs partway
+
+The **Run open** panel on the landing page has a **Change inputs** form.
+Plain fields show the current values. Secret fields are always empty, and
+a secret left empty keeps the value it has, so a secret is never sent back
+to the page. Blocks run after the change see the new values. The change is
+recorded in `run.json` as an `inputs` event with the non-secret values,
+shown in `run.md` as an "inputs changed" line, and written to the session
+log with secrets as `[secret]`.
 
 ## Blank inputs are refused
 
@@ -81,8 +96,9 @@ A `secret: true` input:
 
 - is rendered as a password field,
 - is passed to the child process like any other input,
-- is never written to `run.json` or `run.md`; the active-run panel shows
-  only that it is set,
+- is never written to `run.json`, `run.md`, `session.json` or the session
+  log; the Run open panel shows only that it is set,
+- is never carried into another runbook's run,
 - is redacted from captured output before the output is written.
 
 ### Redaction
@@ -119,7 +135,8 @@ it needs to:
 
 | Variable | Value |
 | --- | --- |
-| `RUNSHEETS_RUN_ID` | The run's id, for example `20261007T173348`. |
+| `RUNSHEETS_SESSION_ID` | The session's id, for example `20261010T141502`. |
+| `RUNSHEETS_RUN_ID` | The run's id: the name of its directory, normally the session id. |
 | `RUNSHEETS_RUN_DIR` | Absolute path of the run directory. |
 | `RUNSHEETS_RUNBOOK` | The runbook slug. |
 | `RUNSHEETS_STEP` | The step slug. |

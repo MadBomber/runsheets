@@ -4,9 +4,9 @@ kind: verify
 timeout: 300
 ---
 
-Run after the last step, or on their own with **Verify only** at any time
-afterwards: these prove staging is really gone and the snapshot is really
-there.
+Run after the last step, or on their own from the **Checks** page at any
+time afterwards: these prove staging is really gone and the snapshot is
+really there.
 
 ```bash run
 set -euo pipefail

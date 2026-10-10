@@ -15,16 +15,20 @@ lib/runsheets/
   single_file.rb              splits a one-file runbook into preamble and ## sections
   runbook.rb                  a directory or a single file: steps, verify, rollback
   library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
+  search.rb                   full-text search over runbooks
   diff.rb                     line diff for drift between a record and the runbook
   redactor.rb                 replaces secret values in captured output
   execution.rb                one execution: state, pid, files, timing
-  executor.rb                 spawns, pumps output through the redactor, reaps, times out, stops
-  run_record.rb               run.json, run.md, blocks/; list, load, drift
-  session.rb                  the active run, inputs, live executions, confirmation codes
+  executor.rb                 spawns, pumps output through the redactor to the file and the log, reaps, times out, stops
+  run_record.rb               run.json, run.md, blocks/; list, load, drift, closing status
+  run.rb                      one runbook's run: inputs, executions, confirmation codes
+  session_log.rb              session.log: tagged, levelled lines, echoed to the terminal
+  session.rb                  the session: engineer, notes, the runs, session.json, ending
   web.rb                      Sinatra routes and the security checks
   pages.rb                    pure functions that build the HTML
   pages/chooser.rb            the library page: header, folder pane, runbook pane
   pages/tree.rb               the folder tree in the library page's left pane
+  pages/search.rb             the search results page
   assets.rb                   inline CSS and JavaScript
   cli.rb                      option parsing and the exe entry point
 bin/runsheets
@@ -79,7 +83,8 @@ at load time, keeps the blocks, and computes its warnings. `Runbook` loads
 `runbook.md` as a step with slug `runbook`, the numbered steps in sorted
 order, and the optional extras, and exposes lookups: `step(slug)`,
 `find_block(id)`, `neighbors(step)`, `interpreter_for(lang)`. Everything is
-immutable after load; editing a runbook means restarting the server.
+immutable after load; an edited runbook is loaded again as a whole (see
+below).
 
 ## Executing
 
@@ -92,13 +97,15 @@ two seconds, then `KILL`, and records the result as `timed_out`.
 
 `Execution` is the state holder, mutated only by the executor through
 `started!`, `finished!` and `failed!` under a mutex, and read by everyone
-else. `wait` joins the reaper thread, which is how tests and the Ruby API
+else. Its `tee` is the session log's output stream for that execution:
+the pump thread writes each redacted chunk to the `.out` file and to the
+tee, which turns it into `>` lines in the log. `wait` joins the reaper thread, which is how tests and the Ruby API
 run a block synchronously.
 
 ## Recording
 
-`RunRecord.start` creates the run directory and writes the initial
-`run.json`. Executions are recorded as hashes the moment they are created,
+`RunRecord.start` creates the run directory, named by the session id, and
+writes the initial `run.json`. Executions are recorded as hashes the moment they are created,
 before spawning, so the order in the record is the order of clicks. Live
 `Execution` objects are kept alongside; `refresh!` copies their current
 state into the hashes before any write. `write!` produces both `run.json`
@@ -110,19 +117,35 @@ panel and the `/runs/:id` page. A record also knows how to judge itself:
 `drift` compares each block's recorded `.cmd` with the runbook as it reads
 now, using the small LCS diff in `diff.rb`.
 
-The session reloads the runbook whenever one of its markdown files changes
-on disk (checked on every GET), so a runbook can be edited while the
-server is up and the drift view compares against what is there now.
+The session reloads the runbook on screen whenever one of its markdown
+files changes on disk (checked on every GET), so a runbook can be edited
+while the server is up and the drift view compares against what is there
+now. Its run carries on with the fresh copy.
 
-## The session
+## The session and its runs
 
-`Session` is the in-memory operator state: the runbook, the active
-`RunRecord`, the resolved inputs (secrets included, never written), and
-the live executions by id. It is the only object the web layer talks to.
-`execute(block_id)` does the checks (active run, executable block, no blank
-referenced inputs), allocates file paths from the record, builds the
-environment, and hands off to the executor. A mutex serialises the
-state-changing calls.
+`Session` is the engineering session: the engineer, the notes, the
+runbook on screen, and a `Run` for each runbook selected, keyed by slug. It
+writes `session.json` and owns the `SessionLog`. It is the only object the
+web layer talks to; the calls that act on "this runbook" (`execute`,
+`mark_step`, `acknowledge`, `change_inputs`) go to the run of the runbook
+on screen, while `stop` and `running` look across every run. `open(runbook,
+inputs:)` establishes a run or returns the existing one. `end!` closes
+every run with `RunRecord#closing_status`. Building a session first calls
+`Session.close_interrupted`, which closes sessions left `running` by a
+process that is no longer alive on this host.
+
+`Run` is one runbook's part of the session: its resolved inputs (secrets
+included, kept in memory and never written), its redactor, its
+`RunRecord`, its live executions by id, and the confirmation codes issued
+for its destructive blocks. `execute(block_id)` does the checks (open run,
+executable block, no blank referenced inputs), allocates file paths from
+the record, builds the environment, logs the code, and hands off to the
+executor. When an execution ends, the reaper thread logs how and rewrites
+the record. A mutex in each serialises the state-changing calls.
+
+`SessionLog` wraps two standard `Logger`s, one for the file and one for
+the terminal echo, each with its own level and the same formatter.
 
 ## The web layer
 
@@ -138,12 +161,16 @@ buttons, the execute-and-poll loop, restoring prior executions from a JSON
 blob the step page embeds, keyboard shortcuts, and on the library page the
 tree filter and cursor.
 
-Started on a directory of runbooks, `Web` holds a `Library` beside the
-session. `Library` scans the tree once (folders to any depth, a runbook
-directory being a leaf), keeps each runbook loaded for the detail pane,
-and rescans when a folder or a runbook file changes. Opening a runbook
-builds a new `Session` around it; the runbook's slug is its path inside the
-library, so run records of `a/backup` and `b/backup` never meet.
+`Web` holds the session once it has started; before that its `before`
+filter sends every page to the start page, and `POST /session` builds the
+session with the options the CLI prepared. Started on a directory of
+runbooks, `Web` also holds a `Library`. `Library` scans the tree once
+(folders to any depth, a runbook directory being a leaf), keeps each
+runbook loaded for the detail pane, and rescans when a folder or a
+runbook file changes. Selecting a runbook (`POST /runs`) puts a freshly
+loaded copy on screen and opens its run in the same session; the
+runbook's slug is its path inside the library, so run records of
+`a/backup` and `b/backup` never meet.
 
 ## Testing
 
@@ -151,7 +178,7 @@ Minitest. The model classes are tested directly against the example
 runbook and small generated runbooks in temporary directories; the executor
 against real `bash` and `ruby` processes including a timeout; the record
 against a temporary runs directory; and `Web` with rack-test, driving a
-whole run from start to finish through HTTP.
+whole session from the start page to End session through HTTP.
 
 ```bash
 bundle exec rake test
@@ -162,7 +189,8 @@ bundle exec rake test
 - **Languages**: the `interpreters` front matter, or `Block::INTERPRETERS`
   for defaults.
 - **Executor**: `Session.new(executor: ...)` accepts anything responding to
-  `start(execution, code:, env:, cwd:)`, which is how a test or an embedding
-  application can intercept execution.
+  `start(execution, code:, env:, cwd:, redactor:)` and `stop(execution)`,
+  which is how a test or an embedding application can intercept
+  execution.
 - **Pages**: every page builder is a module function taking a session; an
   embedding app can reuse `Renderer` and `Pages` or replace them.

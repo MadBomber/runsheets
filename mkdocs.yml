@@ -119,7 +119,7 @@ nav:
   - Concepts:
       - concepts/index.md
       - Runbooks and Documents: concepts/runbooks.md
-      - Runs and Runsheets: concepts/runs.md
+      - Sessions, Runs and Runsheets: concepts/runs.md
   - Writing Runbooks:
       - runbooks/index.md
       - Directory Structure: runbooks/structure.md

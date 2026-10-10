@@ -14,13 +14,13 @@ module Runsheets
       # How much of when_to_use a card shows.
       BLURB = 160
 
-      # The badge each state of a runbook adds to its pane. :current is open
-      # now, :broken does not load, :locked waits for the active run to
-      # finish, :ready can be opened (see .action and Listing#state).
+      # The badge each state of a runbook adds to its pane. :current is on
+      # screen now, :open has a run in this session, :broken does not load,
+      # :ready can be selected (see .action and Listing#state).
       BADGES = {
         current: '<span class="badge current">open now</span>',
+        open:    '<span class="badge current">run open</span>',
         broken:  '<span class="badge destructive">does not load</span>',
-        locked:  "",
         ready:   ""
       }.freeze
 
@@ -36,7 +36,7 @@ module Runsheets
         def state
           if entry.slug == session&.runbook&.slug then :current
           elsif !entry.ok?                         then :broken
-          elsif session&.active?                   then :locked
+          elsif session&.run_for(entry.slug)       then :open
           else :ready
           end
         end
@@ -113,7 +113,7 @@ module Runsheets
             <nav class="crumbs" aria-label="Breadcrumb">#{crumbs(library, view.node).join('<span class="sep">/</span>')}</nav>
             <nav class="actions">
               #{Pages.search_box(query)}
-              #{Pages.nav_button('Back to runbook', '/', :next, key: 'b', title: session.runbook.title) if session}
+              #{Pages.nav_button('Back to runbook', '/', :next, key: 'b', title: session.runbook.title) if session&.runbook}
               #{pill(session)}
             </nav>
           </header>
@@ -130,11 +130,9 @@ module Runsheets
       end
 
       def pill(session)
-        return '<span class="run-pill"><span class="dot"></span>no runbook open</span>' unless session
+        return '<span class="run-pill"><span class="dot"></span>no session</span>' unless session
 
-        label = session.active? ? "#{session.verifying? ? 'verify' : 'run'} #{h session.run.id}" : "open"
-        "<a class=\"run-pill#{' active' if session.active?}\" href=\"/\" title=\"#{h session.runbook.title}\">" \
-          "<span class=\"dot\"></span>#{h session.runbook.slug} · #{label}</a>"
+        Pages.session_pill(session)
       end
 
       # ----------------------------------------------------------------
@@ -142,7 +140,7 @@ module Runsheets
       # ----------------------------------------------------------------
 
       def folder_pane(view, folder)
-        [folder_head(view.library, folder), locked_banner(view.session), readme(folder),
+        [folder_head(view.library, folder), readme(folder),
          cards_section("Folders", folder.folders.map { folder_card(it) }),
          cards_section("Runbooks", folder.entries.map { runbook_card(view.listing(it)) }),
          folder.root? ? HINT : ""].join("\n")
@@ -217,7 +215,7 @@ module Runsheets
 
       def runbook_pane(listing)
         runbook = listing.entry.runbook
-        parts   = [runbook_head(listing), locked_banner(listing.session), open_panel(listing)]
+        parts   = [runbook_head(listing), open_panel(listing)]
         if runbook
           meta = Pages.meta_rows(runbook).except("When to use")
           parts << Pages.warnings_banner(runbook.warnings) << Pages.meta_table(runbook, meta) << inputs_table(runbook)
@@ -248,7 +246,7 @@ module Runsheets
                else
                  "<h2>When to use</h2><p class=\"empty\">Not said. Add <code>when_to_use</code> to the front matter.</p>"
                end
-        action = action(listing, key: "o")
+        action = pane_action(listing)
         <<~HTML
           <section class="panel lib-open #{listing.state}">
             <div class="lib-open-text">#{text}</div>
@@ -257,25 +255,42 @@ module Runsheets
         HTML
       end
 
-      # The one thing the operator can do with a runbook in its state. The
-      # runbook pane's button answers the o key; a card's has no key.
+      # The one thing the operator can do with a runbook in its state, as a
+      # card offers it. A ready runbook with inputs leads to its pane, where
+      # the inputs form is.
       def action(listing, key: nil)
         case listing.state
         when :current then "<a class=\"btn primary\" href=\"/\">#{ICONS[:next]} Continue</a>"
         when :broken  then ""
-        when :locked  then '<span class="btn disabled" title="Finish the active run first">Open</span>'
+        when :open    then select_form(listing, "Return to its run", key:)
         else
-          "<form method=\"post\" action=\"/library/open\" class=\"lib-open-form\"><input type=\"hidden\" name=\"_token\" value=\"#{h listing.token}\">" \
-          "<input type=\"hidden\" name=\"slug\" value=\"#{h listing.entry.slug}\">" \
-          "<button class=\"btn primary\" type=\"submit\" data-key=\"#{h key}\">#{ICONS[:next]} Open</button></form>"
+          return select_form(listing, "Start run", key:) if listing.entry.runbook.inputs.empty?
+
+          "<a class=\"btn primary\" href=\"#{h href(listing.entry.slug)}\">#{ICONS[:next]} Open</a>"
         end
       end
 
-      def locked_banner(session)
-        return "" unless session&.active?
+      # The runbook pane's action answers the o key, and for a ready
+      # runbook carries the inputs form.
+      def pane_action(listing)
+        return action(listing, key: "o") unless listing.state == :ready
 
-        "<div class=\"banner info\">#{ICONS[:alert]}<div>A #{session.verifying? ? 'verification' : 'run'} is active on " \
-          "<strong>#{h session.runbook.title}</strong>. <a href=\"/run\">Finish or abandon it</a> before opening another runbook.</div></div>"
+        select_form(listing, "Start run", key: "o", fields: start_fields(listing))
+      end
+
+      # POST /runs for this runbook: establish its run, or return to it.
+      def select_form(listing, label, key: nil, fields: nil)
+        "<form method=\"post\" action=\"/runs\" class=\"lib-open-form\"><input type=\"hidden\" name=\"_token\" value=\"#{h listing.token}\">" \
+          "<input type=\"hidden\" name=\"slug\" value=\"#{h listing.entry.slug}\">#{fields}" \
+          "<button class=\"btn primary\" type=\"submit\" data-key=\"#{h key}\">#{ICONS[:next]} #{h label}</button></form>"
+      end
+
+      # The runbook's inputs, prefilled from earlier in the session, the
+      # environment and the defaults.
+      def start_fields(listing)
+        runbook = listing.entry.runbook
+        values  = Run.resolve_inputs(runbook, {}, carried: listing.session&.carried_inputs || {})
+        "<div class=\"lib-inputs\">#{Pages.input_fields(runbook, values)}</div>" if runbook.inputs.any?
       end
 
       def inputs_table(runbook)
@@ -328,11 +343,10 @@ module Runsheets
         rows  = runs.first(5).map do |run|
           s       = run.summary
           verdict = s[:status]
-          kind    = run.verify? ? "verify" : "run"
           <<~LI
             <li class="#{h verdict}">
               <span>#{h s[:id]}</span>
-              <span class="badge #{kind}">#{kind}</span>
+              #{run.verify? ? '<span class="badge verify">verify</span>' : '<span></span>'}
               <span class="meta verdict">#{h verdict}</span>
               <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h Pages.duration_text(s[:duration])}</span>
               <span class="meta">#{h Pages.history_progress(run, s, total)}</span>

@@ -1,11 +1,14 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "monitor"
 
 module Runsheets
-  # The runsheet: everything that happened during one run of a runbook.
+  # The runsheet: everything that happened to one runbook during one
+  # session. The run directory is named by the session id, so a runbook's
+  # history stays under its slug and each run points back to its session.
   #
-  #   <runs_root>/<runbook-slug>/<yyyymmddThhmmss>/
+  #   <runs_root>/<runbook-slug>/<session-id>/
   #     run.json        machine-readable record
   #     run.md          human-readable transcript
   #     blocks/
@@ -16,33 +19,34 @@ module Runsheets
   # docs in a repository.
   class RunRecord
     TIMESTAMP       = "%Y%m%dT%H%M%S"
-    STATUSES        = %w[running completed abandoned].freeze
-    FINAL_STATUSES  = %w[completed abandoned].freeze
-    KINDS           = %w[run verify].freeze
+    # How a run ends. A run ends with its session, and its status is worked
+    # out from what was done (see #closing_status); "interrupted" is a run
+    # whose process was killed, found by the next start. Records from before
+    # sessions may say "abandoned".
+    STATUSES        = %w[running completed partial opened interrupted abandoned].freeze
+    FINAL_STATUSES  = (STATUSES - ["running"]).freeze
     TRANSCRIPT_TAIL = 64 * 1024
 
-    attr_reader :dir, :runbook_slug, :runbook_title, :kind, :started_at, :finished_at, :status,
+    attr_reader :dir, :runbook_slug, :runbook_title, :kind, :session_id, :started_at, :finished_at, :status,
                 :inputs, :events, :executions, :step_status, :acks
 
-    # Create the run directory and write the initial record. Secret inputs are
-    # never stored. +kind+ is "run" (the whole procedure) or "verify" (only
-    # the verify documents).
-    def self.start(runs_root, runbook, inputs: {}, kind: "run", now: Time.now)
-      raise ArgumentError, "unknown run kind #{kind}" unless KINDS.include?(kind)
-
-      name = now.strftime(TIMESTAMP)
-      name += "-verify" if kind == "verify"
-      dir = unique_dir(File.join(runs_root, runbook.slug, name))
+    # Create the run directory, named by the session, and write the initial
+    # record. Secret inputs are never stored.
+    def self.start(runs_root, runbook, session_id:, inputs: {}, now: Time.now)
+      dir = unique_dir(File.join(runs_root, runbook.slug, session_id))
       FileUtils.mkdir_p(File.join(dir, "blocks"))
-      visible = inputs.reject { |name, _| runbook.input(name)&.secret? }.transform_keys(&:to_s)
-      new(dir:, runbook_slug: runbook.slug, runbook_title: runbook.title, kind:, started_at: now, inputs: visible).write!
+      new(dir:, runbook_slug: runbook.slug, runbook_title: runbook.title, session_id:, started_at: now,
+          inputs: visible_inputs(inputs, runbook)).write!
     end
+
+    # The inputs as recorded: secret ones left out.
+    def self.visible_inputs(inputs, runbook) = inputs.reject { |name, _| runbook.input(name)&.secret? }.transform_keys(&:to_s)
 
     # Read a record back from its run.json.
     def self.load(dir)
       data = JSON.parse(File.read(File.join(dir, "run.json")))
       new(
-        dir:, runbook_slug: data["runbook"], runbook_title: data["title"], kind: data["kind"] || "run",
+        dir:, runbook_slug: data["runbook"], runbook_title: data["title"], kind: data["kind"] || "run", session_id: data["session"],
         started_at: Time.iso8601(data["started_at"]),
         finished_at: data["finished_at"] && Time.iso8601(data["finished_at"]),
         status: data["status"], inputs: data["inputs"] || {},
@@ -80,12 +84,13 @@ module Runsheets
       end
     end
 
-    def initialize(dir:, runbook_slug:, runbook_title:, started_at:, kind: "run", inputs: {}, status: "running",
+    def initialize(dir:, runbook_slug:, runbook_title:, started_at:, kind: "run", session_id: nil, inputs: {}, status: "running",
                    finished_at: nil, events: [], executions: [], step_status: {}, acks: {})
       @dir           = dir
       @runbook_slug  = runbook_slug
       @runbook_title = runbook_title
       @kind          = kind
+      @session_id    = session_id
       @started_at    = started_at
       @finished_at   = finished_at
       @status        = status
@@ -95,11 +100,13 @@ module Runsheets
       @step_status   = step_status
       @acks          = acks
       @live          = {}
+      @lock          = Monitor.new
     end
 
     def id         = File.basename(dir)
     def active?    = status == "running"
     def completed? = status == "completed"
+    # A verification run, from before sessions (they no longer exist).
     def verify?    = kind == "verify"
     def blocks_dir = File.join(dir, "blocks")
     def duration   = (finished_at || Time.now) - started_at
@@ -116,32 +123,60 @@ module Runsheets
     def record_execution(execution, step:, confirmed: false, at: Time.now)
       event = { type: "execute", at: at.iso8601(3), step: step.slug, block: execution.block_id, execution: execution.id }
       event[:confirmed] = true if confirmed
-      events << event
-      @live[execution.id] = execution
-      executions << execution.to_h.merge(step: step.slug)
+      @lock.synchronize do
+        events << event
+        @live[execution.id] = execution
+        executions << execution.to_h.merge(step: step.slug)
+      end
       self
     end
 
     def mark_step(step, status:, note: nil, at: Time.now)
-      events << { type: "step", at: at.iso8601(3), step: step.slug, status:, note: }.compact
-      step_status[step.slug] = status
+      @lock.synchronize do
+        events << { type: "step", at: at.iso8601(3), step: step.slug, status:, note: }.compact
+        step_status[step.slug] = status
+      end
       self
     end
 
     # The operator confirms they ran a terminal block themselves.
     def acknowledge(block, step:, note: nil, at: Time.now)
       ack = { at: at.iso8601(3), step: step.slug, note: }.compact
-      events << { type: "ack", block: block.id, **ack }
-      acks[block.id] = ack
+      @lock.synchronize do
+        events << { type: "ack", block: block.id, **ack }
+        acks[block.id] = ack
+      end
+      self
+    end
+
+    # The inputs changed partway: recorded as an event, secrets left out.
+    def change_inputs(inputs, runbook, at: Time.now)
+      visible = RunRecord.visible_inputs(inputs, runbook)
+      @lock.synchronize do
+        events << { type: "inputs", at: at.iso8601(3), inputs: visible }
+        @inputs = visible
+      end
       self
     end
 
     def finish!(status: "completed", at: Time.now)
       raise ArgumentError, "unknown status #{status}" unless FINAL_STATUSES.include?(status)
 
-      @status      = status
-      @finished_at = at
-      write!
+      @lock.synchronize do
+        @status      = status
+        @finished_at = at
+        write!
+      end
+    end
+
+    # How this run ends, given the slugs of the runbook's numbered steps:
+    # completed when every one was marked done or skipped, partial when
+    # anything at all was done, opened when nothing was.
+    def closing_status(step_slugs)
+      return "completed" if step_slugs.any? && (step_slugs - step_status.keys).empty?
+      return "partial" if executions.any? || step_status.any? || acks.any?
+
+      "opened"
     end
 
     def failed_executions = executions.select { RunRecord.failure?(it) }
@@ -184,15 +219,17 @@ module Runsheets
     end
 
     def write!
-      refresh!
-      File.write(File.join(dir, "run.json"), JSON.pretty_generate(to_h))
-      File.write(File.join(dir, "run.md"), transcript)
+      @lock.synchronize do
+        refresh!
+        File.write(File.join(dir, "run.json"), JSON.pretty_generate(to_h))
+        File.write(File.join(dir, "run.md"), transcript)
+      end
       self
     end
 
     def to_h
       {
-        runbook: runbook_slug, title: runbook_title, id:, kind:, status:,
+        runbook: runbook_slug, title: runbook_title, id:, session: session_id, kind:, status:,
         started_at: started_at.iso8601(3), finished_at: finished_at&.iso8601(3),
         duration: duration.round(3), inputs:, steps: step_status, acks:, events:, executions:
       }
@@ -216,11 +253,12 @@ module Runsheets
 
     def transcript_header
       lines = ["# #{runbook_title} — #{verify? ? 'verification' : 'run'} #{id}", "",
-               "- Runbook: `#{runbook_slug}`",
-               "- Kind: #{verify? ? 'verification (verify documents only)' : 'full run'}",
-               "- Started: #{started_at.iso8601}",
-               "- Finished: #{finished_at&.iso8601 || 'in progress'}",
-               "- Status: #{status}"]
+               "- Runbook: `#{runbook_slug}`"]
+      lines << "- Session: `#{session_id}`" if session_id
+      lines << "- Kind: verification (verify documents only)" if verify?
+      lines.push("- Started: #{started_at.iso8601}",
+                 "- Finished: #{finished_at&.iso8601 || 'in progress'}",
+                 "- Status: #{status}")
       return lines if inputs.empty?
 
       lines << "- Inputs:"
@@ -234,6 +272,7 @@ module Runsheets
       when "execute" then execution_transcript(event)
       when "step"    then ["- #{event[:at]} step **#{event[:step]}** marked #{event[:status]}#{note_suffix(event)}", ""]
       when "ack"     then ["- #{event[:at]} `#{event[:block]}` (#{event[:step]}) confirmed run in the operator's terminal#{note_suffix(event)}", ""]
+      when "inputs"  then ["- #{event[:at]} inputs changed: #{event[:inputs].map { |k, v| "`#{k}` = `#{v}`" }.join(', ')}", ""]
       else []
       end
     end

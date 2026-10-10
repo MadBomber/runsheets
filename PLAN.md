@@ -3,7 +3,7 @@
 Plan and discussion log for `runsheets`, an open-source tool that turns a directory of
 markdown files into an executable, recorded runbook served in the browser.
 
-Status: all four milestones built and passing (see the 2026-10-07 and 2026-10-08 log). What remains is use against real runbooks.
+Status: milestones 1 to 5 built and passing (see the log). Milestones 6 (activity database) and 7 (Rails engine) are designed, not started.
 Started: 2026-10-07.
 Repo: `~/sandbox/git_repos/madbomber/runsheets`. Origin copy of this plan: `~/scripts/runbook_plan.md`.
 
@@ -262,7 +262,7 @@ recording and rendering are tested without spawning processes.
 
 ## Sessions (milestone 5 design)
 
-Proposed 2026-10-09, not built. Using runsheets on a library showed that one run per
+Proposed 2026-10-09, built 2026-10-10 (see "As built" at the end of this section and the log). Using runsheets on a library showed that one run per
 runbook, started and finished by hand, is the wrong unit. An engineer sits down for a
 reason (a shift, an incident, a change window), works through parts of several
 runbooks, and stops. The record should look like that.
@@ -451,6 +451,29 @@ field, a `kind` field) stay readable.
   runbook's run. Replaces `POST /run` and `POST /library/open`.
 - `POST /run/finish` and the `kind=verify` start go away.
 - `GET /session`: the session page (the notebook so far), linked from the header.
+
+### As built
+
+Built 2026-10-10 on files, ahead of the activity database. Where the build differs
+from the design above, or settles what it left open:
+
+- **Classes.** `Runsheets::Session` is the engineering session; the old per-runbook
+  `Session` became `Runsheets::Run`, one runbook's run. The routes and pages still
+  ask the session about "the runbook on screen", which forwards to its run.
+- **`session.json`** holds the engineer, host, pid, version, status, times, notes and
+  the runs (slug, title, directory, status). It does not copy the timeline: the log
+  is the timeline.
+- **Selecting a runbook.** In a library the runbook pane carries the inputs form and
+  **Start run**; a card for a runbook with inputs links to the pane. A runbook
+  without inputs starts from its card. Selecting a runbook with a run returns to it.
+- **Change inputs** on the run panel: secret fields come back empty, and an empty
+  secret keeps its value, so a secret is never sent back to the page.
+- **Ending** shows a "Session ended" page, then signals the process the way Ctrl-C
+  does; after that every page but the session page answers 410.
+- **Interrupted sessions** are detected by pid and host: a session marked running
+  whose process is alive on this host belongs to another runsheets and is left
+  alone.
+- **Blocks** also see `RUNSHEETS_SESSION_ID`.
 
 ### Open questions
 
@@ -653,7 +676,7 @@ Three modes, chosen by the host application, most restrictive by default:
    runbooks (a directory and a single file), single-file runbooks, SQL through the
    interpreters map, `runsheets --init`, vocabulary settled. The name was picked on
    2026-10-07.
-5. **Sessions.** Designed 2026-10-09, not started; part of the 0.0.1 release. A session per process with an
+5. **Sessions.** Designed 2026-10-09, built 2026-10-10; part of the 0.0.1 release. A session per process with an
    engineer and an opening why note; selecting a runbook establishes its run; runs end with the
    session. See [Sessions](#sessions-milestone-5-design).
 6. **Activity database.** Designed 2026-10-10, not started. SQLite as the record of
@@ -865,3 +888,27 @@ map, a real converted runbook, `capture`, the vocabulary split.
 Not done: `capture` (still no runbook needs it). The gemspec lists files via
 `git ls-files`, so everything added since the last commit is outside the gem until it
 is committed. Next: use it against a real runbook and let the convention take the hits.
+
+### 2026-10-10
+
+**Milestone 5 built: sessions.** 259 tests; the asgard quality gate passes.
+
+- `Runsheets::Session` (who, why, notes, runs, the runbook on screen, the log) and
+  `Runsheets::Run` (one runbook's inputs, record, executions, confirmation codes).
+  Selecting a runbook (`POST /runs`) establishes its run or returns to it;
+  switching finishes nothing; ending the session closes every run with a derived
+  status (`completed`, `partial`, `opened`). The start page asks who and why unless
+  `--engineer` and `--why` say; a killed session is closed as `interrupted` at the
+  next start.
+- `Runsheets::SessionLog`: two standard Loggers (file and terminal) behind one
+  object that adds the bracketed tags and splits multi-line text. Output reaches it
+  through a tee on the executor's pump, after redaction, so `session.log` holds
+  every line as it arrives; an execution's end is logged by a listener the reaper
+  thread calls, which also saves the record. `RunRecord` writes under a lock now,
+  since the reaper writes too.
+- Gone: starting, finishing and abandoning runs by hand, verification runs, the
+  lock on switching runbooks. The Checks page works inside the run.
+- Testing found the Change inputs form sending the current secret back to the
+  page; secret fields there are now empty and an empty one keeps the value.
+- Reek: one exclusion added (`Session#initialize`'s keyword list, like
+  `Pages.layout`); everything else was fixed in the code.

@@ -10,7 +10,7 @@ class TestRunRecord < Minitest::Test
   def test_start_creates_the_directory_and_files_without_secrets
     with_runs_dir do |root|
       rb  = example_runbook
-      run = RunRecord.start(root, rb, inputs: { "NAME" => "x", "SECRET_WORD" => "hunter2" }, now: Time.new(2026, 10, 7, 12, 0, 0))
+      run = RunRecord.start(root, rb, session_id: "20261007T120000", inputs: { "NAME" => "x", "SECRET_WORD" => "hunter2" })
       assert_equal File.join(root, "hello", "20261007T120000"), run.dir
       assert File.directory?(run.blocks_dir)
       assert File.file?(File.join(run.dir, "run.json"))
@@ -18,14 +18,15 @@ class TestRunRecord < Minitest::Test
       assert_equal({ "NAME" => "x" }, run.inputs)
       refute_includes File.read(File.join(run.dir, "run.json")), "hunter2"
       assert run.active?
+      assert_equal "20261007T120000", JSON.parse(File.read(File.join(run.dir, "run.json")))["session"]
+      assert_includes run.transcript, "- Session: `20261007T120000`"
     end
   end
 
-  def test_same_second_gets_a_unique_directory
+  def test_a_reused_session_id_gets_a_unique_directory
     with_runs_dir do |root|
-      now = Time.new(2026, 10, 7, 12, 0, 0)
-      a = RunRecord.start(root, example_runbook, now:)
-      b = RunRecord.start(root, example_runbook, now:)
+      a = RunRecord.start(root, example_runbook, session_id: "S1")
+      b = RunRecord.start(root, example_runbook, session_id: "S1")
       assert_equal "#{a.dir}-2", b.dir
     end
   end
@@ -33,7 +34,7 @@ class TestRunRecord < Minitest::Test
   def test_records_executions_steps_and_transcript
     with_runs_dir do |root|
       rb   = example_runbook
-      run  = RunRecord.start(root, rb)
+      run  = RunRecord.start(root, rb, session_id: "S1")
       step = rb.step("010-say-hello")
       block = step.blocks.first
       cmd, log = run.paths_for(block)
@@ -65,10 +66,10 @@ class TestRunRecord < Minitest::Test
   def test_load_and_list
     with_runs_dir do |root|
       rb = example_runbook
-      RunRecord.start(root, rb, now: Time.new(2026, 1, 1, 0, 0, 0)).finish!(status: "abandoned")
-      newer = RunRecord.start(root, rb, now: Time.new(2026, 1, 2, 0, 0, 0))
+      RunRecord.start(root, rb, session_id: "A", now: Time.new(2026, 1, 1, 0, 0, 0)).finish!(status: "abandoned")
+      newer = RunRecord.start(root, rb, session_id: "B", now: Time.new(2026, 1, 2, 0, 0, 0))
       runs = RunRecord.list(root, "hello")
-      assert_equal [newer.id, "20260101T000000"], runs.map(&:id)
+      assert_equal [newer.id, "A"], runs.map(&:id), "newest first, by start time"
       assert_equal "abandoned", runs.last.status
       assert_equal "running", runs.first.status
       assert_equal 0, runs.first.summary[:executions]
@@ -78,7 +79,7 @@ class TestRunRecord < Minitest::Test
   def test_acknowledgements_and_confirmations_are_recorded
     with_runs_dir do |root|
       rb    = example_runbook
-      run   = RunRecord.start(root, rb)
+      run   = RunRecord.start(root, rb, session_id: "S1")
       step  = rb.step("020-inspect-ruby")
       term  = step.blocks.find(&:terminal?)
       run.acknowledge(term, step:, note: "pressed enter")
@@ -110,7 +111,7 @@ class TestRunRecord < Minitest::Test
   def test_stopped_executions_are_not_failures
     with_runs_dir do |root|
       rb   = example_runbook
-      run  = RunRecord.start(root, rb)
+      run  = RunRecord.start(root, rb, session_id: "S1")
       step = rb.step("035-keep-a-clock-running")
       block = step.blocks.first
       assert block.background?
@@ -130,22 +131,46 @@ class TestRunRecord < Minitest::Test
     end
   end
 
-  def test_verify_kind_gets_its_own_directory_suffix_and_transcript_header
+  def test_an_old_verification_record_still_reads_as_one
     with_runs_dir do |root|
-      run = RunRecord.start(root, example_runbook, kind: "verify", now: Time.new(2026, 10, 8, 9, 0, 0))
-      assert_equal "20261008T090000-verify", run.id
-      assert run.verify?
-      assert_includes run.transcript, "verification (verify documents only)"
-      assert_equal "verify", JSON.parse(File.read(File.join(run.dir, "run.json")))["kind"]
-      assert RunRecord.load(run.dir).verify?
-      assert_raises(ArgumentError) { RunRecord.start(root, example_runbook, kind: "weird") }
+      run  = RunRecord.start(root, example_runbook, session_id: "20261008T090000-verify")
+      data = JSON.parse(File.read(File.join(run.dir, "run.json"))).merge("kind" => "verify", "session" => nil)
+      File.write(File.join(run.dir, "run.json"), JSON.generate(data))
+      old = RunRecord.load(run.dir)
+      assert old.verify?
+      assert_includes old.transcript, "verification (verify documents only)"
+      refute_includes old.transcript, "- Session:"
+    end
+  end
+
+  def test_closing_status_follows_what_was_done
+    with_runs_dir do |root|
+      rb    = example_runbook
+      slugs = rb.steps.map(&:slug)
+      run   = RunRecord.start(root, rb, session_id: "S1")
+      assert_equal "opened", run.closing_status(slugs)
+      run.mark_step(rb.steps.first, status: "skipped")
+      assert_equal "partial", run.closing_status(slugs)
+      rb.steps.drop(1).each { run.mark_step(it, status: "done") }
+      assert_equal "completed", run.closing_status(slugs), "done or skipped, every step"
+      assert_equal "partial", run.closing_status([]), "a runbook without steps is never completed"
+    end
+  end
+
+  def test_finish_takes_any_final_status
+    with_runs_dir do |root|
+      %w[completed partial opened interrupted abandoned].each do |status|
+        run = RunRecord.start(root, example_runbook, session_id: status).finish!(status:)
+        assert_equal status, RunRecord.load(run.dir).status
+        refute run.active?
+      end
     end
   end
 
   def test_a_successful_rerun_clears_an_unresolved_failure
     with_runs_dir do |root|
       rb  = example_runbook
-      run = RunRecord.start(root, rb)
+      run = RunRecord.start(root, rb, session_id: "S1")
       step  = rb.step("010-say-hello")
       block = step.blocks.first
       run.mark_step(step, status: "done")
@@ -169,7 +194,7 @@ class TestRunRecord < Minitest::Test
   def test_drift
     with_runs_dir do |root|
       rb    = example_runbook
-      run   = RunRecord.start(root, rb)
+      run   = RunRecord.start(root, rb, session_id: "S1")
       step  = rb.step("010-say-hello")
       block = step.blocks.first
       cmd, log = run.paths_for(block)
@@ -191,6 +216,6 @@ class TestRunRecord < Minitest::Test
   end
 
   def test_finish_rejects_unknown_status
-    with_runs_dir { |root| assert_raises(ArgumentError) { RunRecord.start(root, example_runbook).finish!(status: "weird") } }
+    with_runs_dir { |root| assert_raises(ArgumentError) { RunRecord.start(root, example_runbook, session_id: "S1").finish!(status: "weird") } }
   end
 end

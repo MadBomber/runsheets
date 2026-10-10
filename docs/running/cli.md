@@ -23,11 +23,16 @@ or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 | `-c`, `--config FILE` | `./config/runsheets.yml` | Config file to read in place of the project config; see [Settings](#settings). A file named here must exist. |
 | `-p`, `--port PORT` | `4567` | Port to listen on. |
 | `-b`, `--bind HOST` | `127.0.0.1` | Address to bind to. See the note below before changing it. |
-| `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where run records are written. |
+| `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where session records, logs and run records are written. |
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
 | `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. `--no-check` turns it off. |
 | `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. `--no-init` turns it off. |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
+| `-e`, `--engineer NAME` | ask | Who is starting the session. Without it the start page asks, pre-filled from `git config user.name`, else `$USER`. See [The session](#the-session). |
+| `-w`, `--why TEXT` | ask | Why the session is being started: its first note. With `--engineer` too, the session starts at once and the start page is skipped. |
+| `--log-level LEVEL` | `info` | The session log's level: `debug`, `info`, `warn`, `error` or `fatal`. See [The session log](#the-session-log). |
+| `--verbose` | | The same as `--log-level debug`. |
+| `-q`, `--quiet` | off | Do not echo the session log to the terminal. `--no-quiet` turns it off. |
 | `-v`, `--version` | | Print the version and exit. |
 | `-h`, `--help` | | Print usage and exit. |
 
@@ -55,6 +60,12 @@ Serve on another port because something else has 4567:
 runsheets -p 4580 ops/runbooks/staging-teardown
 ```
 
+Start the session from the command line, skipping the start page:
+
+```bash
+runsheets -e "Pat Doe" -w "rotate the staging database password" ops/runbooks
+```
+
 Keep run records inside a project (but outside the runbook):
 
 ```bash
@@ -71,22 +82,31 @@ runsheets --check ops/runbooks
 ## What it prints
 
 ```text
-runsheets 0.1.0
+runsheets 0.0.1
 Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
 Runs:    /Users/you/.local/share/runsheets/runs
 Config:  /Users/you/.config/runsheets/runsheets.yml
+Session: starts in the browser (who and why)
 Open http://127.0.0.1:4567/ in your browser
-Press Ctrl-C to stop
+Press Ctrl-C to end the session and stop
+```
+
+Started on a directory of runbooks, the second line is `Library:` with the
+number of runbooks and folders. When `--engineer` and `--why` are both set
+the session has already started, and the `Session:` line gives its id and
+the path of its log:
+
+```text
+Session: 20261010T141502, log /Users/you/.local/share/runsheets/runs/sessions/20261010T141502/session.log
 ```
 
 Authoring warnings are printed to stderr before the banner, prefixed
 `runsheets: warning:`. The server still starts; warnings mark blocks and
 steps in the page but do not block serving.
 
-Puma then prints its own startup lines. Press ++ctrl+c++ to stop. Any block
-still executing when the server stops is not killed by runsheets; its
-process group outlives the server. Finish or abandon the run first if you
-want a clean record.
+Puma then prints its own startup lines. From then on, unless `--quiet` is
+given, the session log is echoed to the terminal as it is written. Press
+++ctrl+c++ to end the session and stop; see [Stopping](#stopping).
 
 ## Exit status
 
@@ -98,7 +118,9 @@ want a clean record.
 ## Settings
 
 Every option is a setting with the same name (`port`, `bind`, `runs_dir`,
-`open`, `check`, `init`, `dump`), and the `RUNBOOK` argument is the setting `dir`.
+`open`, `check`, `init`, `dump`, `engineer`, `why`, `log_level`, `quiet`),
+and the `RUNBOOK` argument is the setting `dir`. `--verbose` sets
+`log_level` to `debug`.
 Settings are layered with [myway_config](https://github.com/madbomber/myway_config);
 each layer overrides the one below it, and anything a layer leaves out
 comes from further down:
@@ -106,7 +128,8 @@ comes from further down:
 1. **Command line.** Whatever is given wins outright.
 2. **Environment variables**, `RUNSHEETS_` plus the setting name in upper
    case: `RUNSHEETS_PORT`, `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`,
-   `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`, `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, `RUNSHEETS_DIR`.
+   `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`, `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, `RUNSHEETS_DIR`,
+   `RUNSHEETS_ENGINEER`, `RUNSHEETS_WHY`, `RUNSHEETS_LOG_LEVEL`, `RUNSHEETS_QUIET`.
 3. **The project config**, `./config/runsheets.yml` in the current directory,
    or the file `--config FILE` or `RUNSHEETS_CONFIG` names in its place. The
    project file may be absent; a file named explicitly must exist.
@@ -121,8 +144,9 @@ Config files are flat YAML, one key per setting. Paths may start with
 for `1`, `true`, `yes` or `on` (any case) and off for any other value, so
 `RUNSHEETS_OPEN=off` switches off an `open: true` in the file, and
 `--no-open` switches off either. A blank value (`RUNSHEETS_PORT=`) counts as
-unset. A port that is not a whole number, or a named config file that does
-not exist, is reported and the command exits `1`.
+unset. A port that is not a whole number, a log level that is not one of
+the five, or a named config file that does not exist, is reported and the
+command exits `1`.
 
 ```yaml
 # ~/.config/runsheets/runsheets.yml
@@ -161,7 +185,9 @@ runsheets                                                  # now serves db-refre
 
 Redirect to `config/runsheets.yml` instead for a project config to commit
 with a repository. `dump` itself is never in the output, so a saved file
-cannot make every later run print and exit.
+cannot make every later run print and exit. Nor is `why`: the reason for a
+session belongs to that session, not to every later one. `engineer` is
+saved.
 
 ## About `--bind`
 
@@ -175,12 +201,52 @@ bind address is not loopback. A wildcard address (`0.0.0.0` or `::`)
 answers on every interface, so the `Host` check is turned off for it; a
 specific address accepts requests for itself and the loopback names.
 
+## The session
+
+Everything from start to stop is one session, belonging to one engineer
+and opened with a note saying why (see
+[Sessions, Runs and Runsheets](../concepts/runs.md)). The engineer and the
+reason come from `--engineer` and `--why`, `RUNSHEETS_ENGINEER` and
+`RUNSHEETS_WHY`, or `engineer:` and `why:` in a config file. With both
+set, the session starts as the server does. Otherwise the browser opens on
+a start page that asks for them, with the name pre-filled from the
+configured engineer, else `git config user.name`, else `$USER`. The name
+is taken as given; nothing authenticates it.
+
+At start, any earlier session in the same runs directory that is still
+marked running but whose process is gone is closed as `interrupted`,
+along with its runs.
+
+## The session log
+
+Every session writes `session.log` in its directory under
+`<runs-dir>/sessions/` (see
+[The Run Record](run-record.md#the-session-log)). `log_level` sets what goes
+into it:
+
+| Level | What is logged |
+| --- | --- |
+| `debug` | Everything in the rows below, plus page views and other requests, searches, polling, runbook reloads, and the environment handed to each execution, secrets shown as `[secret]`. |
+| `info` | Every action and its output: the session starting and ending, notes, a run opened with its inputs, inputs changed, each execution with its code and output, exit 0, stop requested, stopped, step marks and terminal confirmations with their notes. The default. |
+| `warn` | Non-zero exits, timeouts, refused actions (a destructive block without its code or with the wrong one, any other action refused with 409), authoring warnings when a run opens, and an earlier session found interrupted. |
+| `error` | An execution that cannot start, a runbook that no longer loads, an exception in the server. |
+
+`fatal` is accepted too; runsheets writes nothing at that level, so it
+leaves the file empty.
+
+The log is echoed to the terminal that started `runsheets`, at `info`
+whatever the file's level, unless `--quiet`, `RUNSHEETS_QUIET` or
+`quiet: true` turns the echo off. Secret values never reach the log.
+
 ## Stopping
 
-Ctrl-C stops the server. If a run is active it is ended as `abandoned`,
-anything it left running (a `background` block, a block that was still
-going) is stopped, and the run record is written, so nothing outlives the
-tool and no record is left saying `running`.
+Ctrl-C ends the session and stops the server, exactly like **End session**
+on the session page. Every run is closed with a status worked out from what
+was done (`completed`, `partial` or `opened`), anything still running in
+any runbook (a `background` block, a block that was still going) is
+stopped, and the records are written, so nothing outlives the tool and no
+record is left saying `running`. If the process is killed instead, the
+next start closes its session as `interrupted`.
 
 ## Running from a checkout
 

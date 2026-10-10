@@ -105,10 +105,10 @@ cwd: .                   # working directory, relative to the runbook
 - **`manual`**: no executable blocks are expected. The body is an
   instruction. The step is complete when the operator marks it done,
   optionally with a note.
-- **`verify`**: a read-only check. Runs in its place during the procedure
-  and also standalone: a verification run started from the landing page
-  executes only verify steps and `verify.md`, and the **Checks** page shows
-  them all together with a **Run all** button.
+- **`verify`**: a read-only check. Runs in its place during the procedure,
+  and the **Checks** page shows every verify step and `verify.md` together
+  with a **Run all** button that runs them on their own, inside the
+  runbook's run.
 
 `verify.md` and `rollback.md` take the same keys. `verify.md` is usually
 `kind: verify`.

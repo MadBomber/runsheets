@@ -4,9 +4,8 @@ kind: verify
 ---
 
 A `verify` step is a read-only check. It runs in its place during the
-procedure, and it also runs on its own: the landing page's **Verify** panel
-starts a verification run that executes only verify steps and `verify.md`,
-and records it like any other run.
+procedure, and it also appears on the **Checks** page with every other
+check, where **Run all** runs them one after another inside the run.
 
 ```bash run
 echo "Hello, $NAME!" | grep -q "Hello, $NAME!" && echo "greeting looks right"

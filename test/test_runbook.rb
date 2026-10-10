@@ -115,6 +115,32 @@ class TestRunbook < Minitest::Test
     end
   end
 
+  def test_plain_document_is_markdown_outside_any_runbook
+    Dir.mktmpdir do |lib|
+      files = {
+        "notes.md" => "# Notes\n",
+        "guides/setup.md" => "# Setup\n",
+        "deploy.md" => "---\ntitle: Deploy\n---\n## Go\n",
+        "backup/runbook.md" => "---\ntitle: Backup\n---\n",
+        "backup/steps/010-dump.md" => "Dump it.\n",
+        "backup/extra.md" => "# Extra\n"
+      }
+      files.each do |rel, text|
+        FileUtils.mkdir_p(File.dirname(File.join(lib, rel)))
+        File.write(File.join(lib, rel), text)
+      end
+      plain = ->(rel) { Runsheets::Runbook.plain_document?(File.join(lib, rel), lib) }
+      assert plain.call("notes.md")
+      assert plain.call("guides/setup.md")
+      refute plain.call("deploy.md"), "a single-file runbook"
+      refute plain.call("backup/runbook.md")
+      refute plain.call("backup/steps/010-dump.md"), "a step of a runbook directory"
+      refute plain.call("backup/extra.md"), "inside a runbook directory"
+      refute plain.call("missing.md")
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "notes.md"), File.join(lib, "guides")), "outside the root"
+    end
+  end
+
   def test_document_at_finds_the_document_read_from_a_file
     with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a", "notes.md" => "n") do |rb|
       assert_equal rb.landing, rb.document_at(File.join(rb.dir, "runbook.md"))

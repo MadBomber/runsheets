@@ -36,11 +36,15 @@ detectors:
     max_calls: 3
 
   # Execution.new takes one keyword per field it records. Pages.layout takes
-  # the page frame (title, body, kind, step) plus the CSP nonce.
+  # the page frame (title, body, kind, step) plus the CSP nonce. Session.new
+  # takes who and why, where records go, what is served, the token, the
+  # executor and the log settings, each a keyword with a default but who and
+  # why, so tests can replace any one of them.
   LongParameterList:
     max_params: 5
     exclude:
       - "Runsheets::Pages#self.layout"
+      - "Runsheets::Session#initialize"
 
   # Data-holding classes: Execution tracks state, pid, timing and files.
   TooManyInstanceVariables:

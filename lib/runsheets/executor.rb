@@ -20,7 +20,9 @@ module Runsheets
     end
 
     # Write +code+ to the execution's cmd file and start it. Returns the
-    # execution, now running (or failed if it could not start).
+    # execution, now running (or failed if it could not start). The
+    # execution's tee, when it has one, also receives the redacted output as
+    # it arrives and is closed at the end of the stream.
     def start(execution, code:, env: {}, cwd: nil, redactor: nil)
       File.write(execution.cmd_path, code)
       log            = File.open(execution.log_path, "wb") # rubocop:disable Style/FileOpen -- closed by the pump thread
@@ -32,13 +34,14 @@ module Runsheets
         in: File::NULL, out: writer, err: writer
       )
       writer.close
-      pump = Thread.new { pump(reader, log, redactor || Redactor.new({})) }
+      pump = Thread.new { pump(reader, log, redactor || Redactor.new({}), execution.tee) }
       execution.started!(pid, at: clock.now)
       execution.attach(Thread.new { reap(execution, pid, pump) })
     rescue SystemCallError => e
       writer&.close
       reader&.close
       log&.close
+      execution.tee&.close
       execution.failed!("#{e.class}: #{e.message}", at: clock.now)
     end
 
@@ -54,17 +57,22 @@ module Runsheets
 
     # Copy the child's output into the log, redacting as it goes. Runs until
     # every holder of the pipe's write end has closed it.
-    def pump(io, log, redactor)
+    def pump(io, log, redactor, tee = nil)
       while (chunk = io.readpartial(CHUNK))
-        log.write(redactor.feed(chunk))
+        safe = redactor.feed(chunk)
+        log.write(safe)
         log.flush
+        tee&.write(safe)
       end
     rescue IOError
       nil
     ensure
-      log.write(redactor.flush)
+      rest = redactor.flush
+      log.write(rest)
       log.close
       io.close
+      tee&.write(rest)
+      tee&.close
     end
 
     private

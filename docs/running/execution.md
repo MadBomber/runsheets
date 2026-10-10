@@ -27,7 +27,11 @@ is on the [roadmap](../roadmap.md).
 
 The child process receives, in this order of precedence:
 
-1. The `RUNSHEETS_*` variables identifying the run, step and block.
+1. The `RUNSHEETS_*` variables identifying the session, run, runbook, step
+   and block: `RUNSHEETS_SESSION_ID`, `RUNSHEETS_RUN_ID`,
+   `RUNSHEETS_RUN_DIR`, `RUNSHEETS_RUNBOOK`, `RUNSHEETS_STEP` and
+   `RUNSHEETS_BLOCK` (see
+   [Inputs and Secrets](../runbooks/inputs.md#variables-runsheets-sets)).
 2. The run's inputs, secrets included.
 3. The full environment of the `runsheets` process.
 
@@ -46,7 +50,10 @@ Standard output and standard error both go to one pipe, interleaved in the
 order the process wrote them. A thread in the `runsheets` process reads the
 pipe, passes each chunk through the run's redactor (see
 [Inputs and Secrets](../runbooks/inputs.md#redaction)), and appends it to
-the execution's `.out` file, flushing after every chunk. The page polls the
+the execution's `.out` file, flushing after every chunk. The same redacted
+output goes to the session log, one line at a time, each marked `>` and
+tagged with the execution id (see
+[The session log](run-record.md#the-session-log)). The page polls the
 tail of that file every half second while the process runs, so a command
 that prints progress is seen printing it. Up to 256 KB of the tail is shown
 in the page, with a marker when there is more; the file holds everything.
@@ -76,8 +83,7 @@ The execution is recorded with state `timed_out`. Its `exit_status` is
 report, and `signal` holds the raw number.
 
 The process group is created with `pgroup: true` at spawn, so the killing
-cannot reach anything the operator's shell started. Stopping the `runsheets`
-server itself does not kill running blocks; finish the run first.
+cannot reach anything the operator's shell started.
 
 ## Stopping
 
@@ -87,9 +93,12 @@ A running execution can be stopped by the operator: the Stop button on a
 the execution is recorded with state `stopped`. Stopping is not a failure:
 the block's border turns amber, not red, and the step is not marked failed.
 
-Finishing or abandoning the run stops everything still running first and
-waits up to three seconds for the process groups to go away before the
-record is closed.
+Switching to another runbook stops nothing: a block keeps running, and
+the Running panel in the sidebar lists it on every page with its runbook's
+slug, so it can be stopped from anywhere. Ending the session, with **End
+session** or Ctrl-C, stops everything still running in every runbook and
+waits up to three seconds for the process groups to go away before each
+run is closed.
 
 ## States and verdicts
 
@@ -103,7 +112,7 @@ record is closed.
 | `running` | The process is alive. | `null` |
 | `finished` | The process exited on its own. | its exit code, or `128 + signal` if a signal from elsewhere ended it |
 | `timed_out` | runsheets killed it when the step's timeout expired. | `128 + signal` |
-| `stopped` | The operator stopped it, or the run ended while it was running. | `128 + signal` |
+| `stopped` | The operator stopped it, or the session ended while it was running. | `128 + signal` |
 | `failed` | It could not be spawned (interpreter not found, permission denied). `error` holds the message. | `null` |
 
 An execution is a **success** only when its state is `finished` and its

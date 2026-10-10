@@ -56,6 +56,19 @@ module Runsheets
       false
     end
 
+    # Is +path+ a plain document under +root+: an existing markdown file
+    # that is not a runbook and not one of a runbook directory's files
+    # (no runbook.md in its directory or any directory above it, up to
+    # +root+)?
+    def self.plain_document?(path, root)
+      path = File.expand_path(path)
+      root = File.expand_path(root)
+      return false unless File.file?(path) && path.start_with?("#{root}/") && !runbook_file?(path)
+
+      dirs = Pathname(File.dirname(path)).ascend.take_while { it.to_s.start_with?(root) }
+      dirs.none? { File.file?(it.join(MAIN_FILE)) }
+    end
+
     # A runbook starts with YAML front matter that has a title; anything
     # else is a plain document. Front matter that does not parse counts as
     # a runbook: it was meant to be one, and loading it reports why not.
@@ -105,8 +118,8 @@ module Runsheets
 
     def destructive? = !blast_radius.nil? || steps.any?(&:destructive?)
 
-    # The documents a verification run may execute: verify-kind steps in
-    # order, then verify.md.
+    # The checks the Checks page gathers: verify-kind steps in order, then
+    # verify.md.
     def verify_documents = [*steps.select(&:verify?), verify].compact
 
     def verify_document?(step) = verify_documents.include?(step)

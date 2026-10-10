@@ -7,8 +7,8 @@ loopback.
 
 ## Authentication
 
-Every non-GET request must carry the session token, which is generated when
-the server starts and embedded in every page:
+Every non-GET request must carry the token, which is generated when the
+server starts and embedded in every page, the start page included:
 
 ```html
 <meta name="rs-token" content="492a33d8abd63f00ff946cd79bbb2255">
@@ -28,8 +28,27 @@ to that response; the page's own inline script and stylesheet carry it.
 
 ```bash
 B=http://127.0.0.1:4567
-TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
+TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*//p')
 ```
+
+`/session/new` is the one page that answers before the session has
+started; once it has, the page redirects to `/session`, which carries the
+same token, hence `-L`.
+
+## The session
+
+Until the session has started, every `GET` (other than `/session/new`)
+redirects to `/session/new` with **302**, and every other request with a
+valid token gets **409**. After it has ended, every request but
+`GET /session` gets **410**.
+
+| Method and path | Returns |
+| --- | --- |
+| `GET /session/new` | The start page: who is starting the session, and why. Once the session has started, a **302** to `/session`. |
+| `POST /session` | Starts the session. Form fields: `_token`, `engineer`, `why`; `why` becomes the first note. Responds **303** to `/library` (or `/` for one runbook); **422** with the start page and a message if either is blank; **303** to `/session` if a session has already started. |
+| `GET /session` | The session page: engineer, host, start time, notes, runs, the end panel and the last 200 lines of `session.log`. |
+| `POST /session/notes` | Adds a timestamped note. Form fields: `_token`, `note`. Responds **303** to `/session#notes`; **409** for a blank note. |
+| `POST /session/end` | Ends the session: every run is closed with its derived status, anything running is stopped, and the server stops half a second later. Responds **200** with the Session ended page. |
 
 ## Pages
 
@@ -38,58 +57,64 @@ TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
 | `GET /` | The landing page. |
 | `GET /steps/:slug` | A step page. `verify` and `rollback` are slugs too. 404 for an unknown slug. |
 | `GET /verify` | The Checks page: every verify step and `verify.md`. 404 if the runbook has none. |
-| `GET /run` | The active run's transcript, or the most recent run's, with the drift panel for a finished run. 404 if there has never been a run. |
-| `GET /runs/:id` | A previous run's transcript. The id must match `[\w.-]+`. |
+| `GET /run` | The transcript of the open run of the runbook on screen, or of its most recent run, with the drift panel for a closed run. 404 if the runbook has never had a run. |
+| `GET /runs/:id` | A transcript of the runbook on screen, by run id. The id must match `[\w.-]+`. |
 | `GET /files/*path` | A regular, non-hidden file under the directory runsheets was started on, with its content type. 404 otherwise. |
-| `GET /docs/*path` | A markdown file under that directory, rendered as a page with nothing executable. One of the open runbook's own files redirects to its page; another runbook in the library redirects to its library page. 404 for anything that is not a `.md` file. |
-| `GET /search?q=` | Full-text search over every runbook in the library (or the one runbook), best first. Works before a runbook is open. An empty `q` shows the search form. |
+| `GET /docs/*path` | A markdown file under that directory, rendered as a page with nothing executable. One of the own files of the runbook on screen redirects to its page; another runbook in the library redirects to its library page. 404 for anything that is not a `.md` file. |
+| `GET /search?q=` | Full-text search over every runbook in the library (or the one runbook), best first. Works before a runbook is selected. An empty `q` shows the search form. |
 
 ### The library
 
 When the server was started on a directory of runbooks, these routes exist
-too; otherwise they are 404. Until a runbook is open every other page
-redirects to `/library`.
+too; otherwise they are 404. Until a runbook is selected every other page
+redirects to `/library`, except the session routes, `POST /runs`,
+`/search`, `/docs/*` and `/files/*`, which resolve against the library
+directory so the links in a runbook's library pane work before it is
+selected.
 
 | Method and path | Returns |
 | --- | --- |
 | `GET /library` | The library page: the folder tree, and the root folder in the main pane. |
 | `GET /library/*slug` | The same page with that runbook or folder selected. The slug is the path inside the library (`platform/database/backup`). 404 for an unknown one. |
-| `POST /library/open` | Opens the runbook named by the `slug` field and redirects to `/`. Needs the token. 404 for an unknown slug, 409 while a run is active. |
 
 A `GET` of a library page rescans the directory when anything in it has
 changed, so a runbook added while the server is up shows on the next visit.
 
-## Run lifecycle
+## Runs
 
-### `POST /run`
+### `POST /runs`
 
-Starts a run. Form fields: `_token`, `inputs[NAME]` for each input, and
-`kind` (`run`, the default, or `verify` for a verification run that may
-only execute verify steps and `verify.md`). Missing inputs resolve from the
-environment and defaults.
+Selects a runbook: establishes its run, or returns to the run it already
+has in this session, and puts it on screen. Form fields: `_token`,
+`slug` (the runbook's path in the library; ignored when the server was
+started on one runbook), and `inputs[NAME]` for each input. Inputs left
+out resolve from earlier in the session (non-secret only), the
+environment and the defaults. When the runbook already has a run, the
+inputs are ignored. Selecting a runbook finishes nothing; every run stays
+open until the session ends.
 
-Responds **303** to the first step (or to `/verify` for a verification),
-or **409** if a run is already active or `kind=verify` is asked of a
-runbook with no verify documents.
+Responds **303** to `/`; **404** for an unknown slug; **409** before the
+session has started.
 
 ```bash
-curl -X POST --data-urlencode "_token=$TOKEN" \
-  --data-urlencode "inputs[NAME]=smoke" $B/run
+curl -X POST --data-urlencode "_token=$TOKEN" --data-urlencode "slug=hello" \
+  --data-urlencode "inputs[NAME]=smoke" $B/runs
 ```
 
-### `POST /run/finish`
+### `POST /run/inputs`
 
-Form fields: `_token`, `status` (`completed`, default, or `abandoned`).
-Anything still running is stopped first. Responds **303** to the landing
-page; **422** for another status, checked before anything is stopped;
-**409** with no active run.
+Changes the inputs of the run of the runbook on screen. Form fields:
+`_token` and `inputs[NAME]` for each input. A secret sent empty keeps its
+current value. The change is recorded as an `inputs` event and logged.
+Responds **303** to `/`; **409** when the runbook on screen has no run.
 
 ### `POST /steps/:slug/mark`
 
 Form fields: `_token`, `status` (`done` or `skipped`), `note` (optional).
 Responds **303** to the next step or the landing page; **422** for another
 status, or for a slug that is not a numbered step (the landing page,
-`verify` and `rollback` cannot be marked); **409** with no active run.
+`verify` and `rollback` cannot be marked); **409** when the runbook on
+screen has no run.
 
 ## Execution
 
@@ -146,10 +171,9 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" -d "confirm=$CODE" $B/blocks/040-
 
 Errors are **409** with `{"error": "..."}`:
 
-- `start a run before executing blocks`
+- `start the run for <runbook title> before executing blocks`
 - `unknown block <id>`
 - `block <id> is not executable (<kind>)`
-- `a verification run only executes verify steps and verify.md; <id> is in <step>`
 - `blank input referenced by block: NAME`
 
 ### `POST /blocks/:id/acknowledge`
@@ -162,8 +186,8 @@ Form field `note` is optional. Responds **201** with the acknowledgement:
   "note": "pressed enter", "block_id": "020-inspect-ruby-3" }
 ```
 
-**409** with no active run, an unknown block, or a block that is not
-`terminal`.
+**409** when the runbook on screen has no run, for an unknown block, or for
+a block that is not `terminal`.
 
 ### `GET /executions/:id`
 
@@ -184,7 +208,8 @@ curl -s $B/executions/1b6a8f0c2d3e | jq '{state, exit_status, output}'
 Asks a running execution to stop: `TERM` to its process group, `KILL` two
 seconds later if needed. Responds **202** with the execution as it is at
 that moment (usually still `running`); poll `GET /executions/:id` until the
-state is `stopped`. Stopping an execution that has already ended is a
+state is `stopped`. Any execution in the session can be stopped, whichever
+runbook started it. Stopping an execution that has already ended is a
 no-op. **409** for an unknown id.
 
 ```bash
@@ -196,29 +221,40 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e/stop
 | Status | Meaning |
 | --- | --- |
 | 403 | Missing or invalid token on a non-GET request, or a non-loopback `Host`. |
-| 404 | Unknown step, run, execution or file. |
-| 409 | The operation is not allowed in the current run state (`Runsheets::RunError`). |
-| 422 | Invalid step or finish status, or a mark on a document that is not a numbered step. |
-| 428 | A destructive block needs its confirmation code (`Runsheets::Session::ConfirmationRequired`); the body carries `challenge`. |
-| 500 | The runbook failed to load (`Runsheets::RunbookError`). |
-| 503 | The server has no runbook configured. |
+| 404 | Unknown step, run, execution, file or runbook slug. |
+| 409 | The operation is not allowed now (`Runsheets::RunError`): no session yet, no run for the runbook on screen, a blank note. Refusals are logged at `warn`. |
+| 410 | The session has ended. Only `GET /session` still answers. |
+| 422 | A blank engineer or reason on `POST /session`, an invalid step status, or a mark on a document that is not a numbered step. |
+| 428 | A destructive block needs its confirmation code (`Runsheets::Run::ConfirmationRequired`); the body carries `challenge`. |
+| 500 | The runbook failed to load (`Runsheets::RunbookError`), or an unexpected error. |
 
 JSON error bodies are `{"error": "message"}` on `/blocks/*` and
 `/executions/*`, or when the request accepts `application/json`. Everything
 else gets an HTML error page in the normal frame.
 
-## Driving a whole run from the shell
+## Driving a whole session from the shell
+
+Against a server started on `examples/hello` without `--engineer` and
+`--why`:
 
 ```bash
 B=http://127.0.0.1:4567
-TOKEN=$(curl -s $B/ | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
+TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
+post() { curl -s -o /dev/null -X POST --data-urlencode "_token=$TOKEN" "$@"; }
 
-curl -s -o /dev/null -X POST --data-urlencode "_token=$TOKEN" --data-urlencode "inputs[NAME]=cli" $B/run
+post --data-urlencode "engineer=ci" --data-urlencode "why=smoke test" $B/session
+post --data-urlencode "inputs[NAME]=cli" $B/runs
 
 ID=$(curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute | jq -r .id)
 until [ "$(curl -s $B/executions/$ID | jq -r .state)" != running ]; do sleep 0.5; done
 curl -s $B/executions/$ID | jq -r .output
 
-curl -s -o /dev/null -X POST --data-urlencode "_token=$TOKEN" --data-urlencode "status=done" $B/steps/010-say-hello/mark
-curl -s -o /dev/null -X POST --data-urlencode "_token=$TOKEN" --data-urlencode "status=completed" $B/run/finish
+post --data-urlencode "status=done" $B/steps/010-say-hello/mark
+post --data-urlencode "note=greeting checked from the shell" $B/session/notes
+post $B/session/end
 ```
+
+On a server started on a directory of runbooks, add
+`--data-urlencode "slug=hello"` to the `POST /runs`. Ending the session
+closes the run (`partial` here, since only one step was marked) and stops
+the server.

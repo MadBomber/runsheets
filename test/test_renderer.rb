@@ -92,6 +92,18 @@ class TestRenderer < Minitest::Test
     assert_includes out, 'src="/files/steps/x.md"'
   end
 
+  def test_links_to_plain_documents_open_in_a_new_tab
+    Dir.mktmpdir do |root|
+      File.write(File.join(root, "notes.md"), "# Notes\n")
+      File.write(File.join(root, "deploy.md"), "---\ntitle: Deploy\n---\n")
+      html = '<a href="/docs/notes.md#part">n</a><a href="/docs/deploy.md">d</a><a href="/files/x.svg">x</a>'
+      out  = Renderer.open_documents_in_new_tab(html, root)
+      assert_includes out, '<a href="/docs/notes.md#part" target="_blank" rel="noopener">'
+      assert_includes out, '<a href="/docs/deploy.md">', "a runbook stays in the tab"
+      assert_includes out, '<a href="/files/x.svg">'
+    end
+  end
+
   def test_relative_url_escaping_root_is_left_alone
     out = Renderer.rewrite_relative_urls('<img src="../../etc/passwd">', "steps")
     assert_includes out, 'src="../../etc/passwd"'

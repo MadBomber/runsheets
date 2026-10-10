@@ -77,9 +77,9 @@ they are listed in the sidebar under **Also** and are served at
 `/steps/verify` and `/steps/rollback`.
 
 `verify.md` holds whole-procedure checks. Its executable blocks run like any
-other during a run, and a **verification run** started from the landing
-page executes only `verify.md` and verify-kind steps, all gathered on the
-**Checks** page.
+other during a run, and the **Checks** page gathers `verify.md` and the
+verify-kind steps on one page, with a **Run all** button that runs just
+those checks inside the runbook's run.
 
 `rollback.md` additionally renders inside a collapsible **Rollback** panel in
 the sidebar of every step page, so it is one click away when something goes
@@ -105,8 +105,8 @@ with `.`) are never served, which keeps `.git` and `.env` out of reach.
 A link to a markdown file is the exception. It goes to `/docs/`, which
 renders the file as a page: a link to one of the runbook's own files (a
 step, `verify.md`, `rollback.md`, `runbook.md`) opens that step's page, and
-any other markdown file is shown as a plain document with nothing
-executable. See [Runbooks and documents](../concepts/runbooks.md#plain-documents).
+any other markdown file is shown, in a new tab, as a plain document with
+nothing executable. See [Runbooks and documents](../concepts/runbooks.md#plain-documents).
 
 ## Single-file runbooks
 

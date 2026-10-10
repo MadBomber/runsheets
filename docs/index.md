@@ -4,7 +4,8 @@
 page where the steps read like a doc site, the commands the author marked as
 runnable get a Run button, and everything that happens during a run is
 recorded: the exact command, its output, exit status, timing, and the
-operator's acknowledgements of the manual steps.
+operator's acknowledgements of the manual steps. Everything between starting
+and stopping `runsheets` is one session, with a log written as it happens.
 
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
@@ -24,7 +25,8 @@ runsheets closes that gap:
 
 - The runbook renders as HTML, so it reads as well as any doc site.
 - Fenced blocks the author marks as executable get a Run button.
-- Every execution and its output is captured, in order, into a run record.
+- Every execution and its output is captured, in order, into a run record,
+  and every action into the session log.
 - Manual steps are acknowledged by the operator and that acknowledgement is
   recorded.
 - The record lives outside the runbook, so captured output never lands next
@@ -51,9 +53,10 @@ runsheets --open runsheets/examples/db-maintenance.md  # a single all-in-one fil
 runsheets --open runsheets/examples                    # or choose from all of them
 ```
 
-The example runbook is safe to run end to end. Start a run from the landing
-page, click Run on the first step, mark it done, and look at the run record
-that appears under `~/.local/share/runsheets/runs/hello/`.
+The example runbook is safe to run end to end. Say who you are and why on
+the start page, click Start run, click Run on the first step, mark it done,
+and look at the run record that appears under
+`~/.local/share/runsheets/runs/hello/`.
 
 ## Where to go next
 
@@ -61,7 +64,7 @@ that appears under `~/.local/share/runsheets/runs/hello/`.
 
 - **[Getting Started](getting-started.md)**
 
-    Install, run the example, and walk through a complete run.
+    Install, run the examples, and walk through a complete session.
 
 - **[Writing Runbooks](runbooks/index.md)**
 
@@ -70,8 +73,8 @@ that appears under `~/.local/share/runsheets/runs/hello/`.
 
 - **[Running](running/index.md)**
 
-    The command line, the web page, the execution model, and what the run
-    record contains.
+    The command line, the web page, the execution model, and what the
+    session and run records contain.
 
 - **[Reference](reference/security.md)**
 
@@ -81,10 +84,11 @@ that appears under `~/.local/share/runsheets/runs/hello/`.
 
 ## Status
 
-All four milestones of the [roadmap](roadmap.md) are built: rendering,
+All five milestones of the [roadmap](roadmap.md) are built: rendering,
 executing `bash`, `ruby` and any mapped language such as `sql`, background
 processes with Start and Stop, destructive confirmation, terminal and
-manual acknowledgements, expected-output panels, secret redaction,
-standalone verification runs, run history with drift, single-file
-runbooks, a scaffold command, and two realistic sample runbooks. The block
+manual acknowledgements, expected-output panels, secret redaction, a
+Checks page, run history with drift, single-file runbooks, a scaffold
+command, realistic sample runbooks, and sessions: one engineer, a reason,
+notes, many runbooks, and a log of everything. The block
 convention is settled unless real use argues otherwise.

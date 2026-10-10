@@ -36,8 +36,8 @@ module Runsheets
           browser. Without one, the bundled example is served:
           #{DEFAULT_RUNBOOK}
           Fenced blocks marked `bash run`, `ruby run`, `bash destructive`
-          or `bash background` get buttons; every execution is recorded under
-          #{defaults[:runs_dir]}
+          or `bash background` get buttons. Everything from start to Ctrl-C is
+          one session, recorded with its log under #{defaults[:runs_dir]}
 
           Settings are layered: the user config #{Config.xdg_path},
           then ./config/runsheets.yml (or the file --config names), then the
@@ -49,14 +49,8 @@ module Runsheets
           Options:
         BANNER
 
-        opts.on("-c", "--config FILE", "Config file to read in place of ./config/runsheets.yml [RUNSHEETS_CONFIG]") { options[:config] = it }
-        opts.on("-p", "--port PORT", Integer, "Port to listen on (default: #{defaults[:port]}) [RUNSHEETS_PORT]") { options[:port] = it }
-        opts.on("-b", "--bind HOST", "Address to bind to (default: #{defaults[:bind]}) [RUNSHEETS_BIND]") { options[:bind] = it }
-        opts.on("--runs-dir DIR", "Where run records are written (default: #{defaults[:runs_dir]}) [RUNSHEETS_RUNS_DIR]") { options[:runs_dir] = it }
-        opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
-        opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
-        opts.on("--[no-]init", "Create a new runbook skeleton at RUNBOOK (a directory, or a .md file) and exit [RUNSHEETS_INIT]") { options[:init] = it }
-        opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
+        server_options(opts, options, defaults)
+        session_flags(opts, options, defaults)
         opts.on("-v", "--version", "Print the version and exit") do
           out.puts "#{PROGRAM} #{VERSION}"
           return nil
@@ -72,6 +66,28 @@ module Runsheets
 
       options[:dir] = rest.first if rest.first
       options
+    end
+
+    # The options about serving: config file, port, bind, records, and the
+    # one-shot actions.
+    def self.server_options(opts, options, defaults)
+      opts.on("-c", "--config FILE", "Config file to read in place of ./config/runsheets.yml [RUNSHEETS_CONFIG]") { options[:config] = it }
+      opts.on("-p", "--port PORT", Integer, "Port to listen on (default: #{defaults[:port]}) [RUNSHEETS_PORT]") { options[:port] = it }
+      opts.on("-b", "--bind HOST", "Address to bind to (default: #{defaults[:bind]}) [RUNSHEETS_BIND]") { options[:bind] = it }
+      opts.on("--runs-dir DIR", "Where run records are written (default: #{defaults[:runs_dir]}) [RUNSHEETS_RUNS_DIR]") { options[:runs_dir] = it }
+      opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
+      opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
+      opts.on("--[no-]init", "Create a new runbook skeleton at RUNBOOK (a directory, or a .md file) and exit [RUNSHEETS_INIT]") { options[:init] = it }
+      opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
+    end
+
+    # The options about the session: who, why, and its log.
+    def self.session_flags(opts, options, defaults)
+      opts.on("-e", "--engineer NAME", "Who is starting the session (default: ask) [RUNSHEETS_ENGINEER]") { options[:engineer] = it }
+      opts.on("-w", "--why TEXT", "Why: the session's first note; with --engineer, skips the start page [RUNSHEETS_WHY]") { options[:why] = it }
+      opts.on("--log-level LEVEL", SessionLog::LEVELS, "Session log level: #{SessionLog::LEVELS.join(', ')} (default: #{defaults[:log_level]}) [RUNSHEETS_LOG_LEVEL]") { options[:log_level] = it }
+      opts.on("--verbose", "Log page views, searches and polling too (--log-level debug)") { options[:log_level] = "debug" }
+      opts.on("-q", "--[no-]quiet", "Do not echo the session log to the terminal [RUNSHEETS_QUIET]") { options[:quiet] = it }
     end
 
     # Build the effective settings from parsed options and install them as
@@ -143,13 +159,18 @@ module Runsheets
       nil
     end
 
-    # Serve a runbook, or a library of them (the operator chooses in the browser).
+    # Serve a runbook, or a library of them (the operator chooses in the
+    # browser). Everything until the server stops is one session; it starts
+    # now when the engineer and why are known, else on the browser's start
+    # page.
     def self.serve(target, config, out: $stdout, err: $stderr)
-      bind = config.bind
-      port = config.port
+      bind    = config.bind
+      port    = config.port
       library = target.is_a?(Library) ? target : nil
-      session = library ? nil : Session.new(runbook: target)
-      Web.configure_for(session, bind:, port:, library:)
+      runbook = library ? nil : target
+      options = session_options(config, out:)
+      session = (Session.new(engineer: config.engineer, why: config.why, library:, runbook:, **options) if config.engineer && config.why)
+      Web.configure_for(session, bind:, port:, library:, runbook:).prepare_start(session_options: options, engineer: default_engineer(config))
       url = "http://#{bind}:#{port}/"
       err.puts bind_warning(bind) unless Web.loopback?(bind)
 
@@ -158,15 +179,30 @@ module Runsheets
         #{target_line(target)}
         Runs:    #{Runsheets.runs_dir}
         Config:  #{config.files.empty? ? 'none (defaults)' : config.files.join(', ')}
+        Session: #{session ? "#{session.id}, log #{session.log.path}" : 'starts in the browser (who and why)'}
         Open #{url} in your browser
-        Press Ctrl-C to stop
+        Press Ctrl-C to end the session and stop
       INFO
 
       Web.run! do
         open_browser(url) if config.open
       end
     ensure
-      shutdown(Web.session, out:) if Web.session
+      shutdown(Web.session) if Web.session
+    end
+
+    # What every session this process starts is built with: where records
+    # go, the log level, and the terminal echo (none with --quiet).
+    def self.session_options(config, out: $stdout) = { runs_root: Runsheets.runs_dir, log_level: config.log_level, echo: config.quiet ? nil : out }
+
+    # Who the start page suggests: the configured engineer, else git's
+    # user.name, else the login name.
+    def self.default_engineer(config) = [config.engineer, git_user_name, ENV["USER"]].find { !it.to_s.strip.empty? }
+
+    def self.git_user_name
+      IO.popen(%w[git config user.name], err: File::NULL, &:read).strip
+    rescue SystemCallError
+      nil
     end
 
     def self.target_line(target)
@@ -179,16 +215,10 @@ module Runsheets
       end
     end
 
-    # When the server stops (Ctrl-C, or an error), end the active run as
-    # abandoned so nothing it started is left running and its record does
-    # not stay "running" forever.
-    def self.shutdown(session, out: $stdout)
-      return unless session.active?
-
-      run = session.run
-      session.abandon_if_active
-      out.puts "#{PROGRAM}: abandoned run #{run.id}; stopped what it left running"
-    end
+    # When the server stops (Ctrl-C, End session, or an error), end the
+    # session: every run is closed with the status its work earns and
+    # nothing it started is left running. Ending twice does nothing.
+    def self.shutdown(session) = session.end!("runsheets stopped")
 
     def self.bind_warning(bind)
       <<~WARN.chomp

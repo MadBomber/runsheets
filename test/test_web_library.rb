@@ -13,15 +13,23 @@ class TestWebLibrary < Minitest::Test
 
   def setup
     @runs_root = Dir.mktmpdir("runsheets-web")
-    Runsheets.runs_dir = @runs_root # sessions opened from the library default to this
+    Runsheets.runs_dir = @runs_root
     @library = Runsheets::Library.load(EXAMPLES)
-    Runsheets::Web.configure_for(nil, library: @library)
-    Runsheets::Web.set :rs_token, "tok"
+    serve_library
+    Runsheets::Web.start_session(engineer: "Tester", why: "testing")
     header "Host", "localhost"
   end
 
+  # The library served with no session yet, the token "tok".
+  def serve_library
+    Runsheets::Web.configure_for(nil, library: @library).prepare_start(session_options: { runs_root: @runs_root, echo: nil }, engineer: "Prefilled")
+    Runsheets::Web.set :rs_token, "tok"
+    Runsheets::Web.set :rs_stopper, StopCounter.new(0)
+  end
+
   def teardown
-    Runsheets::Web.configure_for(Runsheets::Session.new(runbook: example_runbook, runs_root: @runs_root, token: "tok"))
+    Runsheets::Web.session&.end!("teardown")
+    Runsheets::Web.set :rs_stopper, nil
     Runsheets.runs_dir = nil
     FileUtils.rm_rf(@runs_root)
   end
@@ -30,7 +38,26 @@ class TestWebLibrary < Minitest::Test
 
   def with_token = header("X-Runsheets-Token", "tok")
 
-  def open_runbook(slug) = post("/library/open", "_token" => "tok", "slug" => slug)
+  def open_runbook(slug, inputs: {}) = post("/runs", "_token" => "tok", "slug" => slug, "inputs" => inputs)
+
+  def test_before_the_session_starts_everything_goes_to_the_start_page
+    Runsheets::Web.session.end!("restart")
+    serve_library
+    get "/library"
+    assert_match %r{/session/new\z}, last_response.location
+    get "/session/new"
+    assert last_response.ok?
+    assert_includes last_response.body, 'value="Prefilled"', "the engineer is prefilled"
+    post "/runs", "_token" => "tok", "slug" => "hello"
+    assert_equal 409, last_response.status
+
+    post "/session", "_token" => "tok", "engineer" => "Ada", "why" => "nightly checks"
+    assert_match %r{/library\z}, last_response.location
+    assert_equal "Ada", Runsheets::Web.session.engineer
+    assert_equal "nightly checks", Runsheets::Web.session.why
+    get "/session/new"
+    assert_match %r{/session\z}, last_response.location, "one session per process"
+  end
 
   def test_the_home_page_shows_the_tree_and_the_root_folder_with_nothing_open_yet
     get "/library"
@@ -40,10 +67,9 @@ class TestWebLibrary < Minitest::Test
     assert_includes body, 'href="/library/hello"'
     assert_includes body, "Monthly PostgreSQL maintenance"
     assert_includes body, "4 runbooks"
-    assert_includes body, "no runbook open"
+    assert_includes body, ">Tester · ", "the session in the header"
     assert_includes body, 'id="lib-filter"'
-    assert_includes body, 'name="slug" value="hello"'
-    assert_equal 4, body.scan(" Open</button>").size, "a card per runbook, each with Open"
+    assert_equal 4, body.scan(" Open</a>").size, "a card per runbook, each leading to its pane and inputs"
     refute_includes body, 'data-key="o"', "the o key belongs to the detail pane, not a card"
     assert_includes last_response.headers["Content-Security-Policy"], "nonce-"
   end
@@ -59,11 +85,13 @@ class TestWebLibrary < Minitest::Test
     assert_includes body, "$NAME"
     assert_includes body, "Say hello"
     assert_includes body, 'data-key="o"'
-    assert_equal 1, body.scan(" Open</button>").size
+    assert_equal 1, body.scan(" Start run</button>").size
+    assert_includes body, 'name="inputs[NAME]"', "the pane carries the inputs form"
+    assert_includes body, 'name="slug" value="hello"'
     assert_includes body, '<span class="current">Hello, runsheets</span>'
   end
 
-  def test_everything_else_redirects_to_the_library_until_a_runbook_is_open
+  def test_runbook_pages_redirect_to_the_library_until_a_runbook_is_open
     get "/"
     assert_equal 302, last_response.status
     assert_match %r{/library\z}, last_response.headers["Location"]
@@ -88,7 +116,7 @@ class TestWebLibrary < Minitest::Test
     get "/library"
     assert_includes last_response.body, "Continue"
     assert_includes last_response.body, "Back to runbook"
-    assert_equal 3, last_response.body.scan(" Open</button>").size
+    assert_equal 3, last_response.body.scan(" Open</a>").size
     get "/library/hello"
     assert_includes last_response.body, ">open now<"
     assert_includes last_response.body, 'class="tree-runbook current active'
@@ -155,50 +183,81 @@ class TestWebLibrary < Minitest::Test
     assert_includes last_response.body, "&lt;script&gt;"
   end
 
+  def test_links_in_the_library_pane_work_before_a_runbook_is_open
+    get "/library/disk-space-triage"
+    assert_includes last_response.body, %(href="/docs/disk-usage-glossary.md")
+
+    get "/docs/disk-usage-glossary.md"
+    assert last_response.ok?, "no redirect to the library"
+    body = last_response.body
+    assert_includes body, "<title>Disk usage glossary · runsheets</title>"
+    assert_includes body, %(id="lib-tree-nav"), "shown beside the tree"
+    assert_includes body, %(href="/docs/policies/cleanup-policy.md")
+
+    get "/docs/policies/cleanup-policy.md"
+    assert last_response.ok?
+    get "/files/policies/images/triage-flow.svg"
+    assert last_response.ok?
+
+    get "/docs/disk-space-triage.md"
+    assert_match %r{/library/disk-space-triage\z}, last_response.location, "a runbook opens in the library"
+    get "/docs/missing.md"
+    assert_equal 404, last_response.status
+    get "/steps/010-say-hello"
+    assert_match %r{/library\z}, last_response.location, "runbook pages still need an open runbook"
+  end
+
+  def test_document_links_open_in_a_new_tab_and_runbook_links_do_not
+    get "/library/disk-space-triage"
+    assert_includes last_response.body, '<a href="/docs/disk-usage-glossary.md" target="_blank" rel="noopener">'
+
+    get "/docs/about-the-examples.md"
+    assert_includes last_response.body, '<a href="/docs/disk-space-triage.md">', "a runbook link stays in the tab"
+    assert_includes last_response.body, '<a href="/docs/disk-usage-glossary.md">', "inside a document tab, documents stay in that tab"
+  end
+
   def test_plain_documents_stay_out_of_the_tree
     get "/library"
     %w[about-the-examples disk-usage-glossary policies].each { refute_includes last_response.body, "data-slug=\"#{it}\"" }
   end
 
-  def test_switching_runbooks_and_single_file_runbooks_open_too
-    open_runbook("hello")
+  def test_switching_keeps_the_earlier_run_open_and_returning_finds_it
+    open_runbook("hello", inputs: { "NAME" => "first" })
     open_runbook("db-maintenance")
     get "/"
     assert last_response.ok?
     assert_includes last_response.body, "Monthly PostgreSQL maintenance"
-    assert Runsheets::Web.session.runbook.single_file?
+    session = Runsheets::Web.session
+    assert session.runbook.single_file?
+    assert session.run_for("hello").open?, "switching finishes nothing"
+
+    get "/library/hello"
+    assert_includes last_response.body, ">run open<"
+    assert_includes last_response.body, "Return to its run"
+    open_runbook("hello")
+    assert_equal "hello", session.runbook.slug
+    assert_equal "first", session.current.inputs["NAME"], "the same run"
+    assert_equal 2, session.runs.size
   end
 
   def test_opening_needs_the_token_and_a_known_slug
-    post "/library/open", "slug" => "hello"
+    post "/runs", "slug" => "hello"
     assert_equal 403, last_response.status
-    assert_nil Runsheets::Web.session
     open_runbook("nope")
     assert_equal 404, last_response.status
-    assert_nil Runsheets::Web.session
+    assert_empty Runsheets::Web.session.runs
   end
 
-  def test_switching_is_refused_while_a_run_is_active
-    open_runbook("hello")
-    with_token
-    post "/run", "_token" => "tok"
-    assert_equal 302, last_response.status
-    assert Runsheets::Web.session.active?
-
-    open_runbook("db-maintenance")
-    assert_equal 409, last_response.status
-    assert_equal "hello", Runsheets::Web.session.runbook.slug
-
-    get "/library/db-maintenance"
-    assert_includes last_response.body, "Finish or abandon it"
-    assert_includes last_response.body, "Finish the active run first"
-    assert_equal 0, last_response.body.scan(" Open</button>").size
-  ensure
-    Runsheets::Web.session&.abandon_if_active
+  def test_the_session_page_sits_beside_the_tree_before_a_runbook_is_open
+    get "/session"
+    assert last_response.ok?
+    assert_includes last_response.body, 'id="lib-tree-nav"'
+    assert_includes last_response.body, "No runbook selected yet"
   end
 
   def test_the_library_is_404_when_serving_one_runbook
-    Runsheets::Web.configure_for(Runsheets::Session.new(runbook: example_runbook, runs_root: @runs_root, token: "tok"))
+    Runsheets::Web.session.end!("switching")
+    Runsheets::Web.configure_for(start_session(@runs_root))
     get "/library"
     assert_equal 404, last_response.status
     get "/library/hello"
@@ -227,14 +286,14 @@ class TestWebNestedLibrary < Minitest::Test
     write("platform/network/backup.md", single("Backup the routers"))
     write("platform/broken.md", "---\ntitle: [oops\n---\n")
     @library = Runsheets::Library.load(@dir)
-    Runsheets::Web.configure_for(nil, library: @library)
+    Runsheets::Web.configure_for(nil, library: @library).prepare_start(session_options: { runs_root: @runs_root, echo: nil })
     Runsheets::Web.set :rs_token, "tok"
+    Runsheets::Web.start_session(engineer: "Tester", why: "testing")
     header "Host", "localhost"
   end
 
   def teardown
-    Runsheets::Web.session&.abandon_if_active
-    Runsheets::Web.configure_for(Runsheets::Session.new(runbook: example_runbook, runs_root: @runs_root, token: "tok"))
+    Runsheets::Web.session&.end!("teardown")
     Runsheets.runs_dir = nil
     FileUtils.rm_rf(@runs_root)
     FileUtils.rm_rf(@dir)
@@ -250,7 +309,7 @@ class TestWebNestedLibrary < Minitest::Test
     File.write(path, text)
   end
 
-  def open_runbook(slug) = post("/library/open", "_token" => "tok", "slug" => slug)
+  def open_runbook(slug) = post("/runs", "_token" => "tok", "slug" => slug)
 
   def test_the_root_shows_the_readme_folder_cards_and_the_whole_tree
     get "/library"
@@ -308,12 +367,8 @@ class TestWebNestedLibrary < Minitest::Test
     assert_includes body, '<a href="/library/platform">platform</a>'
     assert_includes body, '<a href="/library/platform/database">database</a>'
 
-    header "X-Runsheets-Token", "tok"
-    post "/run", "_token" => "tok"
-    assert_equal 302, last_response.status
     assert_equal File.join(@runs_root, "platform/database/backup"), File.dirname(session.run.dir)
     assert_equal "platform/database/backup", session.run.runbook_slug
-    post "/run/finish", "_token" => "tok", "status" => "completed"
 
     get "/library/platform/database/backup"
     assert_includes last_response.body, "Previous runs"

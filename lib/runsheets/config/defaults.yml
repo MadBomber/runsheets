@@ -25,6 +25,17 @@ defaults:
   init: false
   # Print the settings in force as a config file to stdout and exit. (--dump, RUNSHEETS_DUMP)
   dump: false
+  # Who is starting the session. Empty means ask, prefilled from
+  # `git config user.name`, then $USER. (--engineer, RUNSHEETS_ENGINEER)
+  engineer:
+  # Why the session is being started: its first note. With engineer set too,
+  # the start page is skipped. Never saved by --dump. (--why, RUNSHEETS_WHY)
+  why:
+  # The session log's level: debug, info, warn, error or fatal.
+  # (--log-level, --verbose for debug, RUNSHEETS_LOG_LEVEL)
+  log_level: info
+  # Do not echo the session log to the terminal. (--quiet, RUNSHEETS_QUIET)
+  quiet: false
 
 # Per-environment overrides (RACK_ENV). None are needed; the sections exist
 # so myway_config recognises the usual environment names.

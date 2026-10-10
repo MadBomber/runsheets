@@ -41,8 +41,9 @@ block above it is just displayed.
 
 A background block is for something that must stay up while later steps
 run. It has no timeout, so the step's `timeout` does not apply to it. Stop
-it from its own Stop button, from the Running panel on any page, or by
-finishing the run. The process group gets `TERM`, then `KILL` two seconds
+it from its own Stop button, from the Running panel on any page (including
+the pages of another runbook), or by ending the session. Switching to
+another runbook leaves it running. The process group gets `TERM`, then `KILL` two seconds
 later if needed, and the execution is recorded with state `stopped`. A
 background process that exits on its own is recorded like a `run` block:
 `finished` with its exit status, which counts as a failure if non-zero.

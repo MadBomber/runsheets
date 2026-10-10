@@ -9,13 +9,24 @@ class TestWeb < Minitest::Test
 
   def setup
     @runs_root = Dir.mktmpdir("runsheets-web")
-    @session   = Runsheets::Session.new(runbook: example_runbook, runs_root: @runs_root, token: "tok")
+    @session   = start_session(@runs_root)
     Runsheets::Web.configure_for(@session)
+    @stopper = StopCounter.new(0)
+    Runsheets::Web.set :rs_stopper, @stopper
     header "Host", "localhost"
   end
 
   def teardown
+    @session&.end!("teardown")
+    Runsheets::Web.set :rs_stopper, nil
     FileUtils.rm_rf(@runs_root)
+  end
+
+  # Point the app at a session on +runbook+ instead.
+  def serve(runbook)
+    @session&.end!("switching")
+    @session = start_session(@runs_root, runbook:)
+    Runsheets::Web.configure_for(@session)
   end
 
   def app = Runsheets::Web
@@ -28,7 +39,9 @@ class TestWeb < Minitest::Test
     assert_includes last_response.body, "Hello, runsheets"
     assert_includes last_response.body, 'name="inputs[NAME]"'
     assert_includes last_response.body, 'type="password"'
-    assert_includes last_response.body, "no active run"
+    assert_includes last_response.body, 'action="/runs"'
+    assert_includes last_response.body, ">Tester · ", "the session in the header"
+    refute_includes last_response.body, "Verify only"
   end
 
   def test_step_page_shows_blocks_and_run_buttons
@@ -36,7 +49,7 @@ class TestWeb < Minitest::Test
     assert last_response.ok?
     assert_includes last_response.body, 'data-block="010-say-hello-1"'
     assert_includes last_response.body, 'data-action="execute"'
-    assert_includes last_response.body, "No active run"
+    assert_includes last_response.body, "No run for this runbook yet"
     assert_includes last_response.body, '<meta name="rs-token" content="tok">'
   end
 
@@ -46,18 +59,10 @@ class TestWeb < Minitest::Test
     get "/steps/020-inspect-ruby"
     assert_includes last_response.body, 'data-action="acknowledge" data-locked disabled title="Start a run to confirm terminal blocks"'
 
-    post "/run", { "_token" => "tok" }
+    post "/runs", { "_token" => "tok" }
     get "/steps/010-say-hello"
     assert_includes last_response.body, 'data-action="execute"'
     refute_includes last_response.body, "data-locked disabled"
-  end
-
-  def test_verification_run_disables_run_buttons_outside_verify_documents
-    post "/run", { "_token" => "tok", "kind" => "verify" }
-    get "/steps/010-say-hello"
-    assert_includes last_response.body, 'data-locked disabled title="A verification run only executes verify steps and verify.md"'
-    get "/steps/045-check-the-greeting"
-    refute_includes last_response.body, 'data-action="execute" data-locked'
   end
 
   def with_linked_document
@@ -69,7 +74,7 @@ class TestWeb < Minitest::Test
       "notes.txt" => "plain"
     }
     with_runbook(files) do |rb|
-      Runsheets::Web.configure_for(Runsheets::Session.new(runbook: rb, runs_root: @runs_root, token: "tok"))
+      serve(rb)
       yield rb
     end
   end
@@ -141,7 +146,7 @@ class TestWeb < Minitest::Test
   end
 
   def test_post_without_token_is_refused
-    post "/run"
+    post "/runs"
     assert_equal 403, last_response.status
     post "/blocks/010-say-hello-1/execute"
     assert_equal 403, last_response.status
@@ -152,17 +157,19 @@ class TestWeb < Minitest::Test
     with_token
     post "/blocks/010-say-hello-1/execute"
     assert_equal 409, last_response.status
-    assert_match(/start a run/, JSON.parse(last_response.body)["error"])
+    assert_match(/start the run for Hello, runsheets/, JSON.parse(last_response.body)["error"])
   end
 
-  def test_start_run_execute_poll_mark_and_finish
-    post "/run", { "_token" => "tok", "inputs" => { "NAME" => "web" } }
+  def test_start_run_execute_poll_and_mark
+    post "/runs", { "_token" => "tok", "inputs" => { "NAME" => "web" } }
     assert_equal 302, last_response.status
-    assert_match %r{/steps/010-say-hello\z}, last_response.location
+    assert_match %r{://[^/]+/\z}, last_response.location, "lands on the runbook page"
     assert @session.active?
 
     get "/"
-    assert_includes last_response.body, "Active run"
+    assert_includes last_response.body, "Run open"
+    assert_includes last_response.body, "Work through the steps"
+    refute_includes last_response.body, "/run/finish"
     assert_includes last_response.body, "<code>NAME=web</code>"
     refute_includes last_response.body, "hunter2"
 
@@ -195,19 +202,16 @@ class TestWeb < Minitest::Test
     assert last_response.ok?
     assert_includes last_response.body, "marked done"
 
-    post "/run/finish", { "_token" => "tok", "status" => "completed" }
-    assert_equal 302, last_response.status
-    refute @session.active?
-
     get "/"
     assert_includes last_response.body, "Previous runs"
     get "/runs/#{@session.run.id}"
     assert last_response.ok?
-    assert_includes last_response.body, "completed"
+    assert_includes last_response.body, "running"
+    assert_includes File.read(@session.log.path), "[hello 010-say-hello] marked done: fine"
   end
 
   def test_destructive_block_needs_the_servers_confirmation_code
-    post "/run", { "_token" => "tok" }
+    post "/runs", { "_token" => "tok" }
     with_token
     post "/blocks/040-exercise-failure-1/execute"
     assert_equal 428, last_response.status
@@ -230,7 +234,7 @@ class TestWeb < Minitest::Test
   end
 
   def test_background_start_stop_and_running_panel
-    post "/run", { "_token" => "tok" }
+    post "/runs", { "_token" => "tok" }
     get "/steps/035-keep-a-clock-running"
     assert_includes last_response.body, ">Start</button>"
     assert_includes last_response.body, 'data-action="stop"'
@@ -262,7 +266,7 @@ class TestWeb < Minitest::Test
   end
 
   def test_acknowledge_terminal_block
-    post "/run", { "_token" => "tok" }
+    post "/runs", { "_token" => "tok" }
     get "/steps/020-inspect-ruby"
     assert_includes last_response.body, 'data-action="acknowledge"'
 
@@ -287,62 +291,40 @@ class TestWeb < Minitest::Test
   end
 
   def test_active_run_panel_shows_secrets_as_set_without_values
-    post "/run", { "_token" => "tok", "inputs" => { "SECRET_WORD" => "swordfish" } }
+    post "/runs", { "_token" => "tok", "inputs" => { "SECRET_WORD" => "swordfish" } }
     get "/"
     assert_includes last_response.body, "SECRET_WORD=•••"
-    refute_includes last_response.body, "swordfish"
+    refute_includes last_response.body, "swordfish", "not even in the change form"
+    assert_includes last_response.body, "leave blank to keep the current value"
   end
 
-  def test_checks_page_and_verification_run
+  def test_checks_run_inside_the_run
     get "/verify"
     assert last_response.ok?
-    assert_includes last_response.body, "No active run"
+    assert_includes last_response.body, "No run for this runbook yet"
     assert_includes last_response.body, 'data-block="045-check-the-greeting-1"'
     assert_includes last_response.body, 'data-block="verify-2"'
     refute_includes last_response.body, '<button type="button" class="btn primary" data-action="run-all"'
 
+    post "/runs", { "_token" => "tok" }
     get "/"
-    assert_includes last_response.body, 'name="kind" value="verify"'
-
-    post "/run", { "_token" => "tok", "kind" => "verify" }
-    assert_equal 302, last_response.status
-    assert_match %r{/verify\z}, last_response.location
-    assert @session.verifying?
-
+    assert_includes last_response.body, "Go to checks (3)"
     get "/verify"
     assert_includes last_response.body, '<button type="button" class="btn primary" data-action="run-all"'
     assert_includes last_response.body, "Run all 3 checks"
-    get "/"
-    assert_includes last_response.body, "Active verification"
-    get "/steps/010-say-hello"
-    assert_includes last_response.body, "This is a verification run"
 
     with_token
-    post "/blocks/010-say-hello-1/execute"
-    assert_equal 409, last_response.status
     post "/blocks/verify-1/execute"
     assert_equal 202, last_response.status
-    id = JSON.parse(last_response.body)["id"]
-    wait_for do
-      get "/executions/#{id}"
-      JSON.parse(last_response.body)["state"] != "running"
-    end
-
-    get "/verify"
-    assert_includes last_response.body, '"executions":{"verify-1"'
-
-    post "/run/finish", { "_token" => "tok" }
-    get "/"
-    assert_includes last_response.body, "<span class=\"badge verify\">verify</span>"
-    refute_includes last_response.body, "/run/stamp"
+    post "/blocks/010-say-hello-1/execute"
+    assert_equal 202, last_response.status, "every step runs in the one run"
   end
 
   def test_run_page_shows_drift_when_the_runbook_changed
     Dir.mktmpdir("runsheets-drift") do |dir|
       FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
-      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
-      Runsheets::Web.configure_for(@session)
-      post "/run", { "_token" => "tok" }
+      serve(Runsheets::Runbook.load(dir))
+      post "/runs", { "_token" => "tok" }
       with_token
       post "/blocks/010-say-hello-1/execute"
       id = JSON.parse(last_response.body)["id"]
@@ -350,7 +332,7 @@ class TestWeb < Minitest::Test
         get "/executions/#{id}"
         JSON.parse(last_response.body)["state"] != "running"
       end
-      post "/run/finish", { "_token" => "tok", "status" => "abandoned" }
+      @session.current.close!
 
       get "/runs/#{@session.run.id}"
       refute_includes last_response.body, "Runbook changed since this run"
@@ -411,8 +393,7 @@ class TestWeb < Minitest::Test
 
   def test_script_in_runbook_markdown_renders_without_the_nonce
     with_runbook("runbook.md" => "---\ntitle: T\n---\n<script>document.title='x'</script>\n", "steps/010-a.md" => "hi\n") do |rb|
-      @session = Runsheets::Session.new(runbook: rb, runs_root: @runs_root, token: "tok")
-      Runsheets::Web.configure_for(@session)
+      serve(rb)
       get "/"
       assert_includes last_response.body, "<script>document.title='x'</script>"
       assert_equal 1, last_response.body.scan('<script nonce=').size
@@ -424,8 +405,7 @@ class TestWeb < Minitest::Test
       FileUtils.cp_r(File.join(RunsheetsTest::EXAMPLE_DIR, "."), dir)
       File.symlink("/etc/hosts", File.join(dir, "outside"))
       File.symlink(File.join(dir, "runbook.md"), File.join(dir, "inside"))
-      @session = Runsheets::Session.new(runbook: Runsheets::Runbook.load(dir), runs_root: @runs_root, token: "tok")
-      Runsheets::Web.configure_for(@session)
+      serve(Runsheets::Runbook.load(dir))
       get "/files/outside"
       assert_equal 404, last_response.status
       get "/files/inside"
@@ -461,22 +441,50 @@ class TestWeb < Minitest::Test
     Runsheets::Web.configure_for(@session)
   end
 
-  def test_finish_with_a_bad_status_is_refused_before_anything_stops
-    post "/run", { "_token" => "tok" }
-    with_token
-    post "/blocks/035-keep-a-clock-running-1/execute"
-    id = JSON.parse(last_response.body)["id"]
-    post "/run/finish", { "_token" => "tok", "status" => "bogus" }
-    assert_equal 422, last_response.status
-    assert @session.active?
-    get "/executions/#{id}"
-    assert_equal "running", JSON.parse(last_response.body)["state"]
-    post "/run/finish", { "_token" => "tok", "status" => "abandoned" }
+  def test_changing_inputs_partway
+    post "/runs", { "_token" => "tok", "inputs" => { "NAME" => "before" } }
+    get "/"
+    assert_includes last_response.body, 'action="/run/inputs"'
+    post "/run/inputs", { "_token" => "tok", "inputs" => { "NAME" => "after" } }
     assert_equal 302, last_response.status
+    get "/"
+    assert_includes last_response.body, "<code>NAME=after</code>"
+    assert_equal "after", @session.current.inputs["NAME"]
+  end
+
+  def test_session_page_notes_and_ending
+    get "/session"
+    assert last_response.ok?
+    body = last_response.body
+    assert_includes body, "Session #{@session.id}"
+    assert_includes body, "testing", "the why is the first note"
+    assert_includes body, "No runbook selected yet"
+    assert_includes body, 'action="/session/end"'
+
+    post "/session/notes", { "_token" => "tok", "note" => "found the cause" }
+    assert_equal 302, last_response.status
+    post "/session/notes", { "_token" => "tok", "note" => "  " }
+    assert_equal 409, last_response.status
+    post "/runs", { "_token" => "tok" }
+    get "/session"
+    assert_includes last_response.body, "found the cause"
+    assert_includes last_response.body, "opened so far"
+    assert_includes last_response.body, "[session] note: found the cause", "the log tail"
+
+    post "/session/end", { "_token" => "tok" }
+    assert last_response.ok?
+    assert_includes last_response.body, "Session ended"
+    assert_equal 1, @stopper.calls, "the server is asked to stop"
+    assert @session.ended?
+    assert_equal "opened", @session.current.record.status
+    get "/"
+    assert_equal 410, last_response.status
+    get "/session"
+    assert last_response.ok?, "the record can still be read"
   end
 
   def test_marking_a_document_that_is_not_a_step_is_refused
-    post "/run", { "_token" => "tok" }
+    post "/runs", { "_token" => "tok" }
     post "/steps/runbook/mark", { "_token" => "tok", "status" => "done" }
     assert_equal 422, last_response.status
     post "/steps/verify/mark", { "_token" => "tok", "status" => "done" }

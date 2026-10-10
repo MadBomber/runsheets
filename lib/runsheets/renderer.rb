@@ -171,6 +171,17 @@ module Runsheets
 
     def self.markdown_path?(path) = path.match?(/\.md(?:[#?]|\z)/i)
 
+    # Make every /docs/ link in +html+ that leads to a plain document under
+    # +root+ open in a new tab; links to a runbook or one of its files stay
+    # in the tab, since they navigate the runbooks rather than open
+    # reference reading.
+    def self.open_documents_in_new_tab(html, root)
+      html.gsub(%r{(<a\b[^>]*\bhref="/docs/([^"#?]*)[^"]*")}) do
+        link, path = Regexp.last_match.captures
+        Runbook.plain_document?(File.join(root, path), root) ? %(#{link} target="_blank" rel="noopener") : link
+      end
+    end
+
     # Join a relative href onto a base directory, resolving '.' and '..'.
     # Returns nil if the href climbs above the root.
     def self.join_relative(base_dir, href)

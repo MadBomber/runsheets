@@ -101,9 +101,9 @@ Most existing runbooks are one markdown file with `## Step` headings.
 6. Move any "if it goes wrong" section into `rollback.md` and any "check it
    worked" section into `verify.md`.
 7. Run `runsheets --check .` and fix the warnings.
-8. Run it once for real, from a clean shell, and finish the run. Now the
-   runbook has a record of its last verification that nobody had to date by
-   hand.
+8. Run it once for real, from a clean shell, mark every step, and end the
+   session. Now the runbook has a `completed` record of its last
+   verification that nobody had to date by hand.
 
 Single-file runbooks with headings as steps may be supported directly in a
 later milestone; see the [roadmap](../roadmap.md).

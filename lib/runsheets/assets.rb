@@ -205,7 +205,20 @@ module Runsheets
       .meta code.secret { color: var(--warn); }
       .history li { grid-template-columns: auto auto auto auto auto 1fr; }
       .history li .verdict { font-weight: 700; }
-      .history li.completed .verdict { color: var(--ok); } .history li.abandoned .verdict { color: var(--warn); } .history li.running .verdict { color: var(--accent); }
+      .history li.completed .verdict { color: var(--ok); } .history li.abandoned .verdict, .history li.interrupted .verdict { color: var(--warn); } .history li.running .verdict { color: var(--accent); }
+      .history li.partial .verdict { color: var(--accent-2); } .history li.opened .verdict { color: var(--muted); }
+      .session-runs li { grid-template-columns: 1fr auto auto auto; }
+      .notes { list-style: none; margin: 0 0 14px; padding: 0; }
+      .notes li { display: grid; grid-template-columns: 5.5em 1fr; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+      .notes li:first-child { border-top: 0; }
+      .notes time { color: var(--muted); font: 600 12px var(--mono); padding-top: 3px; }
+      .note-form { display: flex; gap: 8px; align-items: flex-start; }
+      .note-form textarea, .session-start textarea { flex: 1; width: 100%; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+      .session-log { max-height: 420px; overflow: auto; margin: 0; padding: 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+      .change-inputs { margin-top: 12px; } .change-inputs summary { cursor: pointer; color: var(--muted); }
+      .lib-inputs { flex: 1 1 100%; } .lib-open-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+      .bare-main { max-width: 640px; margin: 8vh auto; padding: 0 16px; }
+      .session-start h1 { margin-top: 0; font-size: 22px; display: flex; align-items: center; gap: 8px; }
       .badge.run { color: var(--accent); background: rgba(90,176,255,.12); }
       .panel.drift { border-color: rgba(255,180,84,.5); max-width: none; }
       .panel.drift h2 { color: var(--warn); display: flex; align-items: center; gap: 6px; }
@@ -310,7 +323,6 @@ module Runsheets
       .lib-card.broken { border-color: rgba(255,107,107,.45); }
       .lib-card.broken h3 svg { color: var(--danger); }
       .lib-card.broken .desc { color: #ffd3d3; font: 12.5px var(--mono); }
-      .lib-card.locked .card-foot .btn.disabled { opacity: .5; cursor: not-allowed; }
       .lib-open { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; border-color: rgba(90,176,255,.35); background: linear-gradient(135deg, rgba(90,176,255,.08), rgba(167,139,250,.06)); }
       .lib-open.current { border-color: rgba(61,220,151,.5); background: linear-gradient(135deg, rgba(61,220,151,.08), rgba(90,176,255,.05)); }
       .lib-open.broken { border-color: rgba(255,107,107,.45); background: rgba(255,107,107,.05); grid-template-columns: 1fr; }

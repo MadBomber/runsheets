@@ -187,21 +187,31 @@ class TestCLI < Minitest::Test
     assert_includes err.string, "no such runbook"
   end
 
-  def test_shutdown_abandons_the_active_run_and_stops_its_processes
+  def test_shutdown_ends_the_session_and_stops_what_runs_left_running
     with_runs_dir do |root|
-      s = Runsheets::Session.new(runbook: example_runbook, runs_root: root)
-      out = StringIO.new
-      CLI.shutdown(s, out:)
-      assert_empty out.string, "nothing to do without a run"
-
-      s.start_run
+      s  = open_session(root)
       bg = s.execute("035-keep-a-clock-running-1")
       wait_for { bg.output.include?("still here") }
-      CLI.shutdown(s, out:)
-      refute s.active?
+      CLI.shutdown(s)
+      assert s.ended?
       assert bg.stopped?
-      assert_equal "abandoned", JSON.parse(File.read(File.join(s.run.dir, "run.json")))["status"]
-      assert_includes out.string, "abandoned run #{s.run.id}"
+      assert_equal "partial", JSON.parse(File.read(File.join(s.run.dir, "run.json")))["status"]
+      assert_includes File.read(s.log.path), "ended (runsheets stopped)"
+      CLI.shutdown(s)
+      assert_equal 1, File.read(s.log.path).scan("ended (").size, "ending twice does nothing"
+    end
+  end
+
+  def test_session_options_follow_the_settings
+    with_clean_home do
+      out    = StringIO.new
+      config = CLI.configure(CLI.parse(%w[--verbose --quiet --engineer Ada --why testing]))
+      assert_equal({ runs_root: Runsheets.runs_dir, log_level: "debug", echo: nil }, CLI.session_options(config, out:))
+      assert_equal "Ada", CLI.default_engineer(config)
+      assert_equal "testing", config.why
+      loud = CLI.configure(CLI.parse(%w[--log-level warn]))
+      assert_equal({ runs_root: Runsheets.runs_dir, log_level: "warn", echo: out }, CLI.session_options(loud, out:))
+      assert_raises(OptionParser::ParseError) { CLI.parse(%w[--log-level chatty]) }
     end
   end
 

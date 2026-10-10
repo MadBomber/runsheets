@@ -56,7 +56,10 @@ Done.
 
 This milestone also wrote a `last_verified` date back into `runbook.md`
 after a verifying run. That was later removed; runsheets now never writes
-inside a runbook directory.
+inside a runbook directory. Verification runs themselves went in
+milestone 5: the Checks page and **Run all** now work inside the
+runbook's ordinary run, and old records of kind `verify` still load and
+keep their badge in history.
 
 ## Milestone 4: packaging
 
@@ -80,6 +83,34 @@ Done.
   file, that passes `--check`.
 - **Vocabulary settled**: the document is the *runbook*; the record of a
   run is the *runsheet*. The page, sidebar and buttons now say so.
+
+## Milestone 5: sessions
+
+Done.
+
+- **The session**: everything from `runsheets` starting to stopping is one
+  session, belonging to one engineer and opened with a note saying why. A
+  start page asks for both, pre-filled from `git config user.name` or
+  `$USER`; `--engineer` and `--why` (or their settings) skip it. The
+  session page shows the notes, with an **Add note** form, each
+  runbook's run and its status so far, and the tail of the log.
+- **Many runbooks, one run each**: selecting a runbook establishes its run;
+  selecting it again returns to the same run. Switching finishes nothing,
+  background processes keep running, and the sidebar's Running panel can
+  stop any of them. Non-secret inputs given earlier in the session pre-fill
+  later runs. Inputs can be changed partway, recorded as an `inputs`
+  event.
+- **Ending**: **End session** or Ctrl-C closes every run with a status
+  worked out from what was done: `completed`, `partial` or `opened`. A
+  session left running by a killed process is closed as `interrupted` at
+  the next start. The Finish and Abandon buttons, and verification
+  runs, are gone.
+- **The session log**: `session.log` records every action and its output
+  as it happens, with Ruby `Logger` levels (`--log-level`, `--verbose`),
+  echoed to the terminal unless `--quiet`. Secrets never reach it.
+- **Records**: `sessions/<id>/session.json` and `session.log`; each run
+  directory is named by the session id and its `run.json` names the
+  session. Blocks see `RUNSHEETS_SESSION_ID`.
 
 ## Open questions
 

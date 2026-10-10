@@ -96,12 +96,7 @@ module Runsheets
       crumbs << "<span class=\"current\">#{h step.title}</span>" if step
       crumbs << '<span class="current">Runsheet</span>' if kind == :run
       crumbs << '<span class="current">Checks</span>' if kind == :verify
-
-      pill = if session.active?
-               "<a class=\"run-pill active\" href=\"/run\" title=\"Active run\"><span class=\"dot\"></span>#{session.verifying? ? 'verify' : 'run'} #{h session.run.id}</a>"
-             else
-               '<span class="run-pill"><span class="dot"></span>no active run</span>'
-             end
+      crumbs << '<span class="current">Session</span>' if kind == :session
 
       <<~HTML
         <header class="rs-header">
@@ -119,10 +114,19 @@ module Runsheets
             #{nav_button('Runbooks', '/library', :book, key: 'r', title: 'Choose another runbook') if session.library}
             #{nav_button('Prev', prev && step_href(prev), :prev, key: '←', title: prev&.title)}
             #{nav_button('Next', nxt && step_href(nxt), :next, key: '→', title: nxt&.title)}
-            #{pill}
+            #{session_pill(session)}
           </nav>
         </header>
       HTML
+    end
+
+    # The session in the header: who, for how long, how many runbooks,
+    # linking to the session page.
+    def self.session_pill(session)
+      runs  = session.runs.size
+      title = "Session #{session.id}: #{session.why}"
+      "<a class=\"run-pill active\" href=\"/session\" title=\"#{h title}\"><span class=\"dot\"></span>" \
+        "#{h session.engineer} · #{h duration_text(session.elapsed)}#{" · #{runs} runbook#{'s' unless runs == 1}" if runs.positive?}</a>"
     end
 
     # When the runbook was opened from a library, the crumbs start with the
@@ -194,18 +198,19 @@ module Runsheets
       HTML
     end
 
-    # Processes still running in the active run, each with a Stop button.
-    # The page's JavaScript keeps the entries current.
+    # Processes still running anywhere in the session, each with a Stop
+    # button. The page's JavaScript keeps the entries current.
     def self.running_panel(session)
-      running = session.running_executions
+      running = session.running
       return "" if running.empty?
 
-      items = running.map do |ex|
-        step = session.runbook.step(ex.step_slug)
-        href = step ? "#{step_href(step)}#block-#{Rack::Utils.escape_path(ex.block_id)}" : "#"
+      items = running.map do |run, ex|
+        here = run == session.current
+        step = here && run.runbook.step(ex.step_slug)
+        href = step ? "#{step_href(step)}#block-#{Rack::Utils.escape_path(ex.block_id)}" : Chooser.href(run.slug)
         <<~LI
           <li data-execution="#{h ex.id}">
-            <a href="#{h href}" title="#{h ex.step_slug}"><code>#{h ex.block_id}</code></a>
+            <a href="#{h href}" title="#{h run.slug} · #{h ex.step_slug}"><code>#{h ex.block_id}</code>#{" <small>#{h run.slug}</small>" unless here}</a>
             <span class="meta" data-role="running-status">#{ex.background? ? 'background' : 'running'} · pid #{ex.pid}</span>
             <button type="button" class="rs-btn rs-stop" data-action="stop" data-execution="#{h ex.id}">Stop</button>
           </li>
@@ -290,69 +295,81 @@ module Runsheets
     end
 
     def self.active_run_panel(session)
-      run  = session.run
-      noun = run.verify? ? "verification" : "run"
+      record  = session.run
+      runbook = session.runbook
       <<~HTML
         <section class="panel">
-          <h2>Active #{noun}</h2>
-          <p><strong>#{h run.id}</strong> started #{h run.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{run_progress(run, session.runbook)} · <a href="/run">view runsheet</a></p>
-          #{inputs_line(run.inputs, session.secret_inputs_set)}
-          <div class="btn-row">
-            #{go_button(run, session.runbook)}
-            #{finish_form(session.token, 'completed', "Finish #{noun}", 'ok')}
-            #{finish_form(session.token, 'abandoned', 'Abandon', 'danger')}
-          </div>
+          <h2>Run open</h2>
+          <p><strong>#{h record.id}</strong> opened #{h record.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{run_progress(record, runbook)} · <a href="/run">view runsheet</a></p>
+          #{inputs_line(record.inputs, session.secret_inputs_set)}
+          <p class="meta">Work through the steps in order, or open any step and run only that. The run stays open until the session ends.</p>
+          <div class="btn-row">#{go_buttons(runbook)}</div>
+          #{change_inputs_form(session) if runbook.inputs.any?}
         </section>
       HTML
     end
 
-    def self.run_progress(run, runbook)
-      if run.verify?
-        checks = runbook.verify_blocks.size
-        "#{run.executions.size} of #{checks} check#{'s' unless checks == 1} run · #{run.unresolved_failures.size} failing"
-      else
-        "#{run.executions.size} execution#{'s' unless run.executions.size == 1} · #{run.steps_done} of #{runbook.steps.size} steps done"
-      end
+    def self.run_progress(record, runbook)
+      "#{record.executions.size} execution#{'s' unless record.executions.size == 1} · #{record.steps_done} of #{runbook.steps.size} steps done"
     end
 
-    def self.go_button(run, runbook)
-      return '<a class="btn primary" href="/verify">Go to checks</a>' if run.verify?
-
-      first = runbook.steps.first
-      first ? "<a class=\"btn primary\" href=\"#{h step_href(first)}\">Go to first step</a>" : ""
+    # Work through the steps from the first, or go to the checks.
+    def self.go_buttons(runbook)
+      first  = runbook.steps.first
+      checks = runbook.verify_blocks.size
+      buttons = []
+      buttons << "<a class=\"btn primary\" href=\"#{h step_href(first)}\">#{ICONS[:next]} Work through the steps</a>" if first
+      buttons << "<a class=\"btn\" href=\"/verify\">#{ICONS[:check]} Go to checks (#{checks})</a>" if checks.positive?
+      buttons.join
     end
 
-    def self.finish_form(token, status, label, style)
-      "<form method=\"post\" action=\"/run/finish\"><input type=\"hidden\" name=\"_token\" value=\"#{h token}\">" \
-        "<input type=\"hidden\" name=\"status\" value=\"#{status}\"><button class=\"btn #{style}\" type=\"submit\">#{h label}</button></form>"
+    KEEP_SECRET = "leave blank to keep the current value"
+
+    # The start form's fields, prefilled with +values+.
+    def self.input_fields(runbook, values) = runbook.inputs.map { input_field(it, values[it.name]) }.join
+
+    # The change form's fields: secrets are left empty, and an empty one
+    # keeps the value the run already has, so a secret never comes back to
+    # the page.
+    def self.change_input_fields(runbook, values)
+      runbook.inputs.map { it.secret? ? input_field(it, "", KEEP_SECRET) : input_field(it, values[it.name]) }.join
+    end
+
+    # One input as a labelled field; a secret is a password field.
+    def self.input_field(input, value, placeholder = "")
+      name   = h input.name
+      secret = input.secret?
+      <<~FIELD
+        <div class="field">
+          <label for="input-#{name}">#{h input.prompt}<code>$#{name}#{' · secret, not recorded' if secret}</code></label>
+          <input type="#{secret ? 'password' : 'text'}" id="input-#{name}" name="inputs[#{name}]" value="#{h value}" placeholder="#{h placeholder}" autocomplete="off">
+        </div>
+      FIELD
+    end
+
+    def self.change_inputs_form(session)
+      <<~HTML
+        <details class="change-inputs">
+          <summary>Change inputs</summary>
+          <form method="post" action="/run/inputs">
+            <input type="hidden" name="_token" value="#{h session.token}">
+            #{change_input_fields(session.runbook, session.current.inputs)}
+            <div class="btn-row"><button class="btn" type="submit">Change inputs</button><span class="meta">Blocks run from now on see the new values; the change is recorded.</span></div>
+          </form>
+        </details>
+      HTML
     end
 
     def self.start_panel(session)
       runbook = session.runbook
-      fields = runbook.inputs.map do |input|
-        name  = h input.name
-        value = session.resolve_inputs[input.name]
-        type  = input.secret? ? "password" : "text"
-        <<~FIELD
-          <div class="field">
-            <label for="input-#{name}">#{h input.prompt}<code>$#{name}#{' · secret, not recorded' if input.secret?}</code></label>
-            <input type="#{type}" id="input-#{name}" name="inputs[#{name}]" value="#{h value}" autocomplete="off">
-          </div>
-        FIELD
-      end
-      checks = runbook.verify_blocks.size
-      verify = if checks.positive?
-                 "<button class=\"btn\" type=\"submit\" name=\"kind\" value=\"verify\" title=\"Run only the verify steps and verify.md\">#{ICONS[:check]} Verify only (#{checks} check#{'s' unless checks == 1})</button>"
-               else
-                 ""
-               end
       <<~HTML
         <section class="panel">
           <h2>Start a run</h2>
-          <form method="post" action="/run">
+          <form method="post" action="/runs">
             <input type="hidden" name="_token" value="#{h session.token}">
-            #{fields.join}
-            <div class="btn-row"><button class="btn primary" type="submit" name="kind" value="run">Start run</button>#{verify}<span class="meta">Writes the runsheet (the run record) under #{h session.runs_root}</span></div>
+            <input type="hidden" name="slug" value="#{h runbook.slug}">
+            #{input_fields(runbook, session.resolve_inputs)}
+            <div class="btn-row"><button class="btn primary" type="submit">Start run</button><span class="meta">The run stays open until the session ends. Its runsheet goes under #{h session.runs_root}</span></div>
           </form>
         </section>
       HTML
@@ -409,11 +426,10 @@ module Runsheets
     def self.history_row(run, total)
       s       = run.summary
       verdict = s[:status]
-      kind    = run.verify? ? "verify" : "run"
       <<~LI
         <li class="#{h verdict}">
           <a href="/runs/#{h s[:id]}">#{h s[:id]}</a>
-          <span class="badge #{kind}">#{kind}</span>
+          #{run.verify? ? '<span class="badge verify">verify</span>' : '<span></span>'}
           <span class="meta verdict">#{h verdict}</span>
           <span class="meta">#{h run.started_at.strftime('%Y-%m-%d %H:%M')} · #{h duration_text(s[:duration])}</span>
           <span class="meta">#{s[:executions]} exec · #{s[:failures]} failed</span>
@@ -462,12 +478,8 @@ module Runsheets
     # why its blocks cannot run right now.
     def self.step_banners(session, step)
       banners = [destructive_banner(session.runbook, step)]
-      if step.executable_blocks.any?
-        banners << info_banner('No active run. Blocks can be read and copied but not executed. <a href="/">Start a run</a> first.') unless session.active?
-        if session.verifying? && !session.runbook.verify_document?(step)
-          banners << info_banner('This is a verification run: only verify steps and verify.md execute. <a href="/verify">Go to the checks</a>, ' \
-                                 'or finish the verification on the <a href="/">home page</a> to start a full run.')
-        end
+      if step.executable_blocks.any? && !session.active?
+        banners << info_banner('No run for this runbook yet. Blocks can be read and copied but not executed. <a href="/">Start the run</a> first.')
       end
       banners.join
     end
@@ -492,13 +504,8 @@ module Runsheets
       locks.compact.reduce(doc.html) { |html, (action, reason)| lock_buttons(html, action, reason) }
     end
 
-    # Why blocks in +doc+ cannot execute right now, or nil if they can.
-    def self.execute_lock(session, doc)
-      return "Start a run to execute blocks" unless session.active?
-      return "A verification run only executes verify steps and verify.md" if session.verifying? && !session.runbook.verify_document?(doc)
-
-      nil
-    end
+    # Why blocks cannot execute right now, or nil if they can.
+    def self.execute_lock(session, _doc) = session.active? ? nil : "Start a run to execute blocks"
 
     # Why terminal blocks cannot be confirmed right now, or nil if they can.
     def self.acknowledge_lock(session) = session.active? ? nil : "Start a run to confirm terminal blocks"
@@ -569,7 +576,7 @@ module Runsheets
       banner = if session.active?
                  ""
                else
-                 "<div class=\"banner info\">#{ICONS[:alert]}<div>No active run. <a href=\"/\">Start a verification</a> from the home page to run these checks on their own, or start a full run.</div></div>"
+                 "<div class=\"banner info\">#{ICONS[:alert]}<div>No run for this runbook yet. <a href=\"/\">Start the run</a> to run these checks.</div></div>"
                end
       toolbar = if session.active? && checks.positive?
                   "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\">#{ICONS[:check]} Run all #{checks} check#{'s' unless checks == 1}</button><span class=\"meta\" data-role=\"run-all-status\"></span></div>"
@@ -652,16 +659,168 @@ module Runsheets
 
     # A plain markdown document the runbook links to: rendered, with nothing
     # executable, its front matter (if any) left out.
-    def self.document(session, path, nonce: nil)
+    # Its relative links resolve from the library, or from the open
+    # runbook's root. With a runbook open the page sits in its layout; in a library with
+    # none open yet, in the library's frame beside the tree.
+    def self.document(session, path, library: nil, token: nil, nonce: nil)
+      root  = library&.dir || session.runbook.root
       text  = FrontMatter.parse(File.read(path, encoding: "UTF-8")).body
       title = Renderer.title_of(text) || File.basename(path, ".*")
-      base  = File.dirname(path).delete_prefix(Runbook.real_path(session.runbook.root)).delete_prefix("/")
+      base  = File.dirname(path).delete_prefix(Runbook.real_path(root)).delete_prefix("/")
       html  = Renderer.rewrite_relative_urls(Renderer.render_plain(text), base)
       body  = <<~HTML
-        <div class="banner info">#{ICONS[:alert]}<div>A document linked from this runbook, not a step: nothing here executes.</div></div>
+        <div class="banner info">#{ICONS[:alert]}<div>A document linked from a runbook, not a step: nothing here executes.</div></div>
         <article class="markdown-body">#{html}</article>
       HTML
-      layout(session, title:, body:, kind: :document, nonce:)
+      return layout(session, title:, body:, kind: :document, nonce:) if session&.runbook
+
+      Chooser.frame(Chooser::View.new(library:, session:, token:, node: library.root), title:, main: body, nonce:)
+    end
+
+    # ------------------------------------------------------------------
+    # The session: starting it, the notebook, and its end
+    # ------------------------------------------------------------------
+
+    # A page with no runbook around it: the start page and the end page.
+    def self.bare(title:, body:, token:, nonce: nil)
+      nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
+      <<~HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta name="rs-token" content="#{h token}">
+          <title>#{h title} · #{h APP_NAME}</title>
+          <style#{nonce_attr}>#{Assets.stylesheet}</style>
+        </head>
+        <body class="kind-bare">
+          <main class="bare-main">#{body}</main>
+          <script#{nonce_attr}>#{Assets.javascript}</script>
+        </body>
+        </html>
+      HTML
+    end
+
+    # Who is starting the session, and why. +error+ explains a refused form.
+    def self.session_new(token, engineer: nil, why: nil, error: nil, nonce: nil)
+      body = <<~HTML
+        <section class="panel session-start">
+          <h1>#{ICONS[:book]} Start a session</h1>
+          <p class="meta">Everything from now until runsheets stops is one session: the runbooks you open, what you run, and your notes, written to a log as it happens.</p>
+          #{"<div class=\"banner danger\">#{ICONS[:alert]}<div>#{h error}</div></div>" if error}
+          <form method="post" action="/session">
+            <input type="hidden" name="_token" value="#{h token}">
+            <div class="field"><label for="engineer">Who are you?</label><input type="text" id="engineer" name="engineer" value="#{h engineer}" required autocomplete="name"></div>
+            <div class="field"><label for="why">Why are you starting this session?<code>the first note</code></label><textarea id="why" name="why" rows="3" required placeholder="Monthly maintenance on the app database">#{h why}</textarea></div>
+            <div class="btn-row"><button class="btn primary" type="submit">#{ICONS[:next]} Start the session</button></div>
+          </form>
+        </section>
+      HTML
+      bare(title: "Start a session", body:, token:, nonce:)
+    end
+
+    # The notebook so far: who, why, the notes, the runs, the log.
+    def self.session(session, library, token, nonce: nil)
+      body = session_body(session)
+      return layout(session, title: "Session", body:, kind: :session, nonce:) if session.runbook
+
+      Chooser.frame(Chooser::View.new(library:, session:, token:, node: library.root), title: "Session", main: body, nonce:)
+    end
+
+    def self.session_body(session)
+      <<~HTML
+        <div class="page-head">
+          <h1>#{ICONS[:log]} Session #{h session.id}</h1>
+          <p class="sub">#{h session.engineer} · #{h session.host} · started #{h session.started_at.strftime('%Y-%m-%d %H:%M:%S')} · #{h duration_text(session.elapsed)}#{" · #{h session.status}" if session.ended?}</p>
+        </div>
+        #{session_notes(session)}
+        #{session_runs(session)}
+        #{session_end_panel(session) unless session.ended?}
+        #{session_log_tail(session)}
+      HTML
+    end
+
+    def self.session_notes(session)
+      items = session.notes.map { "<li><time>#{h it[:at].strftime('%H:%M:%S')}</time><div>#{h(it[:text]).gsub("\n", '<br>')}</div></li>" }
+      form = if session.ended?
+               ""
+             else
+               <<~FORM
+                 <form method="post" action="/session/notes" class="note-form">
+                   <input type="hidden" name="_token" value="#{h session.token}">
+                   <textarea name="note" rows="2" required placeholder="What happened, what you decided, what changed"></textarea>
+                   <button class="btn" type="submit">Add note</button>
+                 </form>
+               FORM
+             end
+      "<section class=\"panel\" id=\"notes\"><h2>Notes</h2><ol class=\"notes\">#{items.join}</ol>#{form}</section>"
+    end
+
+    def self.session_runs(session)
+      return '<section class="panel"><h2>Runs</h2><p class="empty">No runbook selected yet.</p></section>' if session.runs.empty?
+
+      rows = session.runs.map do |run|
+        record = run.record
+        <<~LI
+          <li class="#{h record.status}">
+            <span><strong>#{h run.runbook.title}</strong> <code>#{h run.slug}</code></span>
+            <span class="meta verdict">#{h record.active? ? record.closing_status(run.runbook.steps.map(&:slug)) + ' so far' : record.status}</span>
+            <span class="meta">#{h run_progress(record, run.runbook)}</span>
+            <span>#{run_link(session, run)}</span>
+          </li>
+        LI
+      end
+      "<section class=\"panel\"><h2>Runs</h2><ul class=\"history session-runs\">#{rows.join}</ul></section>"
+    end
+
+    # Back to a run: its page when it is on screen, else select it again.
+    def self.run_link(session, run)
+      return '<a class="btn" href="/">On screen</a>' if run == session.current
+      return "" if session.ended?
+
+      "<form method=\"post\" action=\"/runs\"><input type=\"hidden\" name=\"_token\" value=\"#{h session.token}\">" \
+        "<input type=\"hidden\" name=\"slug\" value=\"#{h run.slug}\"><button class=\"btn\" type=\"submit\">Return to it</button></form>"
+    end
+
+    def self.session_end_panel(session)
+      <<~HTML
+        <section class="panel">
+          <h2>End the session</h2>
+          <p class="meta">Every run closes with the status its work earns (completed, partial, or opened), anything still running is stopped, and runsheets exits. Ctrl-C in the terminal does the same.</p>
+          <form method="post" action="/session/end">
+            <input type="hidden" name="_token" value="#{h session.token}">
+            <button class="btn danger" type="submit">End session</button>
+          </form>
+        </section>
+      HTML
+    end
+
+    # The last lines of the session log.
+    def self.session_log_tail(session, lines: 200)
+      path = session.log.path
+      text = File.file?(path) ? File.readlines(path).last(lines).join : ""
+      <<~HTML
+        <section class="panel">
+          <h2>Session log</h2>
+          <p class="meta"><code>#{h path}</code> · the last #{lines} lines; <code>tail -f</code> it for the rest</p>
+          <pre class="session-log">#{h text}</pre>
+        </section>
+      HTML
+    end
+
+    # What the browser shows after End session.
+    def self.session_ended(session, nonce: nil)
+      runs = session.runs.map { "<li><strong>#{h it.runbook.title}</strong> · #{h it.record.status}</li>" }
+      body = <<~HTML
+        <section class="panel session-start">
+          <h1>#{ICONS[:check]} Session ended</h1>
+          <p>#{h session.engineer} · #{h duration_text(session.elapsed)} · runsheets is stopping.</p>
+          #{"<ul>#{runs.join}</ul>" unless runs.empty?}
+          <p class="meta">The record and the log are in <code>#{h session.dir}</code>.</p>
+        </section>
+      HTML
+      bare(title: "Session ended", body:, token: session.token, nonce:)
     end
 
     def self.error(session, message, status, nonce: nil)

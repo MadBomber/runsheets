@@ -15,10 +15,11 @@ operator's acknowledgements of the manual steps.
 
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
-Status: all four milestones of the [plan](PLAN.md) are built. Every block
-kind in the convention below is live, verify steps run on their own, and
-a runbook can be a directory or a single markdown file. Vocabulary: the document is the
-*runbook*; the record of one run is the *runsheet*.
+Status: milestones 1 to 5 of the [plan](PLAN.md) are built. Every block
+kind in the convention below is live, a runbook can be a directory or a
+single markdown file, and everything between starting runsheets and
+stopping it is one *session* with its own log. Vocabulary: the document is
+the *runbook*; the record of one runbook's run is the *runsheet*.
 
 ## Install
 
@@ -49,7 +50,8 @@ matter that has a `title`; any other markdown file is a plain document that
 a runbook can link to (see
 [Runbooks and Documents](docs/concepts/runbooks.md)). Started on such a library, the browser opens on a folder tree in
 the left pane; selecting a runbook shows its description, prerequisites,
-inputs, steps and previous runs in the main pane, with an **Open** button.
+inputs, steps and previous runs in the main pane, with the inputs form and
+a **Start run** button.
 A `README.md` in a folder is shown as that folder's description. The
 search box in the header searches the full text of every runbook. Try the
 bundled examples:
@@ -64,20 +66,45 @@ runsheets --open examples/disk-space-triage.md # links to plain documents, kept 
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
 records go; default `~/.local/share/runsheets/runs`), `--open`, `--check`,
-`--init`, `--config FILE`, and `--dump` to print the settings in force as a
-config file (redirect it to save them). Settings are layered: the command line beats
+`--init`, `--config FILE`, `--dump` to print the settings in force as a
+config file (redirect it to save them), and for the session `--engineer`,
+`--why`, `--log-level`, `--verbose` and `--quiet`. Settings are layered: the command line beats
 `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`, `RUNSHEETS_DIR` for
 the runbook, ...), which beat `./config/runsheets.yml` (or the file `--config` or
 `RUNSHEETS_CONFIG` names), which beats `~/.config/runsheets/runsheets.yml`,
 which beats the defaults bundled in `lib/runsheets/config/defaults.yml`. See
 [docs/running/cli.md](docs/running/cli.md#settings).
 
-Nothing executes until you start a run from the runbook's landing page; until
-then the Run buttons are disabled. Starting a run does not commit
-you to the whole runbook. With a run active, open any step, in any order,
-run just that step's blocks, and click **Abandon** when you are done. A run
-is the record that executions are written to, not an order you have to
-follow (see [docs/concepts/runs.md](docs/concepts/runs.md#a-run-is-a-record-not-a-sequence)).
+## Sessions
+
+Everything between starting `runsheets` and stopping it is one *session*.
+It starts by asking who you are and why you are starting it (or take them
+from `--engineer` and `--why`); the why is the session's first note. Then:
+
+- **Select a runbook** and fill in its inputs: that starts its *run*. Run
+  buttons are disabled until then.
+- **Work through the steps**, or open any step, in any order, and run just
+  that. A run is the record executions are written to, not an order you
+  have to follow (see [docs/concepts/runs.md](docs/concepts/runs.md#a-run-is-a-record-not-a-sequence)).
+- **Switch runbooks** whenever you like. Every run stays open, and
+  selecting a runbook again returns to its run.
+- **Write notes** on the session page as things happen.
+- **End the session** with the button on the session page, or Ctrl-C.
+  Every run closes with the status its work earns: `completed`,
+  `partial`, or `opened`.
+
+Everything you do, and every line of output, goes to a `session.log`
+written as it happens and echoed to the terminal, like a Rails log:
+
+```text
+2026-10-10 01:17:19.589 INFO  [disk-space-triage 010-check-free-space #acd50b22502a] execute bash via bash
+2026-10-10 01:17:19.589 INFO  [#acd50b22502a] $ df -h "$TARGET_DIR"
+2026-10-10 01:17:19.602 INFO  [#acd50b22502a] > /dev/disk3s5   1.8Ti   1.4Ti   391Gi    79%   /System/Volumes/Data
+2026-10-10 01:17:19.651 INFO  [#acd50b22502a] finished exit 0 in 0.06s
+```
+
+`--log-level`, `--verbose` and `--quiet` tune it; see
+[docs/running/run-record.md](docs/running/run-record.md).
 
 ## A runbook is a directory
 
@@ -183,16 +210,22 @@ directory. Nothing carries over between blocks except the environment.
 ## The run record
 
 ```text
-~/.local/share/runsheets/runs/<runbook-slug>/<yyyymmddThhmmss>/
-  run.json          steps, blocks, timestamps, exit codes, acknowledgements
-  run.md            the same as a readable transcript
-  blocks/
-    020-stop-the-pipeline-1.1.cmd   the exact code that ran
-    020-stop-the-pipeline-1.1.out   its stdout + stderr
+~/.local/share/runsheets/runs/
+  sessions/<session-id>/
+    session.json    who, when, the notes, the runs, how it ended
+    session.log     every action and its output, appended as it happens
+  <runbook-slug>/<session-id>/
+    run.json        steps, blocks, timestamps, exit codes, acknowledgements
+    run.md          the same as a readable transcript
+    blocks/
+      020-stop-the-pipeline-1.1.cmd   the exact code that ran
+      020-stop-the-pipeline-1.1.out   its stdout + stderr
 ```
 
-Runs live outside the runbook so captured output never lands next to the
-docs in a repository. The landing page lists previous runs.
+Records live outside the runbook so captured output never lands next to
+the docs in a repository. A runbook's landing page lists its previous
+runs; each points back to its session. A session left running by a killed
+process is closed as `interrupted` the next time runsheets starts.
 
 ## Security posture
 
@@ -212,8 +245,8 @@ docs in a repository. The landing page lists previous runs.
   output is redacted before it is written; plain string replacement, so an
   encoded secret is not caught.
 - The tool writes nothing inside the runbook directory.
-- Stopping the server ends an active run as abandoned and stops whatever it
-  left running.
+- Stopping the server ends the session: every run is closed and whatever it
+  left running is stopped. Secret values never reach the session log.
 
 ## Development
 
@@ -224,7 +257,7 @@ bundle exec bin/runsheets --open examples/hello
 ```
 
 The model (`Runbook`, `Step`, `Block`, `Renderer`, `Executor`,
-`RunRecord`, `Session`) has no dependency on Sinatra and is tested in
+`RunRecord`, `Run`, `Session`, `SessionLog`) has no dependency on Sinatra and is tested in
 isolation; `Web` and `Pages` are tested with rack-test.
 
 ## License

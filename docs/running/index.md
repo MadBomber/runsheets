@@ -1,10 +1,11 @@
 # Running
 
-runsheets is a script an operator starts and stops. It serves one runbook at a
-time on loopback, executes blocks on request in the operator's own
-environment, and writes a record of each run to disk. The runbook is a
+runsheets is a script an operator starts and stops. Everything between the
+two is one **session**: it serves runbooks on loopback, executes blocks on
+request in the operator's own environment, and writes a record of each
+runbook's run, and a log of the whole session, to disk. The runbook is a
 directory or a single all-in-one markdown file; given a directory of
-runbooks, the operator chooses one in the browser.
+runbooks, the operator chooses among them in the browser.
 
 <div class="grid cards" markdown>
 
@@ -15,8 +16,8 @@ runbooks, the operator chooses one in the browser.
 
 - **[The Web Page](web-ui.md)**
 
-    The landing page, step pages, the run lifecycle, status marks, and
-    keyboard shortcuts.
+    The start page, the landing page, step pages, the session page, status
+    marks, and keyboard shortcuts.
 
 - **[Execution Model](execution.md)**
 
@@ -25,26 +26,28 @@ runbooks, the operator chooses one in the browser.
 
 - **[The Run Record](run-record.md)**
 
-    Where records go, the layout of a run directory, the `run.json` schema
-    and the `run.md` transcript.
+    Where records go, the session's `session.json` and `session.log`, the
+    layout of a run directory, the `run.json` schema and the `run.md`
+    transcript.
 
 </div>
 
 ## A run is a record, not a sequence
 
-Nothing executes without an active run, but a run does not make you follow
-the steps in order or do all of them: start one, open any step, and run
-just that block. See
-[Runs and Runsheets](../concepts/runs.md#a-run-is-a-record-not-a-sequence).
+Nothing executes without a run, but a run does not make you follow the
+steps in order or do all of them: select the runbook, open any step, and
+run just that block. See
+[Sessions, Runs and Runsheets](../concepts/runs.md#a-run-is-a-record-not-a-sequence).
 
-## One run at a time
+## One session per process
 
-A `runsheets` process serves one runbook at a time and holds at most one
-active run. Starting a second run while one is active is refused; finish or
-abandon the first. Started on a directory of runbooks, the process shows a
-chooser and serves whichever runbook the operator opens; switching to
-another is refused while a run is active. To work two runbooks at once,
-start two processes on different ports.
+A `runsheets` process holds one session, started by one engineer with a
+note saying why. Inside it the engineer can select as many runbooks as the
+work needs; each selected runbook gets one run, and switching between them
+is allowed at any time. Every run stays open, and every background process
+keeps running, until the session ends with **End session** or Ctrl-C. Then
+each run is closed with a status worked out from what was done. To keep two
+separate sessions, start two processes on different ports.
 
 ## Where the shell comes from
 
@@ -54,5 +57,5 @@ particular `PATH`, set those up in the terminal first, then start the
 server from it.
 
 <div class="diagram" markdown>
-![Run and execution lifecycle](../assets/images/run-lifecycle.svg)
+![Session, run and execution lifecycle](../assets/images/run-lifecycle.svg)
 </div>
