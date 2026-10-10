@@ -258,17 +258,22 @@ module Runsheets
     end
 
     # The front-matter facts as a table. The library page shows when_to_use
-    # on its own and leaves it out here.
-    def self.meta_table(runbook, when_to_use: true)
-      rows = []
-      rows << ["When to use", h(runbook.when_to_use)] if when_to_use && runbook.when_to_use
-      rows << ["Prerequisites", "<ul>#{runbook.prerequisites.map { "<li>#{h it}</li>" }.join}</ul>"] if runbook.prerequisites.any?
-      rows << ["Blast radius", "<span class=\"badge destructive\">destructive</span> #{h runbook.blast_radius}"] if runbook.blast_radius
-      rows << ["Escalation", h(runbook.escalation)] if runbook.escalation
-      rows << ["Last verified", h(runbook.last_verified)] if runbook.last_verified
+    # on its own and passes the rows without it.
+    def self.meta_table(runbook, rows = meta_rows(runbook))
       return "" if rows.empty?
 
       "<table class=\"meta-table\">#{rows.map { |k, v| "<tr><th>#{k}</th><td>#{v}</td></tr>" }.join}</table>"
+    end
+
+    # label => html for each front-matter fact the runbook states.
+    def self.meta_rows(runbook)
+      rows = {}
+      rows["When to use"] = h(runbook.when_to_use) if runbook.when_to_use
+      rows["Prerequisites"] = "<ul>#{runbook.prerequisites.map { "<li>#{h it}</li>" }.join}</ul>" if runbook.prerequisites.any?
+      rows["Blast radius"] = "<span class=\"badge destructive\">destructive</span> #{h runbook.blast_radius}" if runbook.blast_radius
+      rows["Escalation"] = h(runbook.escalation) if runbook.escalation
+      rows["Last verified"] = h(runbook.last_verified) if runbook.last_verified
+      rows
     end
 
     # Start-run form, or the active run's controls.

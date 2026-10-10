@@ -16,7 +16,7 @@ module Runsheets
 
       # The badge each state of a runbook adds to its pane. :current is open
       # now, :broken does not load, :locked waits for the active run to
-      # finish, :ready can be opened (see .action).
+      # finish, :ready can be opened (see .action and Listing#state).
       BADGES = {
         current: '<span class="badge current">open now</span>',
         broken:  '<span class="badge destructive">does not load</span>',
@@ -24,20 +24,32 @@ module Runsheets
         ready:   ""
       }.freeze
 
+      # What the page is drawn for: the library, the session (nil when no
+      # runbook is open), the CSRF token, and the selected node.
+      View = Data.define(:library, :session, :token, :node) do
+        def listing(entry) = Listing.new(entry:, session:, token:)
+      end
+
+      # One runbook as this session sees it.
+      Listing = Data.define(:entry, :session, :token) do
+        # The state the runbook is in (see BADGES).
+        def state
+          if entry.slug == session&.runbook&.slug then :current
+          elsif !entry.ok?                         then :broken
+          elsif session&.active?                   then :locked
+          else :ready
+          end
+        end
+
+        # Where this session keeps run records, or the default.
+        def runs_root = session&.runs_root || Runsheets.runs_dir
+      end
+
       module_function
 
       def h(value) = Renderer.h(value)
 
       def href(slug) = slug.to_s.empty? ? "/library" : "/library/#{slug.to_s.split('/').map { Rack::Utils.escape_path(it) }.join('/')}"
-
-      # The state a runbook is in for this session (see STATES).
-      def state_of(entry, session)
-        if entry.slug == session&.runbook&.slug then :current
-        elsif !entry.ok?                         then :broken
-        elsif session&.active?                   then :locked
-        else :ready
-        end
-      end
 
       # ----------------------------------------------------------------
       # Page
@@ -46,9 +58,10 @@ module Runsheets
       # +selected+ is the slug of a runbook or a folder, or nil for the root.
       def page(library, session, token, nonce: nil, selected: nil)
         node       = library.node(selected.to_s) || library.root
+        view       = View.new(library:, session:, token:, node:)
         nonce_attr = nonce ? %( nonce="#{h nonce}") : ""
         title      = node.folder? && node.root? ? "Runbooks" : node.title
-        main       = node.folder? ? folder_pane(library, node, session, token) : runbook_pane(library, node, session, token)
+        main       = node.folder? ? folder_pane(view, node) : runbook_pane(view.listing(node))
         <<~HTML
           <!DOCTYPE html>
           <html lang="en">
@@ -60,9 +73,9 @@ module Runsheets
             <style#{nonce_attr}>#{Assets.stylesheet}</style>
           </head>
           <body class="kind-library">
-            #{header(library, node, session)}
+            #{header(view)}
             <div class="rs-shell">
-              #{Tree.pane(library, node, session)}
+              #{Tree.pane(view)}
               <main class="rs-main lib-main">
                 #{main}
               </main>
@@ -77,7 +90,9 @@ module Runsheets
         HTML
       end
 
-      def header(library, node, session)
+      def header(view)
+        library = view.library
+        session = view.session
         <<~HTML
           <header class="rs-header">
             <div class="brand">
@@ -88,7 +103,7 @@ module Runsheets
                 <span class="brand-tag">#{h File.basename(library.dir)}</span>
               </a>
             </div>
-            <nav class="crumbs" aria-label="Breadcrumb">#{crumbs(library, node).join('<span class="sep">/</span>')}</nav>
+            <nav class="crumbs" aria-label="Breadcrumb">#{crumbs(library, view.node).join('<span class="sep">/</span>')}</nav>
             <nav class="actions">
               #{Pages.nav_button('Back to runbook', '/', :next, key: 'b', title: session.runbook.title) if session}
               #{pill(session)}
@@ -118,10 +133,10 @@ module Runsheets
       # Right pane: a folder
       # ----------------------------------------------------------------
 
-      def folder_pane(library, folder, session, token)
-        [folder_head(library, folder), locked_banner(session), readme(folder),
+      def folder_pane(view, folder)
+        [folder_head(view.library, folder), locked_banner(view.session), readme(folder),
          cards_section("Folders", folder.folders.map { folder_card(it) }),
-         cards_section("Runbooks", folder.entries.map { runbook_card(it, session, token) }),
+         cards_section("Runbooks", folder.entries.map { runbook_card(view.listing(it)) }),
          folder.root? ? HINT : ""].join("\n")
       end
 
@@ -164,16 +179,17 @@ module Runsheets
         HTML
       end
 
-      def runbook_card(entry, session, token)
-        state = state_of(entry, session)
+      def runbook_card(listing)
+        entry = listing.entry
+        state = listing.state
         <<~HTML
           <article class="lib-card runbook #{state}" data-slug="#{h entry.slug}">
             <a class="card-link" href="#{h href(entry.slug)}">
               <h3>#{entry.single_file? ? ICONS[:file] : ICONS[:book]} #{h entry.title}</h3>
               <p class="desc">#{h blurb(entry)}</p>
-              <div class="badges">#{badges(entry, state).join}</div>
+              <div class="badges">#{badges(listing).join}</div>
             </a>
-            <div class="card-foot"><span class="meta">#{detail(entry)}</span>#{action(entry, state, token)}</div>
+            <div class="card-foot"><span class="meta">#{detail(entry)}</span>#{action(listing)}</div>
           </article>
         HTML
       end
@@ -191,30 +207,32 @@ module Runsheets
       # Right pane: a runbook
       # ----------------------------------------------------------------
 
-      def runbook_pane(_library, entry, session, token)
-        state   = state_of(entry, session)
-        runbook = entry.runbook
-        parts   = [runbook_head(entry, state), locked_banner(session), open_panel(entry, state, token)]
+      def runbook_pane(listing)
+        runbook = listing.entry.runbook
+        parts   = [runbook_head(listing), locked_banner(listing.session), open_panel(listing)]
         if runbook
-          parts << Pages.warnings_banner(runbook.warnings) << Pages.meta_table(runbook, when_to_use: false) << inputs_table(runbook)
-          parts << steps_list(runbook) << history(entry, session)
+          meta = Pages.meta_rows(runbook).except("When to use")
+          parts << Pages.warnings_banner(runbook.warnings) << Pages.meta_table(runbook, meta) << inputs_table(runbook)
+          parts << steps_list(runbook) << history(listing)
           parts << "<article class=\"markdown-body\">#{runbook.preamble_html}</article>"
         end
         parts.join("\n")
       end
 
-      def runbook_head(entry, state)
+      def runbook_head(listing)
+        entry = listing.entry
         <<~HTML
           <div class="page-head">
             <h1>#{entry.single_file? ? ICONS[:file] : ICONS[:book]} #{h entry.title}</h1>
             <p class="sub">#{detail(entry)} · <code>#{h entry.slug}</code></p>
-            <div class="badges">#{badges(entry, state).join}</div>
+            <div class="badges">#{badges(listing).join}</div>
           </div>
         HTML
       end
 
       # The description and the one action, side by side.
-      def open_panel(entry, state, token)
+      def open_panel(listing)
+        entry = listing.entry
         text = if !entry.ok?
                  "<div class=\"banner danger\">#{ICONS[:alert]}<div><strong>This runbook does not load.</strong><br>#{h entry.error}</div></div>"
                elsif entry.when_to_use
@@ -222,26 +240,26 @@ module Runsheets
                else
                  "<h2>When to use</h2><p class=\"empty\">Not said. Add <code>when_to_use</code> to the front matter.</p>"
                end
-        action = action(entry, state, token, primary: true)
+        action = action(listing, key: "o")
         <<~HTML
-          <section class="panel lib-open #{state}">
+          <section class="panel lib-open #{listing.state}">
             <div class="lib-open-text">#{text}</div>
             #{"<div class=\"btn-row\">#{action}</div>" unless action.empty?}
           </section>
         HTML
       end
 
-      # The one thing the operator can do with a runbook in this state. The
-      # primary button (the runbook pane's) answers the o key; a card's does not.
-      def action(entry, state, token, primary: false)
-        case state
+      # The one thing the operator can do with a runbook in its state. The
+      # runbook pane's button answers the o key; a card's has no key.
+      def action(listing, key: nil)
+        case listing.state
         when :current then "<a class=\"btn primary\" href=\"/\">#{ICONS[:next]} Continue</a>"
         when :broken  then ""
         when :locked  then '<span class="btn disabled" title="Finish the active run first">Open</span>'
         else
-          "<form method=\"post\" action=\"/library/open\" class=\"lib-open-form\"><input type=\"hidden\" name=\"_token\" value=\"#{h token}\">" \
-          "<input type=\"hidden\" name=\"slug\" value=\"#{h entry.slug}\">" \
-          "<button class=\"btn primary\" type=\"submit\"#{' data-key="o"' if primary}>#{ICONS[:next]} Open</button></form>"
+          "<form method=\"post\" action=\"/library/open\" class=\"lib-open-form\"><input type=\"hidden\" name=\"_token\" value=\"#{h listing.token}\">" \
+          "<input type=\"hidden\" name=\"slug\" value=\"#{h listing.entry.slug}\">" \
+          "<button class=\"btn primary\" type=\"submit\" data-key=\"#{h key}\">#{ICONS[:next]} Open</button></form>"
         end
       end
 
@@ -294,12 +312,11 @@ module Runsheets
       end
 
       # The last few runs of this runbook, wherever records are kept.
-      def history(entry, session)
-        root = session&.runs_root || Runsheets.runs_dir
-        runs = RunRecord.list(root, entry.slug)
+      def history(listing)
+        runs = RunRecord.list(listing.runs_root, listing.entry.slug)
         return "" if runs.empty?
 
-        total = entry.steps
+        total = listing.entry.steps
         rows  = runs.first(5).map do |run|
           s       = run.summary
           verdict = Pages.history_verdict(run, s, total)
@@ -327,10 +344,11 @@ module Runsheets
       # Shared bits
       # ----------------------------------------------------------------
 
-      def badges(entry, state)
-        list = ["<span class=\"badge\">#{entry.single_file? ? 'single file' : 'directory'}</span>"]
+      def badges(listing)
+        entry = listing.entry
+        list  = ["<span class=\"badge\">#{entry.single_file? ? 'single file' : 'directory'}</span>"]
         list << '<span class="badge destructive">destructive</span>' if entry.destructive?
-        list << BADGES.fetch(state)
+        list << BADGES.fetch(listing.state)
         list.concat(entry.tags.map { "<span class=\"badge tag\">#{h it}</span>" })
         list.reject(&:empty?)
       end
@@ -345,7 +363,7 @@ module Runsheets
         parts.join(" · ")
       end
 
-      def count(n, noun) = "#{n} #{noun}#{'s' unless n == 1}"
+      def count(amount, noun) = "#{amount} #{noun}#{'s' unless amount == 1}"
     end
 
     # The library page (see Pages::Chooser.page).

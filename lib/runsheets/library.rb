@@ -28,11 +28,11 @@ module Runsheets
     Entry = Data.define(:slug, :name, :folder, :path, :single_file, :runbook, :error) do
       def single_file? = single_file
       def ok?          = error.nil?
-      def title        = runbook ? runbook.title : name
+      def title        = runbook&.title || name
       def when_to_use  = runbook&.when_to_use
-      def tags         = runbook ? runbook.tags : []
-      def steps        = runbook ? runbook.steps.size : 0
-      def warnings     = runbook ? runbook.warnings : []
+      def tags         = runbook&.tags || []
+      def steps        = runbook&.steps&.size || 0
+      def warnings     = runbook&.warnings || []
       def destructive? = runbook&.destructive? || false
       def main_path    = single_file ? path : File.join(path, Runbook::MAIN_FILE)
       def depth        = slug.count("/")
@@ -41,8 +41,9 @@ module Runsheets
     end
 
     # A folder of the tree: its own runbooks and folders, in title order,
-    # and the README's HTML when it has one. The root has the empty slug.
-    Folder = Data.define(:slug, :name, :path, :folders, :entries, :readme_html) do
+    # the README's HTML when it has one, and the directory's mtime when it
+    # was scanned. The root has the empty slug.
+    Folder = Data.define(:slug, :name, :path, :folders, :entries, :readme_html, :mtime) do
       def root?    = slug.empty?
       def title    = name
       def depth    = root? ? 0 : slug.count("/") + 1
@@ -59,6 +60,10 @@ module Runsheets
       def size = runbooks.size
     end
 
+    # Something found while scanning: where it is, its slug and name, and
+    # the slug of the folder holding it. Becomes an Entry or a Folder.
+    Found = Data.define(:slug, :name, :folder, :path)
+
     attr_reader :dir, :root, :entries, :folders, :scanned_at
 
     # Is path a directory of runbooks rather than a runbook?
@@ -74,7 +79,7 @@ module Runsheets
       raise RunbookError, "no such directory: #{@dir}" unless File.directory?(@dir)
 
       scan!
-      raise RunbookError, "no runbooks in #{@dir}: expected .md files or directories holding #{Runbook::MAIN_FILE}" if @entries.empty?
+      raise RunbookError, "no runbooks in #{@dir}: expected .md files or directories holding #{Runbook::MAIN_FILE}" if entries.empty?
     end
 
     # The runbook with this slug, or nil.
@@ -110,7 +115,7 @@ module Runsheets
     # True once a folder has gained or lost a child, or a runbook's files
     # have changed, since the last scan.
     def stale?
-      return true if [root, *folders].any? { folder_mtime(it.path) != @folder_mtimes[it.path] }
+      return true if [root, *folders].any? { folder_mtime(it.path) != it.mtime }
 
       entries.any? { entry_stale?(it) }
     end
@@ -124,54 +129,54 @@ module Runsheets
     private
 
     def scan!
-      @folder_mtimes = {}
-      @scanned_at    = Time.now
-      @root          = scan_folder(dir, slug: "", visited: [File.realpath(dir)])
-      @folders       = @root.subfolders.sort_by(&:slug).freeze
-      @entries       = @root.runbooks.sort_by(&:slug).freeze
+      @scanned_at = Time.now
+      root        = scan_folder(dir, slug: "", visited: [File.realpath(dir)])
+      @root       = root
+      @folders    = root.subfolders.sort_by(&:slug).freeze
+      @entries    = root.runbooks.sort_by(&:slug).freeze
     end
 
     # One folder: its direct runbooks and the folders beneath that hold
     # any, each sorted by title. visited holds the real paths above, so a
     # symlink cycle ends here instead of recursing forever.
     def scan_folder(path, slug:, visited:)
-      @folder_mtimes[path] = folder_mtime(path)
+      mtime   = folder_mtime(path)
       entries = []
       folders = []
       Dir.children(path).sort.each do |name|
         next if name.start_with?(".")
 
-        child      = File.join(path, name)
-        child_slug = slug.empty? ? name : "#{slug}/#{name}"
-        if File.directory?(child)
-          node = scan_directory(child, name:, slug: child_slug, folder: slug, visited:)
+        found = Found.new(slug: slug.empty? ? name : "#{slug}/#{name}", name:, folder: slug, path: File.join(path, name))
+        if File.directory?(found.path)
+          node = scan_directory(found, visited:)
           (node.is_a?(Folder) ? folders : entries) << node if node
         elsif name.end_with?(".md") && !name.casecmp?(README)
-          entries << entry_for(child, name: File.basename(name, ".md"), slug: child_slug.delete_suffix(".md"), folder: slug, single_file: true)
+          entries << entry_for(found.with(name: File.basename(name, ".md"), slug: found.slug.delete_suffix(".md")), single_file: true)
         end
       end
-      Folder.new(slug:, name: File.basename(path), path:, folders: by_title(folders), entries: by_title(entries), readme_html: readme_html(path))
+      Folder.new(slug:, name: File.basename(path), path:, folders: by_title(folders), entries: by_title(entries), readme_html: readme_html(path), mtime:)
     end
 
     # A directory is a runbook when it holds runbook.md, a folder when any
     # runbook lies beneath it, and nothing otherwise.
-    def scan_directory(path, name:, slug:, folder:, visited:)
-      return entry_for(path, name:, slug:, folder:, single_file: false) if File.file?(File.join(path, Runbook::MAIN_FILE))
+    def scan_directory(found, visited:)
+      path = found.path
+      return entry_for(found, single_file: false) if File.file?(File.join(path, Runbook::MAIN_FILE))
 
       real = File.realpath(path)
       return nil if visited.include?(real) || visited.size > MAX_DEPTH
 
-      sub = scan_folder(path, slug:, visited: [*visited, real])
+      sub = scan_folder(path, slug: found.slug, visited: [*visited, real])
       sub.size.positive? ? sub : nil
     rescue SystemCallError
       nil
     end
 
-    def entry_for(path, name:, slug:, folder:, single_file:)
-      runbook = Runbook.load(path, slug:)
-      Entry.new(slug:, name:, folder:, path:, single_file:, runbook:, error: nil)
+    def entry_for(found, single_file:)
+      runbook = Runbook.load(found.path, slug: found.slug)
+      Entry.new(**found.to_h, single_file:, runbook:, error: nil)
     rescue RunbookError => e
-      Entry.new(slug:, name:, folder:, path:, single_file:, runbook: nil, error: e.message)
+      Entry.new(**found.to_h, single_file:, runbook: nil, error: e.message)
     end
 
     def by_title(nodes) = nodes.sort_by { [it.title.downcase, it.name] }.freeze

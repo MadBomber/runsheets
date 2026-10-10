@@ -1,5 +1,12 @@
 # runsheets
 
+> **Note:** This is a proof-of-concept and a work in progress. Expect it to
+> be unstable for a while: features, file formats, and the CLI may change
+> without notice.
+>
+> See the [CHANGELOG.md](https://github.com/MadBomber/runsheets/blob/main/CHANGELOG.md)
+> file to see latest changes.
+
 Executable runbooks. A directory of markdown files becomes a local web page
 where the steps read like a doc site, the commands the author marked as
 runnable get a Run button, and everything that happens during a run is
