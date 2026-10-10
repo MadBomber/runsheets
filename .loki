@@ -34,8 +34,7 @@ class Tasks
 
   desc "Load every bundled example runbook and report authoring warnings"
   def check
-    examples = Dir.glob("examples/*").select { |path| File.directory?(path) || path.end_with?(".md") }
-    examples.each { |path| sh "bundle exec bin/runsheets --check #{path}" }
+    sh "bundle exec bin/runsheets --check examples"
   end
 
   desc "Scaffold a new runbook (a path ending in .md makes a single file)"

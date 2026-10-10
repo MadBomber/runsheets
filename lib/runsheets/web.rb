@@ -248,7 +248,7 @@ module Runsheets
     # Full-text search over every runbook in the library, or over the one
     # runbook the server was started on.
     get "/search" do
-      library ? library.refresh! : rs.refresh_runbook!
+      library&.refresh!
       page { Pages.search(rs, library, params["q"].to_s, token: settings.rs_token, nonce: it) }
     end
 

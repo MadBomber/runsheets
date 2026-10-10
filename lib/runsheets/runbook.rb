@@ -38,18 +38,23 @@ module Runsheets
     def self.load(path, slug: nil, root: nil)
       path = File.expand_path(path)
       if File.directory?(path)
-        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: slug || File.basename(path), single_file: false, root:)
+        new(dir: path, main_path: File.join(path, MAIN_FILE), slug: slug || File.basename(path), single_file: false, **{ root: }.compact)
       elsif File.file?(path)
         slug ||= File.basename(path, ".*")
         slug   = File.basename(File.dirname(path)) if slug == File.basename(MAIN_FILE, ".*")
-        new(dir: File.dirname(path), main_path: path, slug:, single_file: true, root:)
+        new(dir: File.dirname(path), main_path: path, slug:, single_file: true, **{ root: }.compact)
       else
         raise RunbookError, "no such runbook: #{path}"
       end
     end
 
     # Is the markdown file at +path+ a runbook rather than a plain document?
-    def self.runbook_file?(path) = runbook_text?(File.read(path, encoding: "UTF-8"))
+    # A file that cannot be read is neither, and is left out.
+    def self.runbook_file?(path)
+      runbook_text?(File.read(path, encoding: "UTF-8"))
+    rescue SystemCallError
+      false
+    end
 
     # A runbook starts with YAML front matter that has a title; anything
     # else is a plain document. Front matter that does not parse counts as
@@ -60,9 +65,9 @@ module Runsheets
       true
     end
 
-    def initialize(dir:, main_path:, slug:, single_file:, root: nil)
+    def initialize(dir:, main_path:, slug:, single_file:, root: dir)
       @dir         = dir
-      @root        = File.expand_path(root || dir)
+      @root        = File.expand_path(root)
       @main_path   = main_path
       @slug        = slug
       @single_file = single_file

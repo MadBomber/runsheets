@@ -295,9 +295,10 @@ end
 Runsheets::Search.terms('Stop "the pipeline"')   # => ["stop", "the pipeline"]
 ```
 
-Every term must appear somewhere in a runbook for it to match. The
-pieces (`terms`, `text_of`, `count`, `snippet`, `highlight`) are module
-functions and can be called on their own.
+Every term must appear somewhere in a runbook for it to match.
+`Search::Query.parse(string)` gives the parsed query, whose `count`,
+`snippet` and `highlight` can be called on their own; `terms`, `text_of`
+and `plain` are module functions.
 
 ## Rendering markdown
 

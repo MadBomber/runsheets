@@ -10,21 +10,38 @@ module Runsheets
       # Matching documents listed per runbook before "and N more".
       HITS_SHOWN = 5
 
+      # What the results are drawn for: the parsed query, and the slug of
+      # the runbook open now (nil when none is), whose steps link straight
+      # to their pages.
+      Context = Data.define(:query, :open_slug) do
+        def highlight(text) = query.highlight(text)
+
+        def open?(slug) = slug == open_slug
+
+        # Where a result links. The runbook open now goes straight to the
+        # step's page; any other runbook to its page in the library, at the
+        # step when it is a numbered one.
+        def href(slug, step)
+          return Chooser.href(slug) + (step&.position ? "#step-#{step.slug}" : "") unless open?(slug)
+
+          step.nil? || step.slug == "runbook" ? "/" : Pages.step_href(step)
+        end
+      end
+
       module_function
 
       def h(value) = Renderer.h(value)
 
-      # The page's main pane for +query+ over +results+. +open_slug+ is the
-      # runbook open now, whose steps link straight to their pages.
+      # The page's main pane for the query string over +results+.
       def main(results, query, open_slug: nil)
-        words = Search.terms(query)
+        context = Context.new(query: Search::Query.parse(query), open_slug:)
         <<~HTML
           <div class="page-head">
             <h1>#{ICONS[:search]} Search</h1>
             <p class="sub">#{summary(results, query)}</p>
           </div>
           #{form(query)}
-          #{list(results, words, open_slug:) unless words.empty?}
+          #{list(results, context) unless context.query.empty?}
         HTML
       end
 
@@ -43,48 +60,43 @@ module Runsheets
         HTML
       end
 
-      def list(results, words, open_slug:)
+      def list(results, context)
         return '<p class="empty">No runbook contains every word. Try fewer words, or check the spelling.</p>' if results.empty?
 
-        "<ol class=\"search-results\">#{results.map { result(it, words, open_slug:) }.join}</ol>"
+        "<ol class=\"search-results\">#{results.map { result(it, context) }.join}</ol>"
       end
 
-      def result(result, words, open_slug:)
+      def result(result, context)
         runbook = result.runbook
+        slug    = result.slug
         shown   = result.hits.first(HITS_SHOWN)
         more    = result.hits.size - shown.size
-        hits    = shown.map { hit(result, it, words, open_slug:) }.join
+        hits    = shown.map { hit(slug, it, context) }.join
         <<~HTML
           <li class="search-result">
-            <h2><a href="#{h href(result.slug, nil, open_slug:)}">#{Search.highlight(runbook.title, words)}</a>#{' <span class="badge current">open now</span>' if result.slug == open_slug}</h2>
-            <p class="meta">#{h result.slug} · #{runbook.steps.size} step#{'s' unless runbook.steps.size == 1}#{" · #{h runbook.tags.join(', ')}" if runbook.tags.any?}</p>
+            <h2><a href="#{h context.href(slug, nil)}">#{context.highlight(runbook.title)}</a>#{' <span class="badge current">open now</span>' if context.open?(slug)}</h2>
+            <p class="meta">#{h slug} · #{runbook.steps.size} step#{'s' unless runbook.steps.size == 1}#{" · #{h runbook.tags.join(', ')}" if runbook.tags.any?}</p>
             #{"<ul class=\"search-hits\">#{hits}</ul>" unless hits.empty?}
             #{"<p class=\"meta\">and #{more} more</p>" if more.positive?}
           </li>
         HTML
       end
 
-      def hit(result, hit, words, open_slug:)
-        step  = hit.step
-        label = step.position ? "Step #{step.number || step.position}" : (step.slug == "runbook" ? "Preamble" : step.slug)
+      def hit(slug, hit, context)
+        step = hit.step
         <<~HTML
           <li>
-            <a href="#{h href(result.slug, step, open_slug:)}"><span class="num">#{h label}</span> #{Search.highlight(hit.title, words)}</a>
-            <p class="snippet">#{Search.highlight(hit.snippet, words)}</p>
+            <a href="#{h context.href(slug, step)}"><span class="num">#{h label(step)}</span> #{context.highlight(hit.title)}</a>
+            <p class="snippet">#{context.highlight(hit.snippet)}</p>
           </li>
         HTML
       end
 
-      # Where a result links. The runbook open now goes straight to the
-      # step's page; any other runbook to its page in the library, at the
-      # step when it is a numbered one.
-      def href(slug, step, open_slug:)
-        if slug == open_slug
-          step.nil? || step.slug == "runbook" ? "/" : Pages.step_href(step)
-        else
-          anchor = step&.position ? "#step-#{step.slug}" : ""
-          "#{Chooser.href(slug)}#{anchor}"
-        end
+      # "Step 020", "Preamble", or the slug of verify or rollback.
+      def label(step)
+        return "Step #{step.number || step.position}" if step.position
+
+        step.slug == "runbook" ? "Preamble" : step.slug
       end
     end
 

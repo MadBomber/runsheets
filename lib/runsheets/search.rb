@@ -14,8 +14,8 @@ module Runsheets
     # one term, best first.
     Result = Data.define(:runbook, :slug, :score, :hits)
 
-    # One document of a runbook that holds a term. +step+ is nil for a hit
-    # in the runbook's own title or front matter.
+    # One document of a runbook (the preamble, a step, verify or rollback)
+    # that holds a term.
     Hit = Data.define(:step, :title, :snippet, :score)
 
     # How much a term found in each place counts toward a runbook's rank.
@@ -23,6 +23,46 @@ module Runsheets
 
     # Characters of context kept on each side of a match in a snippet.
     CONTEXT = 70
+
+    # A parsed query: its terms, and what can be asked of a text about them.
+    Query = Data.define(:words) do
+      def self.parse(query) = new(words: Search.terms(query))
+
+      def empty? = words.empty?
+
+      # Does +text+ (already lowercased) hold every term?
+      def all_in?(text) = words.all? { text.include?(it) }
+
+      # How many times the terms occur in +text+, all together.
+      def count(text)
+        haystack = text.to_s.downcase
+        words.sum { haystack.scan(it).size }
+      end
+
+      # A line of +text+ around the first match, whitespace collapsed and
+      # markdown syntax dropped, with "…" where it was cut. nil when nothing
+      # matches.
+      def snippet(text, context: CONTEXT)
+        flat  = Search.plain(text).gsub(/\s+/, " ").strip
+        first = words.filter_map { flat.downcase.index(it) }.min
+        return nil unless first
+
+        from = [first - context, 0].max
+        to   = [first + context, flat.size].min
+        "#{'…' if from.positive?}#{flat[from...to].strip}#{'…' if to < flat.size}"
+      end
+
+      # +text+ HTML-escaped, with each term wrapped in <mark>. Longer terms
+      # are tried first, so a phrase wins over a word inside it.
+      def highlight(text)
+        return Renderer.h(text) if empty?
+
+        pattern = Regexp.union(words.sort_by { -it.size }.map { Regexp.new(Regexp.escape(it), Regexp::IGNORECASE) })
+        text.to_s.split(/(#{pattern})/).each_slice(2).map do |plain, match|
+          "#{Renderer.h(plain)}#{"<mark>#{Renderer.h(match)}</mark>" if match}"
+        end.join
+      end
+    end
 
     module_function
 
@@ -33,23 +73,22 @@ module Runsheets
            .reject(&:empty?).uniq
     end
 
-    # Search +runbooks+ (a list of [slug, Runbook] pairs) for +query+.
-    # Results are best first; ties go by title.
+    # Search +runbooks+ (a list of [slug, Runbook] pairs) for the query
+    # string. Results are best first; ties go by title.
     def run(runbooks, query)
-      words = terms(query)
-      return [] if words.empty?
+      query = Query.parse(query)
+      return [] if query.empty?
 
-      runbooks.filter_map { |slug, runbook| result_for(slug, runbook, words) }
+      runbooks.filter_map { |slug, runbook| result_for(slug, runbook, query) }
               .sort_by { [-it.score, it.runbook.title.downcase] }
     end
 
     # The Result for one runbook, or nil when some term appears nowhere in it.
-    def result_for(slug, runbook, words)
-      text = text_of(runbook)
-      return nil unless words.all? { text.include?(it) }
+    def result_for(slug, runbook, query)
+      return nil unless query.all_in?(text_of(runbook))
 
-      hits  = hits_for(runbook, words)
-      score = (count(runbook.title, words) * WEIGHTS[:title]) + (count(meta_text(runbook), words) * WEIGHTS[:meta]) + hits.sum(&:score)
+      hits  = hits_for(runbook, query)
+      score = (query.count(runbook.title) * WEIGHTS[:title]) + (query.count(meta_text(runbook)) * WEIGHTS[:meta]) + hits.sum(&:score)
       Result.new(runbook:, slug:, score:, hits:)
     end
 
@@ -66,32 +105,14 @@ module Runsheets
     end
 
     # The documents that hold a term, best first, each with a snippet.
-    def hits_for(runbook, words)
+    def hits_for(runbook, query)
       hits = runbook.documents.values.filter_map do |doc|
-        score = (count(doc.title, words) * WEIGHTS[:step_title]) + (count(doc.body, words) * WEIGHTS[:body])
+        score = (query.count(doc.title) * WEIGHTS[:step_title]) + (query.count(doc.body) * WEIGHTS[:body])
         next if score.zero?
 
-        Hit.new(step: doc, title: doc.title, snippet: snippet(doc.body, words) || doc.title, score:)
+        Hit.new(step: doc, title: doc.title, snippet: query.snippet(doc.body) || doc.title, score:)
       end
       hits.sort_by { -it.score }
-    end
-
-    # How many times the terms occur in +text+, all together.
-    def count(text, words)
-      haystack = text.to_s.downcase
-      words.sum { haystack.scan(it).size }
-    end
-
-    # A line of text around the first match in +text+, whitespace
-    # collapsed, with "…" where it was cut. nil when nothing matches.
-    def snippet(text, words, context: CONTEXT)
-      flat  = plain(text).gsub(/\s+/, " ").strip
-      first = words.filter_map { flat.downcase.index(it) }.min
-      return nil unless first
-
-      from = [first - context, 0].max
-      to   = [first + context, flat.size].min
-      "#{'…' if from.positive?}#{flat[from...to].strip}#{'…' if to < flat.size}"
     end
 
     # Markdown reduced to the words a reader sees: link text without its
@@ -99,14 +120,6 @@ module Runsheets
     def plain(text)
       text.to_s.gsub(/<!--.*?-->/m, " ").gsub(/^\s*(```|~~~).*$/, " ").gsub(/^\s*\#{1,6}\s+/, "")
           .gsub(/!?\[([^\]]*)\]\([^)]*\)/, '\1')
-    end
-
-    # +text+ HTML-escaped, with each term wrapped in <mark>.
-    def highlight(text, words)
-      return Renderer.h(text) if words.empty?
-
-      pattern = Regexp.union(words.sort_by { -it.size }.map { Regexp.new(Regexp.escape(it), Regexp::IGNORECASE) })
-      text.to_s.split(/(#{pattern})/).each_with_index.map { |part, i| i.odd? ? "<mark>#{Renderer.h(part)}</mark>" : Renderer.h(part) }.join
     end
   end
 end

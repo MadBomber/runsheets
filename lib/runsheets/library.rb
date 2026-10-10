@@ -78,7 +78,8 @@ module Runsheets
     def self.load(dir) = new(dir)
 
     def initialize(dir)
-      @dir = File.expand_path(dir)
+      @dir       = File.expand_path(dir)
+      @documents = []
       raise RunbookError, "no such directory: #{@dir}" unless File.directory?(@dir)
 
       scan!
@@ -167,7 +168,7 @@ module Runsheets
           node = scan_directory(found, visited:)
           (node.is_a?(Folder) ? folders : entries) << node if node
         elsif name.end_with?(".md") && !name.casecmp?(README)
-          next @documents << found.path unless runbook_file?(found.path)
+          next @documents << found.path unless Runbook.runbook_file?(found.path)
 
           entries << entry_for(found.with(name: File.basename(name, ".md"), slug: found.slug.delete_suffix(".md")), single_file: true)
         end
@@ -206,12 +207,6 @@ module Runsheets
       nil
     end
 
-    def runbook_file?(path)
-      Runbook.runbook_file?(path)
-    rescue SystemCallError
-      false
-    end
-
     def changed_since_scan?(path)
       !File.file?(path) || File.mtime(path) > scanned_at
     rescue SystemCallError
@@ -225,11 +220,7 @@ module Runsheets
     end
 
     def entry_stale?(entry)
-      return entry.runbook.stale? if entry.ok?
-
-      !File.file?(entry.main_path) || File.mtime(entry.main_path) > scanned_at
-    rescue SystemCallError
-      true
+      entry.ok? ? entry.runbook.stale? : changed_since_scan?(entry.main_path)
     end
   end
 end

@@ -47,12 +47,12 @@ class TestSearch < Minitest::Test
 
   def test_snippet_shows_context_around_the_first_match
     text = "#{'a ' * 60}needle here #{'b ' * 60}"
-    snip = Search.snippet(text, ["needle"], context: 20)
+    snip = Search::Query.new(words: ["needle"]).snippet(text, context: 20)
     assert snip.start_with?("…")
     assert snip.end_with?("…")
     assert_includes snip, "needle here"
-    assert_equal "short needle", Search.snippet("short\n  needle", ["needle"])
-    assert_nil Search.snippet("nothing", ["needle"])
+    assert_equal "short needle", Search::Query.new(words: ["needle"]).snippet("short\n  needle")
+    assert_nil Search::Query.new(words: ["needle"]).snippet("nothing")
   end
 
   def test_plain_drops_markdown_syntax_but_keeps_the_words
@@ -65,13 +65,21 @@ class TestSearch < Minitest::Test
   end
 
   def test_highlight_escapes_and_marks_every_term
-    assert_equal "&lt;b&gt; <mark>Disk</mark> and <mark>disk</mark> space", Search.highlight("<b> Disk and disk space", ["disk"])
-    assert_equal "<mark>df -h</mark>", Search.highlight("df -h", ["df -h", "df"]), "longest term first"
-    assert_equal "a &amp; b", Search.highlight("a & b", [])
+    assert_equal "&lt;b&gt; <mark>Disk</mark> and <mark>disk</mark> space", Search::Query.new(words: ["disk"]).highlight("<b> Disk and disk space")
+    assert_equal "<mark>df -h</mark>", Search::Query.new(words: ["df -h", "df"]).highlight("df -h"), "longest term first"
+    assert_equal "a &amp; b", Search::Query.new(words: []).highlight("a & b")
+  end
+
+  def test_query_parses_and_needs_every_term
+    query = Search::Query.parse(%(Disk "free space"))
+    assert_equal ["disk", "free space"], query.words
+    assert query.all_in?("check disk free space now")
+    refute query.all_in?("check disk now")
+    assert Search::Query.parse("  ").empty?
   end
 
   def test_count_adds_up_every_term
-    assert_equal 3, Search.count("Disk disk DISK space", ["disk"])
-    assert_equal 0, Search.count(nil, ["disk"])
+    assert_equal 3, Search::Query.new(words: ["disk"]).count("Disk disk DISK space")
+    assert_equal 0, Search::Query.new(words: ["disk"]).count(nil)
   end
 end
