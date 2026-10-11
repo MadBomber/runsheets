@@ -48,6 +48,14 @@ class TestExecutor < Minitest::Test
     end
   end
 
+  def test_a_finished_block_leaves_no_child_behind
+    Dir.mktmpdir do |dir|
+      code = "sleep 30 > /dev/null 2>&1 &\necho $!\n(trap '' TERM; sleep 30) > /dev/null 2>&1 &\necho $!\n"
+      pids = Runsheets::Executor.new.run(execution(dir), code:).output.split.map(&:to_i)
+      assert_equal [false, false], pids.map { Process.kill(0, it) rescue false }, "a child outlived its block"
+    end
+  end
+
   def test_ruby_interpreter
     Dir.mktmpdir do |dir|
       ex = Runsheets::Executor.new.run(execution(dir, command: %w[ruby]), code: "puts 6 * 7\n")

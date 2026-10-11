@@ -19,7 +19,12 @@ module RunsheetsTest
       Runsheets::Web.set :rs_stopper, @stopper
       header "Host", "localhost"
       serve(runbook)
+      sign_in
     end
+
+    # Give the test browser the session key cookie, as opening the CLI's
+    # ?token= link does.
+    def sign_in = set_cookie("runsheets_#{Runsheets::Web.settings.port}=#{Runsheets::Web.settings.rs_token}")
 
     def stop_web
       @session&.end!("teardown")

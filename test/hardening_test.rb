@@ -175,7 +175,7 @@ class TestWebHardening < Minitest::Test
     start_run
     @session.open(runbook_from("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "```bash run\necho '<!--<script>'\n```\n"))
     @session.execute("010-a-1").wait
-    prior = get("/steps/010-a").body[%r{<script type="application/json" id="rs-prior">(.*?)</script>}m, 1]
+    prior = get("/steps/010-a").body[%r{<script type="application/json" id="rs-prior"[^>]*>(.*?)</script>}m, 1]
     refute_nil prior
     refute_includes prior, "<"
   end
@@ -183,5 +183,142 @@ class TestWebHardening < Minitest::Test
   def test_end_session_asks_first
     get "/session"
     assert_match(%r{<form method="post" action="/session/end" data-confirm="End the session and stop runsheets\?}, last_response.body)
+  end
+
+  # --- release review -------------------------------------------------------
+
+  FAKE_BUTTON = %(<div class="rs-block" data-block="010-a-1"><button data-action="execute">Copy example</button></div>\n\n)
+
+  def test_raw_html_cannot_pass_for_a_block
+    start_run
+    @session.open(runbook_from("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "#{FAKE_BUTTON}```bash run\necho hi\n```\n"))
+    body  = get("/steps/010-a").body
+    mark  = Runsheets::Renderer::MARK
+    divs  = body.scan(/<div class="rs-block[^>]*>/)
+    assert_includes body, %(<meta name="rs-mark" content="#{mark}">)
+    assert_equal 2, divs.size
+    assert_equal 1, divs.count { it.include?(%(data-rs-mark="#{mark}")) }, "only the real block carries the mark"
+    assert_includes Runsheets::Assets.javascript, "ours('.rs-block')"
+  end
+
+  def test_a_library_preview_cannot_execute_its_blocks
+    rb   = runbook_from("runbook.md" => "---\ntitle: T\n---\n```bash run\necho hi\n```\n", "steps/010-a.md" => "a\n")
+    html = Runsheets::Pages::Chooser.preview_html(rb)
+    assert_includes html, %(data-action="execute" data-locked disabled)
+  end
+
+  def test_run_refuses_a_block_edited_since_the_page_loaded
+    dir = runbook_dir
+    FileUtils.mkdir_p(File.join(dir, "steps"))
+    File.write(File.join(dir, "runbook.md"), "---\ntitle: T\n---\n")
+    File.write(File.join(dir, "steps/010-a.md"), "```bash run\necho first\n```\n")
+    serve(Runsheets::Runbook.load(dir))
+    start_run
+    shown = get("/steps/010-a").body[/data-digest="(\h+)"/, 1]
+    File.write(File.join(dir, "steps/010-a.md"), "```bash run\necho something else\n```\n")
+    FileUtils.touch(File.join(dir, "steps/010-a.md"), mtime: Time.now + 5)
+    fresh = get("/steps/010-a").body[/data-digest="(\h+)"/, 1]
+    stale = execute("010-a-1", "digest" => shown)
+    assert_equal 409, stale.status
+    assert_includes json(stale)["error"], "changed on disk since this page loaded"
+    assert_equal 202, execute("010-a-1", "digest" => fresh).status
+    finish(json["id"])
+  end
+
+  def test_a_browser_without_the_key_sees_nothing_of_the_session
+    clear_cookies
+    %w[/ /session /session/new /steps/010-say-hello /nope].each do |path|
+      res = get(path, {}, "HTTP_ACCEPT" => BROWSER)
+      assert_equal 401, res.status, path
+      assert_includes res.body, %(<meta name="rs-token" content="">), "#{path} shows no token"
+      assert_includes res.body, "Open the link from the terminal"
+    end
+    assert_equal 401, get("/executions/x").status
+  end
+
+  def test_the_link_from_the_terminal_hands_the_browser_the_key
+    clear_cookies
+    get "/steps/010-say-hello?token=wrong"
+    assert_equal 401, last_response.status
+    get "/steps/010-say-hello?token=tok"
+    assert_equal 302, last_response.status
+    assert_equal "http://localhost/steps/010-say-hello", last_response.location, "the key leaves the address bar"
+    cookie = last_response.headers["set-cookie"]
+    assert_match(/runsheets_4567=tok/, cookie)
+    assert_match(/httponly/i, cookie)
+    assert_match(/samesite=lax/i, cookie)
+    assert_equal 200, get("/steps/010-say-hello").status
+  end
+
+  def test_a_script_can_use_the_token_instead_of_the_cookie
+    clear_cookies
+    header "X-Runsheets-Token", "tok"
+    assert_equal 200, get("/session").status
+  end
+
+  def test_the_url_brackets_an_ipv6_address_and_carries_the_key
+    assert_equal "http://127.0.0.1:4567/?token=k", Runsheets::SessionKey.url("127.0.0.1", 4567, "k")
+    assert_equal "http://[::1]:4567/?token=k", Runsheets::SessionKey.url("::1", 4567, "k")
+    assert_equal "http://[::]:80/?token=k", Runsheets::SessionKey.url("[::]", 80, "k")
+  end
+end
+
+# Front matter whose structured keys have the wrong shape.
+class TestFrontMatterShapes < Minitest::Test
+  include RunsheetsTest
+
+  BAD = {
+    "inputs: [REGION]"     => "inputs must be a list of mappings",
+    "inputs:\n  REGION: x" => "inputs must be a list of mappings",
+    "interpreters: python3" => "interpreters must map a language",
+    "interpreters:\n  sql: [psql, -f]" => "interpreters must map a language"
+  }.freeze
+
+  def test_a_misshapen_key_is_a_runbook_error_naming_the_key
+    BAD.each do |yaml, message|
+      error = assert_raises(Runsheets::RunbookError, yaml) do
+        with_runbook("runbook.md" => "---\ntitle: T\n#{yaml}\n---\n", "steps/010-a.md" => "a\n") { nil }
+      end
+      assert_includes error.message, message
+    end
+  end
+
+  def test_a_misshapen_runbook_is_a_broken_library_entry
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "fine.md"), "---\ntitle: Fine\n---\n## One\ntext\n")
+      File.write(File.join(dir, "bad.md"), "---\ntitle: Bad\ninputs: [REGION]\n---\n## One\ntext\n")
+      library = Runsheets::Library.load(dir)
+      refute library.find("bad").ok?
+      assert_includes library.find("bad").error, "inputs must be a list"
+      assert library.find("fine").ok?
+    end
+  end
+
+  def test_a_cwd_that_is_not_a_path_is_warned_about_and_ignored
+    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "---\ncwd: [a, b]\n---\n```bash run\npwd\n```\n") do |rb|
+      step = rb.step("010-a")
+      assert_nil step.cwd
+      assert_includes rb.warnings, "010-a: cwd must be a path (using the runbook directory)"
+    end
+  end
+end
+
+# Starting the session from the start page, twice at once.
+class TestSessionStartRace < Minitest::Test
+  include Rack::Test::Methods
+  include RunsheetsTest
+  include RunsheetsTest::WebLibraryFixtures
+
+  def setup = serve_examples_library
+
+  def teardown = stop_library_server
+
+  def app = Runsheets::Web
+
+  def test_a_double_submitted_start_form_makes_one_session
+    restart_without_session
+    sessions = Array.new(4) { Thread.new { Runsheets::Web.start_session(engineer: "E", why: "w") } }.map(&:value)
+    assert_equal 1, sessions.uniq.size
+    assert_same Runsheets::Web.session, sessions.first
   end
 end

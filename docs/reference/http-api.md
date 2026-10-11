@@ -13,8 +13,16 @@ loopback.
 
 ## Authentication
 
-Every non-GET request must carry the token, which is generated when the
-server starts and embedded in every page, the start page included:
+The token is generated when the server starts and printed in the link the
+banner shows (`http://127.0.0.1:4567/?token=…`). Every request, GET
+included, must hold it, either as the cookie a browser gets by opening
+that link or in the `X-Runsheets-Token` header. Without it a browser gets
+a page saying to open the link from the terminal and a script gets
+`{"error": "missing session key: open the link runsheets printed"}`,
+both with **401**.
+
+Every non-GET request must also carry the token itself. It is embedded in
+every page, the start page included:
 
 ```html
 <meta name="rs-token" content="492a33d8abd63f00ff946cd79bbb2255">
@@ -32,14 +40,14 @@ Every HTML page is sent with `Cache-Control: no-store` and a
 `Content-Security-Policy` whose script and style sources are a nonce unique
 to that response; the page's own inline script and stylesheet carry it.
 
+A script copies the token from the banner's link and sends it on every
+request:
+
 ```bash
 B=http://127.0.0.1:4567
-TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
+TOKEN=3f9c…                      # the ?token= value from the banner
+curl -s -H "X-Runsheets-Token: $TOKEN" $B/session
 ```
-
-`/session/new` is the one page that answers before the session has
-started; once it has, the page redirects to `/session`, which carries the
-same token, hence `-L`.
 
 ## The session
 
@@ -174,6 +182,12 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
 }
 ```
 
+The page also sends `digest`, the `data-digest` of the block it shows. If
+the runbook has been edited since and the block no longer matches, the
+request is refused with **409**
+(`block <id> changed on disk since this page loaded; reload the page`).
+A request without `digest` skips the check.
+
 A **destructive** block needs a confirmation code. The first request
 without one is answered **428** with the code to type:
 
@@ -200,11 +214,12 @@ Errors are **409** with `{"error": "..."}`:
 - `unknown block <id>`
 - `block <id> is not executable (<kind>)`
 - `blank input referenced by block: NAME`
+- `block <id> changed on disk since this page loaded; reload the page`
 
 ### `POST /blocks/:id/acknowledge`
 
 Records that the operator ran a `terminal` block in their own terminal.
-Form fields `note` and `runbook` are optional. Responds **201** with the
+Form fields `note`, `runbook` and `digest` (as for execute) are optional. Responds **201** with the
 acknowledgement:
 
 ```json
@@ -220,13 +235,12 @@ that is not `terminal`.
 The current state of an execution, same shape as above. `output` is the
 last 256 KB of the log, `output_size` is the full size and
 `output_truncated` says whether anything was cut. **404** for an unknown
-id. Requires no token (it is a GET) but, like every request, a loopback
-`Host`.
+id. Like every request, it needs the session key and a loopback `Host`.
 
 The page polls this every 500 ms until `state` is no longer `running`.
 
 ```bash
-curl -s $B/executions/1b6a8f0c2d3e | jq '{state, exit_status, output}'
+curl -s -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e | jq '{state, exit_status, output}'
 ```
 
 ### `POST /executions/:id/stop`
@@ -246,6 +260,7 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/executions/1b6a8f0c2d3e/stop
 
 | Status | Meaning |
 | --- | --- |
+| 401 | No session key: neither the cookie from the banner's link nor the token in `X-Runsheets-Token`. |
 | 403 | Missing or invalid token on a non-GET request, or a non-loopback `Host`. |
 | 404 | Unknown step, run, execution, file or runbook slug. |
 | 409 | The operation is not allowed now (`Runsheets::RunError`): no session yet, no run for the runbook acted on. Refusals are logged at `warn`. |
@@ -269,15 +284,16 @@ Against a server started on `examples/directory_based_runbooks/hello` without `-
 
 ```bash
 B=http://127.0.0.1:4567
-TOKEN=$(curl -sL $B/session/new | sed -n 's/.*rs-token" content="\([a-f0-9]*\)".*/\1/p')
-post() { curl -s -o /dev/null -X POST --data-urlencode "_token=$TOKEN" "$@"; }
+TOKEN=3f9c…                      # the ?token= value from the banner
+post() { curl -s -o /dev/null -X POST -H "X-Runsheets-Token: $TOKEN" "$@"; }
+get()  { curl -s -H "X-Runsheets-Token: $TOKEN" "$@"; }
 
 post --data-urlencode "engineer=ci" --data-urlencode "why=smoke test" $B/session
 post --data-urlencode "inputs[NAME]=cli" $B/runs
 
 ID=$(curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute | jq -r .id)
-until [ "$(curl -s $B/executions/$ID | jq -r .state)" != running ]; do sleep 0.5; done
-curl -s $B/executions/$ID | jq -r .output
+until [ "$(get $B/executions/$ID | jq -r .state)" != running ]; do sleep 0.5; done
+get $B/executions/$ID | jq -r .output
 
 post --data-urlencode "status=done" $B/steps/010-say-hello/mark
 post --data-urlencode "note=greeting checked from the shell" $B/session/notes

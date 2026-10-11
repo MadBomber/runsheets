@@ -52,6 +52,12 @@ interpreters:
 
 ### `inputs` entries
 
+`inputs` must be a list, and each entry a mapping. `inputs: [REGION]` or
+`inputs: {REGION: x}` does not load: the error is
+`runbook.md: inputs must be a list of mappings, each with a name (- name: REGION)`,
+and in a library the runbook shows as broken. `interpreters` likewise
+must be a mapping of language to a command string.
+
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `name` | string | required | Must be a valid environment variable name (`/\A[A-Za-z_][A-Za-z0-9_]*\z/`); anything else is an authoring warning. |
@@ -105,7 +111,7 @@ cwd: .                   # working directory, relative to the runbook
 | `kind` | `automated`, `manual` or `verify` | `automated` if the body has an executable block, else `manual` | Badge on the step. Anything else is a warning. An `automated` step with no executable block is a warning. |
 | `destructive` | boolean | `false` | Marks the step destructive even if no block is. A step is also destructive when any of its blocks carries the `destructive` flag. Destructive steps show the blast-radius banner. |
 | `timeout` | whole number of seconds | `600` | Bounds every execution of a block in this step, except `background` blocks. Must be a positive whole number; anything else is a warning and `600` is used. |
-| `cwd` | path | the runbook directory | Working directory for executed blocks, resolved relative to the runbook directory. |
+| `cwd` | path | the runbook directory | Working directory for executed blocks, resolved relative to the runbook directory. Anything but a string is a warning and the runbook directory is used. |
 
 ### What `kind` means
 

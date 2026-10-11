@@ -9,7 +9,7 @@
 > contributions.
 >
 > See the [CHANGELOG.md](https://github.com/MadBomber/runsheets/blob/main/CHANGELOG.md)
-> file to see latest changes.
+> file for the latest changes.
 
 **Full documentation:** <https://madbomber.github.io/runsheets>. This
 README is the overview; the documentation site covers authoring, the
@@ -244,12 +244,18 @@ process is closed as `interrupted` the next time runsheets starts.
   another address is possible, warns, and is a bad idea off a network you
   control.
 - Executes only blocks whose info string opts in. Everything else is inert.
+- Every request needs this start's session key, which the browser gets by
+  opening the link runsheets prints. Another account on the same machine
+  can reach the port but sees nothing.
 - Every state-changing request needs a per-process token that only a page
   served by this process knows, and the `Host` header must be a loopback
   name. Together these stop a page on another origin from driving the tool.
 - Every page sets a Content-Security-Policy that lets only the page's own
-  script run. Raw HTML in a runbook renders; script in it does not, so a
-  runbook cannot drive the tool either.
+  script run, and the script acts only on blocks runsheets itself rendered.
+  Raw HTML in a runbook renders, but neither its script nor a copied Run
+  button does anything, so a runbook cannot drive the tool either.
+- Anything a block leaves running (`cmd &`) is stopped when the block
+  finishes; a long-running process belongs in a `background` block.
 - Destructive blocks show the blast radius and need a confirmation code the
   server issues per block, checked server-side.
 - Secret inputs reach the child process but never the run record. Captured

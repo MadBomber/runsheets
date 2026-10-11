@@ -76,11 +76,27 @@ module Runsheets
     # path: the config file to read instead of RUNSHEETS_CONFIG / ./config/runsheets.yml.
     def initialize(overrides = nil, path: nil)
       @explicit_path = path
+      @override_keys = overrides.to_h.keys.map(&:to_s)
       super(overrides&.transform_keys(&:to_s))
     end
 
     # The config files that exist and were read, lowest layer first.
     def files = [self.class.xdg_path, path].select { File.file?(it) }
+
+    # The bind address in force when it came from the project config found
+    # in the current directory, else nil. That file arrives with whatever
+    # repository was cloned, so the CLI will not let it alone open the
+    # server to the network (see CLI.check_bind_source).
+    def project_bind
+      return nil if @explicit_path || !self.class.blank?(ENV["RUNSHEETS_CONFIG"])
+      return nil if @override_keys.include?("bind") || !self.class.blank?(ENV["RUNSHEETS_BIND"])
+      return nil unless File.file?(path.to_s)
+
+      data = YAML.safe_load_file(path, aliases: false)
+      data.is_a?(Hash) && data.key?("bind") ? bind : nil
+    rescue Psych::Exception
+      nil
+    end
 
     # The settings in force as the flat hash a config file holds. dump is
     # left out: it is an action for this run, and a saved `dump: true` would

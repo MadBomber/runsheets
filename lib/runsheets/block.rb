@@ -100,6 +100,11 @@ module Runsheets
     def display?     = kind == :display
     def label        = flags.empty? ? lang : "#{lang} #{flags.join(' ')}"
 
+    # A short fingerprint of what the block says and does. The page sends
+    # it back with Run and I ran this, so an edit made after the page loaded
+    # cannot turn a click into a different block.
+    def digest = Digest::SHA256.hexdigest("#{label}\0#{code}")[0, 16]
+
     # Terminal blocks are not executed; the operator confirms they ran them.
     def acknowledgeable? = terminal?
 

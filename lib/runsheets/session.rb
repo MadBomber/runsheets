@@ -193,7 +193,7 @@ module Runsheets
 
       log.debug("reloaded #{runbook.slug}: its files changed", tags: ["session"])
       show(Runbook.load(runbook.single_file? ? runbook.main_path : runbook.dir, slug: runbook.slug, root: runbook.root))
-    rescue RunbookError, SystemCallError => e
+    rescue StandardError => e # whatever the edit broke, the page keeps the last good copy
       log.error("#{runbook.slug} no longer loads: #{e.message}", tags: ["session"])
       runbook.checked!
       runbook
@@ -206,8 +206,8 @@ module Runsheets
     # The record of the runbook on screen's run.
     def run = current&.record
 
-    def execute(block_id, confirm: nil)        = current!.execute(block_id, confirm:)
-    def acknowledge(block_id, note: nil)       = current!.acknowledge(block_id, note:)
+    def execute(block_id, confirm: nil, digest: nil)  = current!.execute(block_id, confirm:, digest:)
+    def acknowledge(block_id, note: nil, digest: nil) = current!.acknowledge(block_id, note:, digest:)
     def mark_step(slug, status:, note: nil)    = current!.mark_step(slug, status:, note:)
     def change_inputs(given)                   = current!.change_inputs(given)
     def step_status(slug)                      = current&.step_status(slug)

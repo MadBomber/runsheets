@@ -123,9 +123,17 @@ Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/st
 Runs:    /Users/you/.local/share/runsheets/runs
 Config:  /Users/you/.config/runsheets/runsheets.yml
 Session: starts in the browser (who and why)
-Open http://127.0.0.1:4567/ in your browser
+Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
 Press Ctrl-C to end the session and stop
 ```
+
+The link carries this start's session key. Opening it gives the browser
+the key as a cookie and drops it from the address bar; every request
+needs the key, so another account on the machine that can reach the port
+still sees nothing. `--open` opens this link. Each start makes a new key,
+so a tab or bookmark from an earlier start shows "Open the link from the
+terminal" until the new link is opened. With an IPv6 `--bind` the address
+is bracketed, `http://[::1]:4567/?token=…`.
 
 Started on a directory of runbooks, the second line is `Library:` with the
 number of runbooks and folders. When `--engineer` and `--why` are both set
@@ -204,7 +212,11 @@ With that file, plain `runsheets` serves the db-refresh runbook on port 4580
 and opens the browser; `runsheets --check` checks it instead; and
 `RUNSHEETS_PORT=4581 runsheets` or `runsheets -p 4581` moves it for one run. A
 repository can carry its own `config/runsheets.yml` (say `dir:` and
-`runs_dir:`) that applies whenever `runsheets` is run from its root.
+`runs_dir:`) that applies whenever `runsheets` is run from its root. One
+thing it cannot do is open the server to the network: a non-loopback
+`bind:` set only by that file stops the start with
+`runsheets: ./config/runsheets.yml sets bind: 0.0.0.0, which is not a loopback address…`.
+Pass `--bind` or set `RUNSHEETS_BIND` if that is really wanted.
 
 | Variable | Effect |
 | --- | --- |

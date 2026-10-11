@@ -377,7 +377,11 @@ module Runsheets
       (() => {
         const body  = document.body;
         const token = document.querySelector('meta[name="rs-token"]')?.content || '';
-        const LS    = 'runsheets.sidebar';
+        // Only elements stamped with this page's mark are acted on: raw HTML in
+        // a runbook can copy a Run button's markup, but not the mark.
+        const pageMark = document.querySelector('meta[name="rs-mark"]')?.content || '';
+        const ours  = sel => [...document.querySelectorAll(sel)].filter(el => pageMark && el.dataset.rsMark === pageMark);
+        const LS   = 'runsheets.sidebar';
         const fmt   = s => (s == null ? '' : s < 10 ? s.toFixed(2) + 's' : Math.round(s) + 's');
 
         // Sidebar toggle (remembered across pages).
@@ -411,7 +415,7 @@ module Runsheets
 
         // Executable blocks.
         const prior = (() => {
-          try { const p = JSON.parse(document.getElementById('rs-prior')?.textContent || '{}'); return { executions: p.executions || {}, acks: p.acks || {} }; }
+          try { const p = JSON.parse(ours('#rs-prior')[0]?.textContent || '{}'); return { executions: p.executions || {}, acks: p.acks || {} }; }
           catch (e) { return { executions: {}, acks: {} }; }
         })();
         const headers = { 'X-Runsheets-Token': token, 'Accept': 'application/json' };
@@ -446,7 +450,7 @@ module Runsheets
         const compare = (block, id, data) => {
           const expected = data.expected;
           if (!expected) return null;
-          const source = document.querySelector('.rs-expect[data-expect-for="' + CSS.escape(id) + '"]');
+          const source = ours('.rs-expect[data-expect-for="' + CSS.escape(id) + '"]')[0];
           if (source) source.hidden = true;
           const pane   = block.querySelector('[data-role="expected"]');
           const panes  = block.querySelector('.rs-panes');
@@ -559,11 +563,12 @@ module Runsheets
           const status = block.querySelector('[data-role="status"]');
           status.className = 'rs-status running'; status.textContent = 'starting';
           try {
-            let { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute');
+            const digest = block.dataset.digest;
+            let { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { digest });
             if (res.status === 428 && data.challenge) {
               const typed = prompt('This block is destructive. Type the code ' + data.challenge + ' to run it.');
               if (typed === null || typed.trim() !== data.challenge) { status.className = 'rs-status'; status.textContent = typed === null ? 'cancelled' : 'code did not match'; enable(button); return null; }
-              ({ res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { confirm: typed.trim() }));
+              ({ res, data } = await post('/blocks/' + encodeURIComponent(id) + '/execute', { confirm: typed.trim(), digest }));
             }
             if (!res.ok) throw new Error(data.error || res.statusText);
             return show(block, data) ? poll(block, data.id) : data;
@@ -574,10 +579,10 @@ module Runsheets
         };
 
         // Checks page: run every plain `run` block on the page, in order, one at a time.
-        const runAll = document.querySelector('[data-action="run-all"]');
+        const runAll = ours('[data-action="run-all"]')[0];
         if (runAll) runAll.addEventListener('click', async () => {
           const status = document.querySelector('[data-role="run-all-status"]');
-          const blocks = [...document.querySelectorAll('.rs-block.rs-executable[data-kind="run"]')];
+          const blocks = ours('.rs-block.rs-executable[data-kind="run"]');
           runAll.disabled = true;
           let ok = 0, failed = 0, skipped = 0;
           for (const [i, block] of blocks.entries()) {
@@ -609,7 +614,7 @@ module Runsheets
           if (note === null) return;
           button.disabled = true;
           try {
-            const { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/acknowledge', { note });
+            const { res, data } = await post('/blocks/' + encodeURIComponent(id) + '/acknowledge', { note, digest: block.dataset.digest });
             if (!res.ok) throw new Error(data.error || res.statusText);
             showAck(block, data);
             enable(button);
@@ -618,7 +623,7 @@ module Runsheets
           }
         };
 
-        document.querySelectorAll('.rs-block').forEach(block => {
+        ours('.rs-block').forEach(block => {
           const id   = block.dataset.block;
           const code = block.querySelector('pre');
           block.querySelector('[data-action="copy"]')?.addEventListener('click', async e => {
@@ -637,7 +642,7 @@ module Runsheets
         });
 
         // Running-processes panel in the sidebar.
-        document.querySelectorAll('#rs-running li[data-execution]').forEach(li => {
+        ours('#rs-running li[data-execution]').forEach(li => {
           const executionId = li.dataset.execution;
           const stop   = li.querySelector('[data-action="stop"]');
           const status = li.querySelector('[data-role="running-status"]');

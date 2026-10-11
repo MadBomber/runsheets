@@ -44,13 +44,30 @@ list can be right: the check is off for one, and the CLI says so when it
 starts. A specific non-loopback address permits itself as well as the
 loopback names.
 
+### Session key
+
+When the server starts it generates a random 128-bit token, and every
+request must hold it. The banner prints a link that carries it,
+`http://127.0.0.1:4567/?token=…`; the first visit moves the token into
+an `HttpOnly`, `SameSite=Lax` cookie named for the port and redirects to
+the same page without it. A browser without the cookie gets a page
+saying to open the link from the terminal (status 401), and a script
+gets 401 JSON; neither shows the token or anything of the session. A
+script can send the token in the `X-Runsheets-Token` header instead of
+the cookie.
+
+This is what keeps other accounts on a shared machine out. Any local user
+can connect to a loopback port, but without the key they see no page, so
+they cannot read the token from one. Every start makes a new key, so a
+link from an earlier start stops working.
+
 ### Session token
 
-When the server starts it generates a random 128-bit token. Every page
-embeds it in a `<meta>` tag, and every state-changing request must carry
-it, either in the `X-Runsheets-Token` header (used by the page's
-JavaScript) or in a `_token` form field (used by the HTML forms). Requests
-without it are refused with 403 before any handler runs.
+Every page also embeds the token in a `<meta>` tag, and every
+state-changing request must carry it, either in the `X-Runsheets-Token`
+header (used by the page's JavaScript) or in a `_token` form field (used
+by the HTML forms). Requests without it are refused with 403 before any
+handler runs.
 
 A page on another origin cannot read the token: same-origin policy stops it
 reading the response of a request to `127.0.0.1`. It also cannot send the
@@ -75,6 +92,19 @@ the page can run script, load a frame or plugin, or submit a form
 elsewhere. A `<script>` in a step still renders as text in the HTML, and
 does nothing. Pages are also sent with `Cache-Control: no-store`, since
 they carry the token.
+
+Raw HTML can still copy the markup of a block, a Run button included. So
+every block runsheets renders, and every control its script acts on,
+carries a random value made when the server starts, which the page's
+script checks before wiring anything up. A copied button lacks the value
+and does nothing, so a step cannot show "Copy example" on a button that
+runs another block. A runbook previewed in the library shows its blocks
+with Copy only; they run from the runbook's own pages.
+
+Each block also carries a digest of its code, sent back with Run and
+I ran this. If the runbook was edited after the page loaded and the
+block is no longer the one shown, the request is refused with 409 and
+the page says to reload.
 
 A Content Security Policy cannot stop a `<meta http-equiv="refresh">`
 from navigating the page, so `<meta>` tags are removed from rendered
@@ -152,7 +182,10 @@ transformed forms; see [Inputs and Secrets](../runbooks/inputs.md#redaction).
 ### Process groups, timeouts and stops
 
 Every execution is its own process group. Timeouts, operator stops and the
-end of the session kill the group, so a block cannot leave a child behind.
+end of the session kill the group. When a block's own process exits,
+anything it left running in its group (`cmd &`, `nohup cmd &`) gets
+`TERM`, then `KILL` two seconds later, so a block cannot leave a child
+behind; something meant to keep running belongs in a `background` block.
 The group is created at spawn, so nothing runsheets kills can reach the
 operator's shell or the server. When the server stops (**End session**,
 Ctrl-C, or a crash on the way up), the session ends: every run is closed
@@ -189,8 +222,18 @@ refused, so a small file cannot expand into a huge one, and so are tags
 and classes other than dates and times. Either is a load error with a
 message saying which: in a step file the message names the file; in a
 library the runbook shows as broken, and `--check` reports it as an
-error. A UTF-8 byte order mark is accepted, and bytes
+error. `inputs` must be a list of mappings and `interpreters` a mapping
+of language to command; any other shape is a load error of the same
+kind, not a crash. A UTF-8 byte order mark is accepted, and bytes
 that are not valid UTF-8 are replaced rather than failing the load.
+
+### Settings from a cloned repository
+
+`./config/runsheets.yml` is read from the current directory, so it can
+arrive with a repository someone else wrote. It cannot open the server
+to the network: a non-loopback `bind:` that only that file sets is
+refused at start, naming the file. `--bind`, `RUNSHEETS_BIND`, a file
+named with `--config`, or the user config can still choose one.
 
 ### Bounded reads
 
@@ -215,8 +258,8 @@ whatever the old `session.json` says.
 
 - **No sandboxing of blocks.** They run as the operator on purpose.
 - **No HTTPS.** Loopback traffic does not leave the machine.
-- **No authentication beyond the token.** There is one operator and the
-  token is already bound to their browser session.
+- **No authentication beyond the session key.** There is one operator,
+  and the key is bound to their browser by the link they opened.
 - **No remote mode.** Binding to a non-loopback address is possible with
   `--bind` and is a bad idea on any network you do not fully control. The
   token is then the only thing between the network and your shell.

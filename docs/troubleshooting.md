@@ -46,13 +46,20 @@ it. Messages are quoted exactly as `runsheets` prints them.
     `runsheets: port must be a whole number, got "abc"`. The `PORT`
     variable is not read. See [Settings](running/cli.md#settings).
 
+??? question "The browser shows “Open the link from the terminal”"
+    The browser does not hold this start's session key. Open the link the
+    banner printed, `http://127.0.0.1:4567/?token=…`; the browser keeps the
+    key in a cookie until runsheets stops. Every start makes a new key, so
+    a tab left open from an earlier start, or a bookmark, shows this page
+    until the new link is opened. `--open` opens the right link for you.
+
 ??? question "The browser shows “Host not permitted”"
     The server only answers requests whose `Host` header is `localhost`,
     `127.0.0.1`, `::1` or the bind address. A machine name, an alias in
     `/etc/hosts`, or a LAN address in the URL gets a plain-text
     `Host not permitted` (status 403). This is what stops a hostile web
-    page from reaching the server through DNS rebinding. Use the URL the
-    banner prints, `http://127.0.0.1:4567/`, or `http://localhost:4567/`.
+    page from reaching the server through DNS rebinding. Use the link the
+    banner prints, `http://127.0.0.1:4567/?token=…`.
 
     To reach the server from another address, bind to it with `--bind`
     (or `RUNSHEETS_BIND`). Any address that is not loopback prints a
@@ -159,6 +166,12 @@ it. Messages are quoted exactly as `runsheets` prints them.
     log records `<slug> no longer loads: <message>` at `error`; run
     `runsheets --check` on it to see why. See
     [Reloading](running/web-ui.md#reloading).
+
+??? question "Run says “changed on disk since this page loaded”"
+    The block's file was edited after the page was shown, and the block at
+    that position is no longer the one on screen. runsheets refuses rather
+    than run something you did not see. Reload the page and click Run on
+    the block as it now reads.
 
 ## Running blocks
 

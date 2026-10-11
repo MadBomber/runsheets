@@ -79,6 +79,7 @@ module Runsheets
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="rs-token" content="#{h view.token}">
+            <meta name="rs-mark" content="#{Renderer::MARK}">
           #{Pages::FAVICON}
             <title>#{h title} · #{h APP_NAME}</title>
             <style#{nonce_attr}>#{Assets.stylesheet}</style>
@@ -225,9 +226,16 @@ module Runsheets
           meta = Pages.meta_rows(runbook).except("When to use")
           parts << Pages.warnings_banner(runbook.warnings) << Pages.meta_table(runbook, meta) << inputs_table(runbook)
           parts << steps_list(runbook) << history(listing)
-          parts << "<article class=\"markdown-body\">#{runbook.preamble_html}</article>"
+          parts << "<article class=\"markdown-body\">#{preview_html(runbook)}</article>"
         end
         parts.join("\n")
+      end
+
+      # The runbook's preamble as a preview: Copy works, but its blocks
+      # execute only on the runbook's own pages, inside its run.
+      def preview_html(runbook)
+        reason = "Open this runbook to use its blocks"
+        %w[execute acknowledge].reduce(runbook.preamble_html) { |html, action| Pages.lock_buttons(html, action, reason) }
       end
 
       def runbook_head(listing)

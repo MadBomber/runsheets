@@ -95,7 +95,19 @@ module Runsheets
     # Runsheets.config. The command line beats the environment, which beats
     # the config file, which beats the bundled defaults.
     def self.configure(options)
-      Runsheets.configure(options.except(:config), path: options[:config])
+      Runsheets.configure(options.except(:config), path: options[:config]).tap { check_bind_source(it) }
+    end
+
+    # Refuse a non-loopback bind that only the project config in the
+    # current directory asks for: a cloned repository could otherwise open
+    # runsheets to the network. --bind, RUNSHEETS_BIND, --config and the
+    # user config can still choose one.
+    def self.check_bind_source(config)
+      bind = config.project_bind
+      return if bind.nil? || Web.loopback?(bind)
+
+      raise ConfigError, "#{config.path} sets bind: #{bind}, which is not a loopback address. A project config cannot open " \
+                         "runsheets to the network; pass --bind #{bind} (or set RUNSHEETS_BIND) if that is what you want"
     end
 
     # --dump: print the settings in force as a config file. Redirect it to
@@ -174,7 +186,7 @@ module Runsheets
       options = session_options(config, out:)
       session = early_session(config, library:, runbook:, options:)
       Web.configure_for(session, bind:, port:, library:, runbook:).prepare_start(session_options: options, engineer: default_engineer(config))
-      url = "http://#{bind}:#{port}/"
+      url = SessionKey.url(bind, port, Web.settings.rs_token)
       err.puts bind_warning(bind) unless Web.loopback?(bind)
       runbook&.warnings&.each { err.puts "#{PROGRAM}: warning: #{it}" }
 

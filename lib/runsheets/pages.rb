@@ -49,6 +49,7 @@ module Runsheets
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="rs-token" content="#{h session.token}">
+                <meta name="rs-mark" content="#{Renderer::MARK}">
         #{FAVICON}
                 <meta name="rs-runbook" content="#{h runbook.slug}">
                 <title>#{h title} · #{h runbook.title}</title>
@@ -231,7 +232,7 @@ module Runsheets
         step = here && run.runbook.step(ex.step_slug)
         href = step ? "#{step_href(step)}#block-#{Rack::Utils.escape_path(ex.block_id)}" : Chooser.href(run.slug)
         <<~LI
-          <li data-execution="#{h ex.id}">
+          <li data-execution="#{h ex.id}"#{Renderer.mark_attr}>
             <a href="#{h href}" title="#{h run.slug} · #{h ex.step_slug}"><code>#{h ex.block_id}</code>#{" <small>#{h run.slug}</small>" unless here}</a>
             <span class="meta" data-role="running-status">#{ex.background? ? 'background' : 'running'} · pid #{ex.pid}</span>
             <button type="button" class="rs-btn rs-stop" data-action="stop" data-execution="#{h ex.id}">Stop</button>
@@ -494,7 +495,7 @@ module Runsheets
         <article class="markdown-body">#{document_html(session, step)}</article>
         #{mark_panel(session, step)}
         #{step_nav(session.runbook, step)}
-        <script type="application/json" id="rs-prior">#{prior_executions_json(session, step)}</script>
+        <script type="application/json" id="rs-prior"#{Renderer.mark_attr}>#{prior_executions_json(session, step)}</script>
       HTML
       layout(session, title: step.title, body:, kind: :step, step:, nonce:)
     end
@@ -616,7 +617,7 @@ module Runsheets
                  "<div class=\"banner info\">#{ICONS[:alert]}<div>No run for this runbook yet. <a href=\"/\">Start the run</a> to run these checks.</div></div>"
                end
       toolbar = if session.active? && runnable.positive?
-                  "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\">#{ICONS[:check]} Run all #{runnable} check#{'s' unless runnable == 1}</button><span class=\"meta\" data-role=\"run-all-status\" role=\"status\" aria-live=\"polite\"></span></div>"
+                  "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\"#{Renderer.mark_attr}>#{ICONS[:check]} Run all #{runnable} check#{'s' unless runnable == 1}</button><span class=\"meta\" data-role=\"run-all-status\" role=\"status\" aria-live=\"polite\"></span></div>"
                 else
                   ""
                 end
@@ -638,7 +639,7 @@ module Runsheets
         #{banner}
         #{toolbar}
         #{sections.join}
-        <script type="application/json" id="rs-prior">#{prior_executions_json(session, *docs)}</script>
+        <script type="application/json" id="rs-prior"#{Renderer.mark_attr}>#{prior_executions_json(session, *docs)}</script>
       HTML
       layout(session, title: "Checks", body:, kind: :verify, nonce:)
     end
@@ -890,6 +891,19 @@ module Runsheets
     end
 
     # What went wrong, in words, for a status.
+    # What a browser without the session key sees: how to get in, and
+    # nothing of the session (no token, no runbook).
+    def self.locked(nonce: nil)
+      body = <<~HTML
+        <section class="panel session-start">
+          <h1>#{ICONS[:alert]} Open the link from the terminal</h1>
+          <p>This browser does not have the key for this runsheets server. Open the link runsheets printed when it started (it ends in <code>?token=…</code>); this browser then keeps the key until runsheets stops.</p>
+          <p class="meta">Every start makes a new key, so a link from an earlier start no longer works.</p>
+        </section>
+      HTML
+      bare(title: "Open the link from the terminal", body:, token: "", nonce:)
+    end
+
     def self.error_title(status)
       { 403 => "Not allowed", 404 => "Not found", 409 => "Not right now", 410 => "The session has ended",
         422 => "Check what you entered", 500 => "Something went wrong" }.fetch(status) { "Error #{status}" }

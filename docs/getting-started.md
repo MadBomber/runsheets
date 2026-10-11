@@ -56,12 +56,15 @@ Library: 5 runbooks in 3 folders under /path/to/examples
 Runs:    /Users/you/.local/share/runsheets/runs
 Config:  none (defaults)
 Session: starts in the browser (who and why)
-Open http://127.0.0.1:4567/ in your browser
+Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
 Press Ctrl-C to end the session and stop
 ```
 
 `--open` launches your default browser. Without it, open the printed URL
-yourself.
+yourself. The `?token=` part is this start's key: the browser keeps it in
+a cookie, so every later page needs nothing more. A browser that has not
+opened the link sees "Open the link from the terminal" instead of the
+runbooks.
 
 The argument can also be one runbook, a directory or a single all-in-one
 markdown file:

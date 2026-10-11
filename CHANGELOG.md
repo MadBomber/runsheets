@@ -66,13 +66,21 @@ happens during a run as a *runsheet*.
 
 ### Security
 
-- Binds to loopback by default. Every state-changing request needs a
+- Binds to loopback by default. Every request needs the session key the
+  printed `?token=` link gives the browser as a cookie, so other accounts
+  on the machine see nothing; every state-changing request also needs the
   per-process session token and an allowed Host header.
-- Secret inputs are redacted from output and logs and never written back
-  into the page.
+- Secret inputs are redacted from output and logs, however the output is
+  split, and never written back into the page.
 - Every page has a Content-Security-Policy with a per-response nonce, so a
-  `<script>` in a runbook's markdown does not run. Files served from a
-  runbook are sandboxed and cannot follow a symlink out of it.
+  `<script>` in a runbook's markdown does not run, and the page's script
+  acts only on blocks runsheets rendered, so a copied Run button does
+  nothing. Run refuses a block edited since the page loaded. Files served
+  from a runbook are sandboxed and cannot follow a symlink out of it.
+- Anything a block leaves running in its process group is stopped when
+  the block finishes.
+- A project `./config/runsheets.yml` cannot by itself bind runsheets to a
+  non-loopback address.
 
 ### Settings
 

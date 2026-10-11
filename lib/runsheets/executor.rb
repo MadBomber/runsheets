@@ -82,6 +82,7 @@ module Runsheets
     rescue SystemCallError => e
       execution.failed!("#{e.class}: #{e.message}", at: clock.now)
     else
+      sweep_group(pid)
       finish(execution, pump, status, **how)
     end
 
@@ -121,6 +122,28 @@ module Runsheets
       end
       signal(pid, "KILL")
       nil
+    end
+
+    # The block's own process has been reaped; end anything it left behind
+    # in its group (`cmd &`, `nohup cmd &`) the same way: TERM, then KILL
+    # after GRACE. A block that started nothing returns at once.
+    def sweep_group(pid)
+      %w[TERM KILL].each do |name|
+        break unless group_alive?(pid)
+
+        signal(pid, name)
+        stop = monotonic + GRACE
+        sleep POLL while group_alive?(pid) && monotonic < stop
+      end
+    end
+
+    def group_alive?(pid)
+      Process.kill(0, -pid)
+      true
+    rescue Errno::ESRCH
+      false
+    rescue Errno::EPERM
+      true
     end
 
     def signal(pid, name)

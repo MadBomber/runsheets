@@ -351,4 +351,22 @@ class TestCLI < Minitest::Test
   ensure
     taken&.close
   end
+
+  def test_a_project_config_alone_cannot_open_the_server_to_the_network
+    with_scratch_dir("config/runsheets.yml" => "bind: 0.0.0.0\n") do |dir|
+      Dir.chdir(dir) do
+        run = run_cli("--check", RunsheetsTest::EXAMPLE_DIR)
+        assert_equal 1, run.status
+        assert_match(/sets bind: 0\.0\.0\.0, which is not a loopback address/, run.err)
+        assert_equal "0.0.0.0", cli_config("--bind", "0.0.0.0").bind, "the command line can still choose it"
+        assert_equal "0.0.0.0", with_env("RUNSHEETS_BIND" => "0.0.0.0") { cli_config.bind }, "so can the environment"
+      end
+    end
+  end
+
+  def test_a_project_config_may_bind_a_loopback_address
+    with_scratch_dir("config/runsheets.yml" => "bind: localhost\n") do |dir|
+      Dir.chdir(dir) { assert_equal "localhost", cli_config.bind }
+    end
+  end
 end

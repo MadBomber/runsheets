@@ -90,6 +90,8 @@ module Runsheets
       parsed     = FrontMatter.parse(File.read(main_path, encoding: "BOM|UTF-8"))
       @data      = parsed.data
       raise RunbookError, "#{File.basename(main_path)} is not a runbook: it needs YAML front matter with a title" if data["title"].to_s.strip.empty?
+
+      Runbook.check_shapes(data, File.basename(main_path))
       @section_warnings = []
       if single_file
         load_single_file(parsed.body)
@@ -101,6 +103,22 @@ module Runsheets
       @inputs       = Array(data["inputs"]).map { Input.from(it) }.freeze
       @warnings     = validate.freeze
       @source_count = source_files.size
+    end
+
+    # Raise RunbookError unless the front matter's structured keys have the
+    # shape the rest of runsheets reads: +inputs+ a list of mappings, and
+    # +interpreters+ a mapping of language to command string. +file+ names
+    # the file in the message.
+    def self.check_shapes(data, file)
+      inputs = data["inputs"]
+      unless inputs.nil? || (inputs.is_a?(Array) && inputs.all?(Hash))
+        raise RunbookError, "#{file}: inputs must be a list of mappings, each with a name (- name: REGION)"
+      end
+
+      interpreters = data["interpreters"]
+      return if interpreters.nil? || (interpreters.is_a?(Hash) && interpreters.each_value.all?(String))
+
+      raise RunbookError, "#{file}: interpreters must map a language to a command (sql: psql -f)"
     end
 
     def single_file? = @single_file

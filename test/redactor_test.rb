@@ -79,4 +79,27 @@ class TestRedactor < Minitest::Test
     assert_equal 2, r.partial_secret_length("zzab")
     assert_equal 0, r.partial_secret_length("swordfish")
   end
+
+  def test_a_secret_overlapping_itself_across_chunks_is_not_leaked
+    r = Redactor.new("PW" => "hunter2hunt")
+    out = r.feed("hunter2hunter2hunt") + r.feed("er2hunt\n") + r.flush
+    assert_equal "[redacted PW]er2[redacted PW]\n", out
+  end
+
+  # Fed in any pieces, no secret survives in the text between the markers,
+  # and with one secret the stream comes out as #redact makes it in one go.
+  def test_streaming_never_leaks_a_secret_for_any_split
+    rng = Random.new(20_261_011)
+    3_000.times do
+      secrets = Array.new(rng.rand(1..3)) { |i| ["S#{i}", Array.new(rng.rand(1..6)) { "ab"[rng.rand(2)] }.join] }.to_h
+      text    = Array.new(rng.rand(0..30)) { "abx"[rng.rand(3)] }.join
+      cuts    = Array.new(rng.rand(0..4)) { rng.rand(0..text.size) }.sort
+      pieces  = [0, *cuts, text.size].each_cons(2).map { |a, b| text[a...b] }
+      r       = Redactor.new(secrets)
+      out     = pieces.sum("") { r.feed(it) } + r.flush
+      context = [secrets, pieces].inspect
+      out.split(/\[redacted S\d\]/).each { |part| secrets.each_value { refute_includes part, it, context } }
+      assert_equal Redactor.new(secrets).redact(text), out, context if secrets.size == 1
+    end
+  end
 end

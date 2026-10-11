@@ -91,6 +91,16 @@ report, and `signal` holds the raw number.
 The process group is created with `pgroup: true` at spawn, so the killing
 cannot reach anything the operator's shell started.
 
+## Leftover children
+
+A block's process can exit while something it started is still running
+in its group: `kubectl port-forward … &`, `nohup ./server &`. When the
+block's own process has been reaped, runsheets sends `SIGTERM` to the
+group, waits up to two seconds, then sends `SIGKILL`, the same as a
+timeout. The execution's state and exit status are the block's own. A
+process meant to keep running belongs in a `background` block, which has
+Start and Stop buttons and is stopped when the session ends.
+
 ## Stopping
 
 A running execution can be stopped by the operator: the Stop button on a

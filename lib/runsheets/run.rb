@@ -96,10 +96,12 @@ module Runsheets
     #
     # A destructive block needs +confirm+ to equal the challenge issued for
     # it; the first attempt without one raises ConfirmationRequired carrying
-    # the challenge.
-    def execute(block_id, confirm: nil)
+    # the challenge. +digest+, when given, is the Block#digest the page
+    # showed; a block that no longer matches it is refused.
+    def execute(block_id, confirm: nil, digest: nil)
       @mutex.synchronize do
         step, block = executable_block!(block_id)
+        Run.same_block!(block, digest)
         if block.destructive? && !confirmed?(block_id, confirm)
           log.warn("destructive block #{block_id} refused: #{confirm.nil? ? 'needs' : 'wrong'} confirmation code", tags: [slug, step.slug])
           raise ConfirmationRequired.new(block_id, challenge_for(block_id))
@@ -157,7 +159,7 @@ redactor: Redactor.new(@redactor.secrets))
     end
 
     # Record that the operator ran a terminal block themselves.
-    def acknowledge(block_id, note: nil)
+    def acknowledge(block_id, note: nil, digest: nil)
       note = Run.note(note)
       ack = @mutex.synchronize do
         ensure_open!
@@ -165,6 +167,8 @@ redactor: Redactor.new(@redactor.secrets))
         step, block = runbook.find_block(block_id)
         raise RunError, "unknown block #{block_id}" unless block
         raise RunError, "block #{block_id} is not a terminal block (#{block.kind})" unless block.acknowledgeable?
+
+        Run.same_block!(block, digest)
 
         record.acknowledge(block, step:, note:)
         record.write!
@@ -230,6 +234,14 @@ redactor: Redactor.new(@redactor.secrets))
 
     def working_directory(step)
       step.cwd ? File.expand_path(step.cwd, runbook.dir) : runbook.dir
+    end
+
+    # Raise RunError unless +block+ is still the one whose Block#digest the
+    # page sent. No digest (a script calling the API) skips the check.
+    def self.same_block!(block, digest)
+      return if digest.nil? || digest == block.digest
+
+      raise RunError, "block #{block.id} changed on disk since this page loaded; reload the page"
     end
 
     # A note as recorded: stripped, nil when blank.

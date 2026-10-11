@@ -55,7 +55,10 @@ module Runsheets
     end
 
     def timeout_valid? = data["timeout"].nil? || (data["timeout"].to_s.match?(/\A\d+\z/) && data["timeout"].to_i.positive?)
-    def cwd          = data["cwd"]
+    # The working directory the step names, or nil. A value that is not a
+    # path is warned about (see #validate) and ignored.
+    def cwd          = cwd_valid? ? data["cwd"] : nil
+    def cwd_valid?   = data["cwd"].nil? || data["cwd"].is_a?(String)
     def number       = slug[/\A\d+/]
 
     def block(id)         = blocks.find { it.id == id }
@@ -81,6 +84,7 @@ module Runsheets
       warnings << "kind '#{kind}' is not one of #{KINDS.join(', ')}" unless KINDS.include?(kind)
       warnings << "automated step has no executable block" if automated? && executable_blocks.empty?
       warnings << "timeout must be a positive number of seconds (using #{DEFAULT_TIMEOUT})" unless timeout_valid?
+      warnings << "cwd must be a path (using the runbook directory)" unless cwd_valid?
       warnings
     end
   end

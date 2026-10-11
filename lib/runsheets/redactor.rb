@@ -6,7 +6,8 @@ module Runsheets
   # Plain string replacement: a secret that a command prints base64-encoded,
   # URL-encoded or split across lines is not caught. Output arrives in
   # chunks, so #feed holds back any tail that could be the start of a
-  # secret until the next chunk (or #flush) settles it.
+  # secret until the next chunk (or #flush) settles it, so however the
+  # output is split, no whole secret gets through.
   class Redactor
     # The redactor for a run: every secret input that has a value.
     def self.for(inputs, runbook)
@@ -20,22 +21,25 @@ module Runsheets
     def initialize(secrets)
       @secrets = secrets.to_h { |name, value| [name.to_s, value.to_s.b] }.reject { |_, v| v.empty? }.freeze
       @values  = @secrets.sort_by { |_, v| -v.bytesize }.freeze
+      @names   = @values.reverse.to_h(&:reverse).freeze # value => name, the first name winning a shared value
+      @pattern = Redactor.pattern(@values.map(&:last))
       @pending = +"".b
     end
+
+    # One binary Regexp matching any of +values+, longest first, so a secret
+    # that contains another is matched whole.
+    def self.pattern(values) = values.empty? ? nil : Regexp.new(values.map { Regexp.escape(it) }.join("|").b)
 
     def empty? = @secrets.empty?
 
     # Longest tail of a chunk that could still be the start of a secret.
     def hold_back = @values.map { |_, v| v.bytesize }.max.to_i - 1
 
-    # Every occurrence of every secret replaced. Longer secrets first, so a
-    # secret that contains another is replaced whole.
+    # Every occurrence of every secret replaced, in one left-to-right pass.
     def redact(text)
       return text if empty?
 
-      out = text.b
-      @values.each { |name, value| out = out.gsub(value, "[redacted #{name}]") }
-      out.force_encoding(text.encoding)
+      text.b.gsub(@pattern) { "[redacted #{@names[it]}]" }.force_encoding(text.encoding)
     end
 
     # Streaming: returns the part of the output so far that is safe to
@@ -44,8 +48,9 @@ module Runsheets
       return chunk if empty?
 
       @pending << chunk.b
-      keep = [partial_secret_length(@pending), @pending.bytesize - last_match_end(@pending)].min
-      safe = @pending.byteslice(0, @pending.bytesize - keep)
+      settled = last_match_end(@pending)
+      keep    = partial_secret_length(@pending.byteslice(settled..))
+      safe    = @pending.byteslice(0, @pending.bytesize - keep)
       @pending = @pending.byteslice(@pending.bytesize - keep, keep) || +"".b
       redact(safe)
     end
@@ -57,14 +62,16 @@ module Runsheets
       out
     end
 
-    # Where the last whole secret in +text+ ends, or 0. Nothing up to there
-    # may be held back: a tail that both ends a whole secret and starts
-    # another would otherwise keep the whole one out of #redact.
+    # Where the last secret #redact would replace in +text+ ends, or 0.
+    # Matches are found left to right as #redact finds them, so one that
+    # overlaps an earlier match is not counted.
     def last_match_end(text)
-      @values.filter_map do |_, value|
-        at = text.rindex(value)
-        at && (at + value.bytesize)
-      end.max || 0
+      at = 0
+      ends = 0
+      while (match = @pattern.match(text, at))
+        ends = at = match.end(0)
+      end
+      ends
     end
 
     # Length of the longest suffix of +text+ that is a proper prefix of

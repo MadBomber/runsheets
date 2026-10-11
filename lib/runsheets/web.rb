@@ -4,6 +4,54 @@ require "ipaddr"
 require "sinatra/base"
 
 module Runsheets
+  # The session key: every request must hold it, so another account on the
+  # same machine that can reach the port still sees nothing. A browser gets
+  # it by opening the ?token= link the CLI prints, which the server turns
+  # into an HttpOnly cookie; a script sends the token itself.
+  module SessionKey
+    # The address to open in a browser: the bind address (bracketed when
+    # it is IPv6) with the session key.
+    def self.url(bind, port, token)
+      host = bind.to_s.include?(":") ? "[#{bind.to_s.delete('[]')}]" : bind
+      "http://#{host}:#{port}/?token=#{token}"
+    end
+
+    # Is +value+ the session +token+?
+    def self.matches?(value, token) = value.is_a?(String) && !token.to_s.empty? && Rack::Utils.secure_compare(value, token.to_s)
+
+    # The request side, as Sinatra helpers of Web.
+    module Helpers
+      # Is +value+ this server's session token?
+      def key?(value) = SessionKey.matches?(value, settings.rs_token)
+
+      def token_ok? = [request.env["HTTP_X_RUNSHEETS_TOKEN"], params["_token"]].any? { key?(it) }
+
+      # Cookies are shared by every port on a host, so the name carries the
+      # port: two servers on one machine keep separate keys.
+      def cookie_name = "runsheets_#{settings.port}"
+
+      # Does this request hold the session key, as the cookie or the token?
+      def key_ok? = key?(request.cookies[cookie_name]) || token_ok?
+
+      # GET /anything?token=KEY (or HEAD): keep the key in an HttpOnly cookie and drop
+      # it from the address bar.
+      def accept_key_from_link
+        return unless (request.get? || request.head?) && key?(params["token"])
+
+        response.set_cookie(cookie_name, value: settings.rs_token, path: "/", httponly: true, same_site: :lax)
+        redirect request.path_info
+      end
+
+      # Stop a request without the key before anything of the session is
+      # shown: the error pages carry the token too.
+      def refuse_without_key
+        return if key_ok?
+
+        halt 401, (wants_json? ? json({ error: "missing session key: open the link runsheets printed" }, status: 401) : page { Pages.locked(nonce: it) })
+      end
+    end
+  end
+
   # The local web application. Binds to loopback, serves the runbook pages,
   # and exposes the execute/poll endpoints the page JavaScript uses.
   #
@@ -11,7 +59,11 @@ module Runsheets
   # - Host header must be a loopback name or the bind address (rack-protection
   #   HostAuthorization), which defeats DNS rebinding. A wildcard bind cannot
   #   enumerate its hosts, so the check is off for one; the CLI warns.
-  # - Every non-GET request must carry the session token, either in the
+  # - Every request needs the session key: the browser gets it as an
+  #   HttpOnly cookie by opening the ?token= link the CLI prints, and a
+  #   script can send the token itself. Another account on the same machine
+  #   can reach the port but has neither, so it sees no page and no token.
+  # - Every non-GET request must also carry the session token, either in the
   #   X-Runsheets-Token header (fetch) or the _token form field. A page on
   #   another origin cannot read the token or send the custom header without
   #   a CORS preflight this app never answers.
@@ -87,11 +139,17 @@ module Runsheets
     # The engineering session, once it has started.
     def self.session = settings.rs_session
 
-    # Start the session from the start page's answers.
+    @start_lock = Mutex.new
+
+    # Start the session from the start page's answers. Puma serves requests
+    # on several threads, so a double-submitted form must not make two: the
+    # second caller gets the session the first one started.
     def self.start_session(engineer:, why:)
-      set :rs_session, Session.new(engineer:, why:, library: settings.rs_library, runbook: settings.rs_runbook,
-                                   token: settings.rs_token, **settings.rs_session_options)
+      @start_lock.synchronize { settings.rs_session || set(:rs_session, Session.new(engineer:, why:, **session_sources)).rs_session }
     end
+
+    # What a session started here is built from, beside who and why.
+    def self.session_sources = { library: settings.rs_library, runbook: settings.rs_runbook, token: settings.rs_token, **settings.rs_session_options }
 
     # +path+ when it is a path on this server, else +fallback+. "//host" and
     # "/\host" are rejected: browsers read both as another site.
@@ -159,15 +217,12 @@ module Runsheets
         "img-src 'self' data: https: http:; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
     end
 
+    helpers SessionKey::Helpers
+
     helpers do
       def rs      = settings.rs_session
       def library = settings.rs_library
       def runbook = rs.runbook
-
-      def token_ok?
-        token = settings.rs_token
-        [request.env["HTTP_X_RUNSHEETS_TOKEN"], params["_token"]].any? { it.is_a?(String) && Rack::Utils.secure_compare(it, token) }
-      end
 
       def library_route? = request.path_info == "/library" || request.path_info.start_with?("/library/")
 
@@ -258,6 +313,8 @@ module Runsheets
 
     before do
       reading = request.get? || request.head?
+      accept_key_from_link
+      refuse_without_key
       fail_with("missing or invalid session token", 403) unless reading || token_ok?
       if start_route?
         redirect "/session" if rs
@@ -458,12 +515,12 @@ module Runsheets
     # -- execution ------------------------------------------------------
 
     post "/blocks/:id/execute" do
-      execution = target_run.execute(params["id"], confirm: params["confirm"])
+      execution = target_run.execute(params["id"], confirm: params["confirm"], digest: params["digest"])
       json execution_json(execution), status: 202
     end
 
     post "/blocks/:id/acknowledge" do
-      ack = target_run.acknowledge(params["id"], note: params["note"])
+      ack = target_run.acknowledge(params["id"], note: params["note"], digest: params["digest"])
       json ack.merge(block_id: params["id"]), status: 201
     end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "cgi/escape"
+require "securerandom"
 require "kramdown"
 require "kramdown-parser-gfm"
 require "rouge"
@@ -12,6 +13,11 @@ module Runsheets
     Result = Data.define(:html, :blocks)
 
     ROUGE_THEME = "base16.monokai.dark"
+
+    # A random value for this process, stamped on every block wrapper and
+    # control the page's script may act on. Raw HTML in markdown can copy the
+    # markup of a Run button, but not this value, so the script ignores it.
+    MARK = SecureRandom.hex(16)
 
     # Rouge formatter that wraps block output the way kramdown's layout
     # expects (<div class="highlight"><pre class="highlight"><code>) without
@@ -94,6 +100,9 @@ module Runsheets
 
     def self.h(value) = CGI.escapeHTML(value.to_s)
 
+    # The attribute that marks an element as the page's own (see MARK).
+    def self.mark_attr = %( data-rs-mark="#{MARK}")
+
     # An expect block illustrates the nearest executable block above it.
     def self.link_expectations(blocks)
       last = nil
@@ -113,7 +122,8 @@ module Runsheets
       classes = ["rs-block", "rs-#{block.kind}"]
       classes << "rs-executable" if block.executable?
       classes << "rs-warned" if block.warnings.any?
-      attrs = %(id="block-#{h block.id}" data-block="#{h block.id}" data-kind="#{block.kind}" data-lang="#{h block.lang}")
+      attrs = %(id="block-#{h block.id}"#{mark_attr} data-block="#{h block.id}" data-kind="#{block.kind}" ) +
+              %(data-digest="#{block.digest}" data-lang="#{h block.lang}")
       attrs += %( data-expect-for="#{h block.expect_for}") if block.expect_for
 
       <<~HTML

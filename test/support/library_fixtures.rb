@@ -85,6 +85,7 @@ module RunsheetsTest
                     .prepare_start(session_options: { runs_root: @runs_root, echo: nil }, engineer: "Prefilled")
       Runsheets::Web.set :rs_token, "tok"
       Runsheets::Web.set :rs_stopper, StopCounter.new(0)
+      set_cookie "runsheets_#{Runsheets::Web.settings.port}=tok"
     end
 
     # End the running session and serve the library as if just started.

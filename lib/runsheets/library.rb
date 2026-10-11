@@ -235,7 +235,7 @@ module Runsheets
     def entry_for(found, single_file:)
       runbook = Runbook.load(found.path, slug: found.slug, root: dir)
       Entry.new(**found.to_h, single_file:, runbook:, error: nil)
-    rescue RunbookError, SystemCallError => e # an unreadable file is shown as broken, not dropped
+    rescue StandardError => e # a file that does not load, for any reason, is shown as broken, not dropped
       Entry.new(**found.to_h, single_file:, runbook: nil, error: e.message)
     end
 
