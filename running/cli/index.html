@@ -2087,9 +2087,16 @@ the check. It is reported as an error with its slug and no summary line:</p>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Config:  /Users/you/.config/runsheets/runsheets.yml
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Session: starts in the browser (who and why)
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>Open http://127.0.0.1:4567/ in your browser
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>Press Ctrl-C to end the session and stop
 </span></code></pre></div>
+<p>The link carries this start's session key. Opening it gives the browser
+the key as a cookie and drops it from the address bar; every request
+needs the key, so another account on the machine that can reach the port
+still sees nothing. <code>--open</code> opens this link. Each start makes a new key,
+so a tab or bookmark from an earlier start shows "Open the link from the
+terminal" until the new link is opened. With an IPv6 <code>--bind</code> the address
+is bracketed, <code>http://[::1]:4567/?token=…</code>.</p>
 <p>Started on a directory of runbooks, the second line is <code>Library:</code> with the
 number of runbooks and folders. When <code>--engineer</code> and <code>--why</code> are both set
 the session has already started, and the <code>Session:</code> line gives its id and
@@ -2168,7 +2175,11 @@ be read is reported in one line and the command exits <code>1</code>:</p>
 and opens the browser; <code>runsheets --check</code> checks it instead; and
 <code>RUNSHEETS_PORT=4581 runsheets</code> or <code>runsheets -p 4581</code> moves it for one run. A
 repository can carry its own <code>config/runsheets.yml</code> (say <code>dir:</code> and
-<code>runs_dir:</code>) that applies whenever <code>runsheets</code> is run from its root.</p>
+<code>runs_dir:</code>) that applies whenever <code>runsheets</code> is run from its root. One
+thing it cannot do is open the server to the network: a non-loopback
+<code>bind:</code> set only by that file stops the start with
+<code>runsheets: ./config/runsheets.yml sets bind: 0.0.0.0, which is not a loopback address…</code>.
+Pass <code>--bind</code> or set <code>RUNSHEETS_BIND</code> if that is really wanted.</p>
 <table>
 <thead>
 <tr>

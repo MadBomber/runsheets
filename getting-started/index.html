@@ -2166,11 +2166,14 @@ reads. Change to the installed gem's directory:</p>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>Config:  none (defaults)
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Session: starts in the browser (who and why)
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>Open http://127.0.0.1:4567/ in your browser
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Press Ctrl-C to end the session and stop
 </span></code></pre></div>
 <p><code>--open</code> launches your default browser. Without it, open the printed URL
-yourself.</p>
+yourself. The <code>?token=</code> part is this start's key: the browser keeps it in
+a cookie, so every later page needs nothing more. A browser that has not
+opened the link sees "Open the link from the terminal" instead of the
+runbooks.</p>
 <p>The argument can also be one runbook, a directory or a single all-in-one
 markdown file:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>directory_based_runbooks/hello<span class="w">                </span><span class="c1"># one runbook directory</span>

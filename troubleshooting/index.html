@@ -1826,13 +1826,21 @@ refused with a message such as
 variable is not read. See <a href="../running/cli/#settings">Settings</a>.</p>
 </details>
 <details class="question">
+<summary>The browser shows “Open the link from the terminal”</summary>
+<p>The browser does not hold this start's session key. Open the link the
+banner printed, <code>http://127.0.0.1:4567/?token=…</code>; the browser keeps the
+key in a cookie until runsheets stops. Every start makes a new key, so
+a tab left open from an earlier start, or a bookmark, shows this page
+until the new link is opened. <code>--open</code> opens the right link for you.</p>
+</details>
+<details class="question">
 <summary>The browser shows “Host not permitted”</summary>
 <p>The server only answers requests whose <code>Host</code> header is <code>localhost</code>,
 <code>127.0.0.1</code>, <code>::1</code> or the bind address. A machine name, an alias in
 <code>/etc/hosts</code>, or a LAN address in the URL gets a plain-text
 <code>Host not permitted</code> (status 403). This is what stops a hostile web
-page from reaching the server through DNS rebinding. Use the URL the
-banner prints, <code>http://127.0.0.1:4567/</code>, or <code>http://localhost:4567/</code>.</p>
+page from reaching the server through DNS rebinding. Use the link the
+banner prints, <code>http://127.0.0.1:4567/?token=…</code>.</p>
 <p>To reach the server from another address, bind to it with <code>--bind</code>
 (or <code>RUNSHEETS_BIND</code>). Any address that is not loopback prints a
 warning to stderr before the banner:</p>
@@ -1922,6 +1930,13 @@ runbook unable to load, the previous version is kept and the session
 log records <code>&lt;slug&gt; no longer loads: &lt;message&gt;</code> at <code>error</code>; run
 <code>runsheets --check</code> on it to see why. See
 <a href="../running/web-ui/#reloading">Reloading</a>.</p>
+</details>
+<details class="question">
+<summary>Run says “changed on disk since this page loaded”</summary>
+<p>The block's file was edited after the page was shown, and the block at
+that position is no longer the one on screen. runsheets refuses rather
+than run something you did not see. Reload the page and click Run on
+the block as it now reads.</p>
 </details>
 <h2 id="running-blocks">Running blocks<a class="headerlink" href="#running-blocks" title="Permanent link">&para;</a></h2>
 <details class="question">

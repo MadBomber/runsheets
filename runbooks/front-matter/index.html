@@ -1958,6 +1958,11 @@ that is not valid YAML, stops the runbook from loading with a clear error.</p>
 </tbody>
 </table>
 <h3 id="inputs-entries"><code>inputs</code> entries<a class="headerlink" href="#inputs-entries" title="Permanent link">&para;</a></h3>
+<p><code>inputs</code> must be a list, and each entry a mapping. <code>inputs: [REGION]</code> or
+<code>inputs: {REGION: x}</code> does not load: the error is
+<code>runbook.md: inputs must be a list of mappings, each with a name (- name: REGION)</code>,
+and in a library the runbook shows as broken. <code>interpreters</code> likewise
+must be a mapping of language to a command string.</p>
 <table>
 <thead>
 <tr>
@@ -2060,7 +2065,7 @@ if a block asks for <code>run</code>; the block renders with a warning instead.<
 <td><code>cwd</code></td>
 <td>path</td>
 <td>the runbook directory</td>
-<td>Working directory for executed blocks, resolved relative to the runbook directory.</td>
+<td>Working directory for executed blocks, resolved relative to the runbook directory. Anything but a string is a warning and the runbook directory is used.</td>
 </tr>
 </tbody>
 </table>

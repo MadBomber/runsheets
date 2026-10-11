@@ -1276,6 +1276,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#leftover-children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Leftover children
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stopping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1745,6 +1756,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#leftover-children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Leftover children
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stopping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1963,6 +1985,14 @@ it expires:</p>
 report, and <code>signal</code> holds the raw number.</p>
 <p>The process group is created with <code>pgroup: true</code> at spawn, so the killing
 cannot reach anything the operator's shell started.</p>
+<h2 id="leftover-children">Leftover children<a class="headerlink" href="#leftover-children" title="Permanent link">&para;</a></h2>
+<p>A block's process can exit while something it started is still running
+in its group: <code>kubectl port-forward … &amp;</code>, <code>nohup ./server &amp;</code>. When the
+block's own process has been reaped, runsheets sends <code>SIGTERM</code> to the
+group, waits up to two seconds, then sends <code>SIGKILL</code>, the same as a
+timeout. The execution's state and exit status are the block's own. A
+process meant to keep running belongs in a <code>background</code> block, which has
+Start and Stop buttons and is stopped when the session ends.</p>
 <h2 id="stopping">Stopping<a class="headerlink" href="#stopping" title="Permanent link">&para;</a></h2>
 <p>A running execution can be stopped by the operator: the Stop button on a
 <code>background</code> block, the Stop button in the sidebar's <strong>Running</strong> panel, or

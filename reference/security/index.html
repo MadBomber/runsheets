@@ -1389,6 +1389,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#session-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-token" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1503,6 +1514,17 @@
     <span class="md-ellipsis">
       
         Front matter is data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-from-a-cloned-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings from a cloned repository
       
     </span>
   </a>
@@ -1851,6 +1873,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#session-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-token" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1965,6 +1998,17 @@
     <span class="md-ellipsis">
       
         Front matter is data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-from-a-cloned-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings from a cloned repository
       
     </span>
   </a>
@@ -2151,12 +2195,26 @@ defeats DNS rebinding, where a hostile site points its own domain at
 list can be right: the check is off for one, and the CLI says so when it
 starts. A specific non-loopback address permits itself as well as the
 loopback names.</p>
+<h3 id="session-key">Session key<a class="headerlink" href="#session-key" title="Permanent link">&para;</a></h3>
+<p>When the server starts it generates a random 128-bit token, and every
+request must hold it. The banner prints a link that carries it,
+<code>http://127.0.0.1:4567/?token=…</code>; the first visit moves the token into
+an <code>HttpOnly</code>, <code>SameSite=Lax</code> cookie named for the port and redirects to
+the same page without it. A browser without the cookie gets a page
+saying to open the link from the terminal (status 401), and a script
+gets 401 JSON; neither shows the token or anything of the session. A
+script can send the token in the <code>X-Runsheets-Token</code> header instead of
+the cookie.</p>
+<p>This is what keeps other accounts on a shared machine out. Any local user
+can connect to a loopback port, but without the key they see no page, so
+they cannot read the token from one. Every start makes a new key, so a
+link from an earlier start stops working.</p>
 <h3 id="session-token">Session token<a class="headerlink" href="#session-token" title="Permanent link">&para;</a></h3>
-<p>When the server starts it generates a random 128-bit token. Every page
-embeds it in a <code>&lt;meta&gt;</code> tag, and every state-changing request must carry
-it, either in the <code>X-Runsheets-Token</code> header (used by the page's
-JavaScript) or in a <code>_token</code> form field (used by the HTML forms). Requests
-without it are refused with 403 before any handler runs.</p>
+<p>Every page also embeds the token in a <code>&lt;meta&gt;</code> tag, and every
+state-changing request must carry it, either in the <code>X-Runsheets-Token</code>
+header (used by the page's JavaScript) or in a <code>_token</code> form field (used
+by the HTML forms). Requests without it are refused with 403 before any
+handler runs.</p>
 <p>A page on another origin cannot read the token: same-origin policy stops it
 reading the response of a request to <code>127.0.0.1</code>. It also cannot send the
 custom header without a CORS preflight, which this server never answers.
@@ -2177,6 +2235,17 @@ the page can run script, load a frame or plugin, or submit a form
 elsewhere. A <code>&lt;script&gt;</code> in a step still renders as text in the HTML, and
 does nothing. Pages are also sent with <code>Cache-Control: no-store</code>, since
 they carry the token.</p>
+<p>Raw HTML can still copy the markup of a block, a Run button included. So
+every block runsheets renders, and every control its script acts on,
+carries a random value made when the server starts, which the page's
+script checks before wiring anything up. A copied button lacks the value
+and does nothing, so a step cannot show "Copy example" on a button that
+runs another block. A runbook previewed in the library shows its blocks
+with Copy only; they run from the runbook's own pages.</p>
+<p>Each block also carries a digest of its code, sent back with Run and
+I ran this. If the runbook was edited after the page loaded and the
+block is no longer the one shown, the request is refused with 409 and
+the page says to reload.</p>
 <p>A Content Security Policy cannot stop a <code>&lt;meta http-equiv="refresh"&gt;</code>
 from navigating the page, so <code>&lt;meta&gt;</code> tags are removed from rendered
 markdown altogether, in runbooks and in plain documents alike. A runbook
@@ -2240,7 +2309,10 @@ another within a session. Output is redacted on its way from the child to the
 transformed forms; see <a href="../../runbooks/inputs/#redaction">Inputs and Secrets</a>.</p>
 <h3 id="process-groups-timeouts-and-stops">Process groups, timeouts and stops<a class="headerlink" href="#process-groups-timeouts-and-stops" title="Permanent link">&para;</a></h3>
 <p>Every execution is its own process group. Timeouts, operator stops and the
-end of the session kill the group, so a block cannot leave a child behind.
+end of the session kill the group. When a block's own process exits,
+anything it left running in its group (<code>cmd &amp;</code>, <code>nohup cmd &amp;</code>) gets
+<code>TERM</code>, then <code>KILL</code> two seconds later, so a block cannot leave a child
+behind; something meant to keep running belongs in a <code>background</code> block.
 The group is created at spawn, so nothing runsheets kills can reach the
 operator's shell or the server. When the server stops (<strong>End session</strong>,
 Ctrl-C, or a crash on the way up), the session ends: every run is closed
@@ -2269,8 +2341,16 @@ refused, so a small file cannot expand into a huge one, and so are tags
 and classes other than dates and times. Either is a load error with a
 message saying which: in a step file the message names the file; in a
 library the runbook shows as broken, and <code>--check</code> reports it as an
-error. A UTF-8 byte order mark is accepted, and bytes
+error. <code>inputs</code> must be a list of mappings and <code>interpreters</code> a mapping
+of language to command; any other shape is a load error of the same
+kind, not a crash. A UTF-8 byte order mark is accepted, and bytes
 that are not valid UTF-8 are replaced rather than failing the load.</p>
+<h3 id="settings-from-a-cloned-repository">Settings from a cloned repository<a class="headerlink" href="#settings-from-a-cloned-repository" title="Permanent link">&para;</a></h3>
+<p><code>./config/runsheets.yml</code> is read from the current directory, so it can
+arrive with a repository someone else wrote. It cannot open the server
+to the network: a non-loopback <code>bind:</code> that only that file sets is
+refused at start, naming the file. <code>--bind</code>, <code>RUNSHEETS_BIND</code>, a file
+named with <code>--config</code>, or the user config can still choose one.</p>
 <h3 id="bounded-reads">Bounded reads<a class="headerlink" href="#bounded-reads" title="Permanent link">&para;</a></h3>
 <p>A page never reads a whole output file or log. Block output on a page
 and in the poll response is the last 256 KB of the execution's <code>.out</code>
@@ -2289,8 +2369,8 @@ whatever the old <code>session.json</code> says.</p>
 <ul>
 <li><strong>No sandboxing of blocks.</strong> They run as the operator on purpose.</li>
 <li><strong>No HTTPS.</strong> Loopback traffic does not leave the machine.</li>
-<li><strong>No authentication beyond the token.</strong> There is one operator and the
-  token is already bound to their browser session.</li>
+<li><strong>No authentication beyond the session key.</strong> There is one operator,
+  and the key is bound to their browser by the link they opened.</li>
 <li><strong>No remote mode.</strong> Binding to a non-loopback address is possible with
   <code>--bind</code> and is a bad idea on any network you do not fully control. The
   token is then the only thing between the network and your shell.</li>

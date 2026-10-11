@@ -1945,13 +1945,21 @@ happens during a run as a <em>runsheet</em>.</p>
 </ul>
 <h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Binds to loopback by default. Every state-changing request needs a
+<li>Binds to loopback by default. Every request needs the session key the
+  printed <code>?token=</code> link gives the browser as a cookie, so other accounts
+  on the machine see nothing; every state-changing request also needs the
   per-process session token and an allowed Host header.</li>
-<li>Secret inputs are redacted from output and logs and never written back
-  into the page.</li>
+<li>Secret inputs are redacted from output and logs, however the output is
+  split, and never written back into the page.</li>
 <li>Every page has a Content-Security-Policy with a per-response nonce, so a
-  <code>&lt;script&gt;</code> in a runbook's markdown does not run. Files served from a
-  runbook are sandboxed and cannot follow a symlink out of it.</li>
+  <code>&lt;script&gt;</code> in a runbook's markdown does not run, and the page's script
+  acts only on blocks runsheets rendered, so a copied Run button does
+  nothing. Run refuses a block edited since the page loaded. Files served
+  from a runbook are sandboxed and cannot follow a symlink out of it.</li>
+<li>Anything a block leaves running in its process group is stopped when
+  the block finishes.</li>
+<li>A project <code>./config/runsheets.yml</code> cannot by itself bind runsheets to a
+  non-loopback address.</li>
 </ul>
 <h3 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h3>
 <ul>
