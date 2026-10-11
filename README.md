@@ -1,8 +1,12 @@
 # runsheets
 
-> **Note:** This is a proof-of-concept and a work in progress. Expect it to
-> be unstable for a while: features, file formats, and the CLI may change
-> without notice.
+> **Note:** This is a proof-of-concept and a work in progress. Features,
+> file formats, and the CLI may change without notice.
+>
+> Runbooks are common among DevOps engineers but a little foreign to me.
+> Please [open an issue](https://github.com/MadBomber/runsheets/issues) and
+> let me know where I get this concept wrong. I appreciate all feedback and
+> contributions.
 >
 > See the [CHANGELOG.md](https://github.com/MadBomber/runsheets/blob/main/CHANGELOG.md)
 > file to see latest changes.

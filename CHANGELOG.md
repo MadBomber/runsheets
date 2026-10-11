@@ -4,351 +4,87 @@
 
 ## [0.0.1] - 2026-10-11
 
-### Fixed
+First release. runsheets turns a markdown runbook into a local web page
+where marked commands get a Run button, and records everything that
+happens during a run as a *runsheet*.
 
-A review of the whole application found the following; each has a test.
+### Runbooks
 
-- Security:
-  - A runbook could make a page run its blocks with no click: a meta refresh
-    in its markdown led to an HTML file served from `/files/`, whose script
-    read the session token. Served files now carry a sandboxing CSP and
-    `nosniff`, and only images, PDFs and plain text are shown inline (anything
-    else downloads); `<meta>` tags are removed from rendered markdown.
-  - A secret whose last characters repeat its first (`s3cr3ts`) escaped the
-    redactor in full. Concurrent executions shared one redactor and could
-    swap output; each execution now has its own.
-  - Secret inputs were written into the start form from the environment or
-    the default; secret fields are now always empty in the page.
-  - Command output, notes and input values could become live HTML on the
-    runsheet page; `run.md` now fences and escapes them. The JSON a step page
-    embeds escapes `<`, so output containing `<!--<script>` no longer stops
-    the page's buttons working.
-  - Pages read only the end of a large output file or session log; YAML
-    aliases in front matter are refused; log tags cannot carry a newline;
-    interrupted-session cleanup stays inside the runs directory; run history
-    no longer expands glob characters in a slug.
-  - Adding a note redirected to any `back` value starting with `/`, so
-    `//other.site` sent the browser off site. Only paths on this server
-    are followed now; anything else returns to the session page.
-- Runs and sessions:
-  - `runsheets --engineer --why` failed to start after a killed session
-    (`Time.iso8601` without `require "time"`).
-  - Output over 64 KB with any non-ASCII character broke the record, so the
-    session could not end.
-  - A block started while the session was ending kept running afterwards; a
-    failure while closing one run stopped the others closing.
-  - A second tab that opened another runbook made the first tab's Run, I ran
-    this and Mark act on the wrong runbook; every action now names its
-    runbook.
-  - A double-click on Start run created two runs.
-  - Invalid UTF-8 or a NUL in an input broke the record; a deleted or broken
-    runbook made every page fail or retry; a character split across two reads
-    was mangled in the log; malformed session records stopped a start.
-  - Records are written to a temporary file and renamed into place.
-- Web page:
-  - Browsers were sent errors as raw JSON, and every 404 said only "not
-    found"; errors are now pages in words with the specific message and ways
-    back, in the library's frame when there is no runbook on screen.
-  - End session now asks first; a blank note keeps you on the session page
-    with a message; the elapsed time keeps counting; the library shows what
-    is running; a step's mark updates when its block finishes; "Previous runs"
-    leaves out the open run.
-  - Pages no longer scroll sideways at phone width (footer, notes, long
-    paths, history rows, a long engineer name).
-  - Keyboard shortcuts no longer steal arrows and Enter from links, buttons
-    and the page; block status is announced to screen readers; every page has
-    an icon.
-- Command line, loading and search:
-  - `--dump` saved `check:` and `init:`, so a saved config checked or
-    scaffolded on every later start.
-  - One malformed markdown file (an unknown YAML tag, Latin-1 text) crashed
-    `--check` and the library; it is now a broken entry with the reason. A
-    UTF-8 byte-order mark no longer hides the front matter.
-  - `--init` wrote titles like `null` or `yes` as YAML that read back wrong.
-  - In a library, `deploy.md` beside `deploy/runbook.md` hid one of them;
-    clashing names are now reported. A runbook added to a folder with none, a
-    fixed broken runbook, and an edited README are picked up while serving.
-  - `--check` on a library dropped unreadable runbooks and could not tell two
-    runbooks with the same name apart; lines now carry the slug.
-  - A step's title could come from a comment in its code; `## Upgrade to C#`
-    lost its `#`; an unclosed fence in a single-file runbook silently swallowed
-    the steps after it (now a warning); steps named `runbook`, `verify` or
-    `rollback` are warned about.
-  - Search phrases now match across line breaks and fold case; snippets
-    found the wrong place after characters whose lowercase is longer.
-  - Ports outside 1–65535, bad config YAML, an unknown bind host and an
-    unreadable directory give a one-line error instead of a stack trace;
-    `--log-level` accepts any case.
-  - The gem declares `logger` and leaves dotfiles, docs and quality outputs
-    out of the package.
+- A runbook is a directory (`runbook.md` with YAML front matter, ordered
+  `steps/`, optional `verify.md` and `rollback.md`) or a single markdown
+  file whose `##` headings are the steps.
+- Front matter declares `inputs` (with secrets) and `interpreters` that map
+  other languages, such as `sql` through `psql`, to a command.
+- `runsheets --init PATH` scaffolds a starter runbook; `runsheets --check`
+  reports authoring warnings.
+- Runbooks are re-read when their files change on disk.
 
-- Run, Start and "I ran this" buttons are disabled when they cannot work,
-  with a tooltip saying why: until the runbook on screen has a run. Before,
-  they looked live and a click only showed a small "not run" status.
-- Single-file runbooks are reloaded from their own file. Before, a session
-  reloaded the containing directory, so edits to a single-file runbook were
-  never picked up.
-- Stopping the server (Ctrl-C) ends the session: every run closes with the
-  status its work earns and everything left running is stopped. Before,
-  background blocks outlived the server and the run record stayed `running`
-  forever.
-- Every page carries a Content-Security-Policy with a per-response nonce on
-  its own inline script and stylesheet, and `Cache-Control: no-store`. Raw
-  HTML in runbook markdown still renders, but a `<script>` in it no longer
-  runs, so a runbook cannot use the page's session token to execute its own
-  blocks or answer its own destructive confirmation.
-- `/files/*` no longer follows a symbolic link out of the runbook directory.
-- `--bind` to a wildcard address (`0.0.0.0`, `::`) works. The Host check is
-  off for a wildcard bind, since no host list can be right, and the CLI warns
-  on any non-loopback bind. A specific non-loopback address permits itself.
-- A fenced block in a list item indented four or more spaces (a step under
-  `10.`, or a nested bullet) or inside a blockquote rendered as plain text
-  with no Run button and no warning. Fences are now found where kramdown
-  finds them, so those blocks execute; an indented code block outside a
-  list is still literal text.
-- `run` beside another flag was read by position: `bash run background`
-  became a `run` block with a warning while `bash background run` was a
-  `background` block. `run` is now redundant beside `background` or
-  `destructive` in any order, and `text expect run` or `bash run terminal`
-  warns about the conflict instead of silently dropping `run`.
-- The Checks page's "Run all N checks" counted destructive and background
-  checks, which Run all never runs. It counts only the checks it runs.
-- Starting with `--engineer` and `--why` on a port already in use created
-  a session record, marked ended, before failing. The port is checked
-  first, so a failed start records nothing.
-- The server process was titled after the directory runsheets was started
-  in, so `pgrep -f runsheets` could not find it. It is tagged `runsheets`.
-- Only numbered steps can be marked done or skipped (422 otherwise). Marking
-  the landing page or the `verify`/`rollback` documents used to count toward
-  "every step done".
-- A step whose `timeout` is not a positive integer warns and uses the default
-  instead of timing out at once.
-- `Pages` requires `rack/utils` itself, so it works without `Web` loaded;
-  `step.kind` is HTML-escaped in badges.
+### The fenced block convention
 
-### Added (expected output)
+- The info string marks a block as `run`, `destructive`, `background`,
+  `terminal` or `expect`.
+- `run` blocks execute `bash`, `sh`, `zsh`, `ruby` or any mapped language
+  as a fresh process group with a per-step timeout.
+- `destructive` blocks need a typed confirmation, checked on the server.
+- `background` blocks get Start and Stop buttons and appear in a Running
+  panel on every page.
+- `terminal` blocks are run by the operator, who confirms with "I ran this"
+  and an optional note.
+- `text expect` blocks are compared with the output of the block above
+  them. `{{any}}` matches text that changes on each run, and a mismatch
+  shows the output and the expected text side by side with the differences
+  highlighted.
 
-- `{{any}}` in a `text expect` block matches any characters within one
-  line, for output that changes on every run (ids, timestamps, PIDs). The
-  hello example uses it for the run id, so it now matches.
-- Output is compared with its expect block on the server
-  (`Runsheets::Expectation`); `/executions/:id` and the step page's restored
-  executions carry the result. A match shows the output alone with
-  `✓ matches expected`. A mismatch shows **Output** and **Expected** panes
-  with the same title row and padding, no wrapping and one shared scroll, so
-  line N sits beside line N; differing rows are tinted, differing characters
-  highlighted, and a line only one side has faces a hatched gap.
-- Once a block's result is compared, its expect block is hidden instead of
-  repeating the expected text below.
+### Libraries, search and documents
 
-### Changed (examples)
+- `runsheets DIR` on a folder of runbooks opens a library: a folder tree
+  with a filter box, each folder's `README.md`, and a summary of each
+  runbook with its inputs, steps and previous runs.
+- Full-text search across every runbook in the library, with ranked
+  results and highlighted snippets.
+- Relative links to other markdown files open as pages: another runbook,
+  or a plain document with nothing executable.
+- A Checks page gathers every verify document and runs them all with one
+  button.
 
-- The examples are grouped by shape: `examples/directory_based_runbooks/`
-  holds `hello` and `staging-teardown`; `examples/single_md_file_runbooks/`
-  holds `db-maintenance.md` and `disk-space-triage.md` with the documents
-  the latter links to. Their library slugs gain the folder
-  (`directory_based_runbooks/hello`). `runsheets` with no RUNBOOK still
-  serves `hello`, from its new path.
-- `examples/single_md_file_runbooks/runbooks_with_scripts/asgard-tasks.md`:
-  a runbook whose blocks call asgard tasks defined in `.loki` files beside
-  it (`asgard greet "$NAME"`, `asgard health`). asgard finds the nearest
-  `.loki` above its working directory, and blocks run in the runbook's
-  directory, so the local task files are found before any other.
+### Sessions and the run record
 
-### Changed (sidebar)
+- Everything between starting and stopping runsheets is one session, with
+  an engineer and a reason (from the start page, or `--engineer` and
+  `--why`).
+- The session page holds timestamped notes, every run's progress, the tail
+  of the session log, and an End session button. Ending a session, or
+  Ctrl-C, closes each run as `completed`, `partial` or `opened`. A session
+  left open by a killed process is closed as `interrupted` at the next
+  start.
+- Each run records the exact command, output, exit status, timing, step
+  acknowledgements and notes in `run.json` and a readable `run.md`.
+- `session.log` records every action and line of output, timestamped and
+  levelled, and echoes it to the terminal.
+- Run history, and a diff for every block whose code has changed since a
+  past run.
 
-- On a step page the rollback document appears only in the collapsible
-  Rollback panel, not also under **Also**; the rollback page itself has no
-  panel.
+### Security
 
-### Added (milestone 5: sessions)
+- Binds to loopback by default. Every state-changing request needs a
+  per-process session token and an allowed Host header.
+- Secret inputs are redacted from output and logs and never written back
+  into the page.
+- Every page has a Content-Security-Policy with a per-response nonce, so a
+  `<script>` in a runbook's markdown does not run. Files served from a
+  runbook are sandboxed and cannot follow a symlink out of it.
 
-- The session page lists earlier sessions; a "Session & notes" link sits in
-  every runbook's sidebar, and the `n` key goes to the note box.
-- Sessions: everything between starting runsheets and stopping it is one
-  session (`Runsheets::Session`). It starts on a page asking who is
-  starting it and why (`GET /session/new`, `POST /session`), or straight
-  away with `--engineer` and `--why` (`RUNSHEETS_ENGINEER`,
-  `RUNSHEETS_WHY`, config `engineer:`); the engineer is prefilled from
-  config, `git config user.name`, then `$USER`. The why is the first note.
-- Selecting a runbook starts its run (`POST /runs`, `Runsheets::Run`): in a
-  library the runbook pane carries the inputs form and a Start run button;
-  on one runbook the landing page does. Selecting it again returns to the
-  same run, and switching between runbooks finishes nothing. Inputs given
-  earlier in the session are offered as defaults (never secrets).
-- A session page (`GET /session`) with timestamped notes
-  (`POST /session/notes`), the runs and their progress, the tail of the
-  session log, and an End session button (`POST /session/end`). The header
-  shows the session: engineer, elapsed time, runbooks.
-- Ending the session (the button, or Ctrl-C) closes every run with a status
-  worked out from what was done: `completed`, `partial` or `opened`. A
-  session left running by a killed process is closed as `interrupted` at
-  the next start, with its runs.
-- `session.log` (`Runsheets::SessionLog`, Ruby's Logger underneath): every
-  action and every line of output, timestamped, tagged and levelled like a
-  Rails log, written as it happens and echoed to the terminal. Secrets
-  never reach it. `--log-level`, `--verbose` (debug), `--quiet`,
-  `RUNSHEETS_LOG_LEVEL`, `RUNSHEETS_QUIET`.
-- Change a run's inputs partway (`POST /run/inputs`); a secret left blank
-  keeps its value and never comes back to the page. Recorded as an
-  `inputs` event.
-- The Running panel lists background processes from every runbook in the
-  session, each with Stop.
-- Records: `runs/sessions/<id>/session.json` and `session.log`; a run's
-  directory is named by its session id and its `run.json` names the
-  session. Blocks see `RUNSHEETS_SESSION_ID`.
+### Settings
 
-### Added (milestone 4: packaging)
+- Layered settings through `myway_config`. Command-line flags override
+  `RUNSHEETS_*` environment variables, which override `./config/runsheets.yml`,
+  which overrides `~/.config/runsheets/runsheets.yml`, which overrides the
+  bundled defaults.
+- `runsheets --dump` prints the settings in force as a config file.
 
-- Full-text search (`GET /search`, `Runsheets::Search`): a search box in
-  every header ([f] focuses it) searches every runbook in the library, or
-  the one runbook: titles, front matter prose, preambles, steps, verify
-  and rollback, code included. Every word must appear; "quoted phrases"
-  match as written. Results are ranked, with the matching steps and a
-  highlighted snippet for each, linking to the step (the open runbook) or
-  to its row in the library. Works before a runbook is open.
-- A relative link to a markdown file opens it as a page (`/docs/*`): one of
-  the runbook's own files goes to its step page, another runbook in the
-  library to its library page, and any other renders as a plain document
-  with nothing executable, in a new tab. Links resolve within the directory `runsheets`
-  was started on, so a runbook in a library can link anywhere in it, and
-  they work from the library pane before any runbook is opened.
-- Docs: a Concepts section (runbooks and plain documents, runs and
-  runsheets).
-- A directory of runbooks (`Runsheets::Library`): `runsheets DIR` where DIR
-  holds single-file runbooks and runbook directories, in folders nested to
-  any depth, opens on the library page (`/library`): a folder tree in the
-  left pane with a filter box and keyboard cursor, and in the main pane
-  whatever is selected. A folder shows its `README.md` and cards for what it
-  holds; a runbook (`/library/<path>`) shows its description, prerequisites,
-  inputs, steps, previous runs and preamble beside the Open button. The tree
-  never descends into a runbook directory. A runbook's slug is its path
-  inside the library, so run records of `a/backup` and `b/backup` stay
-  apart; the header breadcrumbs of an open runbook lead back through its
-  folders. Runbooks added, removed or edited while serving appear on the
-  next visit. Switching is refused while a run is active. `--check` on such
-  a directory checks every runbook.
-- Layered settings through `myway_config` (`Runsheets::Config`): the command
-  line beats `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`,
-  `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`, `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`,
-  `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, and `RUNSHEETS_DIR` for the `RUNBOOK` argument), which beat
-  the project config `./config/runsheets.yml` (or the file `--config FILE` /
-  `RUNSHEETS_CONFIG` names), which beats the XDG user config
-  `~/.config/runsheets/runsheets.yml`, which beats the bundled
-  `lib/runsheets/config/defaults.yml`. `--no-open`, `--no-check` and `--no-init` switch a
-  flag off that a lower layer turned on. `Runsheets.config` exposes the
-  settings in force; `Runsheets.configure` installs others.
-- `runsheets --dump` prints the settings in force in the shape of a config
-  file to stdout and exits; redirect it to save a run's options as the
-  defaults for later runs. `RUNSHEETS_DUMP` and `--no-dump` as for any flag.
-- Single-file runbooks: `runsheets path/to/file.md` reads one markdown
-  file whose `##` headings are the steps, with step attributes in an HTML
-  comment after the heading and Verify and Rollback sections standing in
-  for `verify.md` and `rollback.md` (`Runsheets::SingleFile`).
-- A language mapped under `interpreters` in the front matter now executes;
-  `sql run` through `psql` works. Previously the mapping was honoured at
-  spawn time but blocks were classified against the built-in languages
-  only, so such blocks warned and had no Run button.
-- `runsheets --init PATH` scaffolds a starter runbook (directory, or a
-  single file when the path ends in `.md`) that passes `--check`.
-- `examples/staging-teardown` (directory, the shape of a real AWS
-  teardown) and `examples/db-maintenance.md` (single file, `sql run`
-  blocks via `psql`).
-- `examples/disk-space-triage.md`: a safe single-file runbook whose steps
-  link to plain markdown documents in the examples directory (a glossary,
-  a cleanup policy with an SVG diagram, and an overview of the examples).
-  None of them has runbook front matter, so none appears in the tree.
-- Vocabulary: the record of a run is the *runsheet* in the page, sidebar
-  and buttons.
+### Examples
 
-### Changed
-
-- A run is no longer started, finished or abandoned by hand, and there are
-  no verification runs: `POST /run`, `POST /run/finish`,
-  `POST /library/open`, the Finish, Abandon and Verify only buttons, and
-  the rule that refused switching runbooks during a run are gone. The
-  Checks page and Run all work inside the runbook's run. Older records
-  still load.
-- The `last_verified` front matter key and the offer to stamp it into the
-  runbook are gone, along with the `verified` history verdict. runsheets
-  never writes inside a runbook directory.
-- A markdown file is a runbook only when it starts with YAML front matter
-  that has a `title`. A `runbook.md` or single-file runbook without one no
-  longer loads (it was a warning), and a library leaves such files out of
-  its tree as plain documents.
-- The executable is `runsheets`, the same name as the gem (was `runsheet`).
-- `-c` is now short for `--config`; `--check` has no short form.
-- `myway_config` is a runtime dependency.
-- `runsheets` with no RUNBOOK serves the bundled `examples/hello`. `--init`
-  still needs an explicit path.
-- The `runsheets` executable lives in `bin/` (was `exe/`); `bin/console` and
-  `bin/setup` are gone, so `bin/` holds only what the gem installs.
-- Development: `.loki` task file for asgard, `.rubocop.yml`, `.reek.yml` and a
-  Reek baseline under `.quality/`; the quality tools are in the Gemfile and
-  `asgard quality` passes every gate. Ten methods were split to get under the
-  Flog threshold; behaviour is unchanged.
-- `Runbook.load` raises "no such runbook" for a missing path; `Runbook`
-  gains `main_path`, `single_file?`; `Step.new` takes `data:` and
-  `interpreters:`; `Renderer.render` and `Block.new` take `interpreters:`.
-- The CLI's parsed option is `:runbook` (was `:dir`).
-
-### Added (milestone 3: verification and history)
-
-- Verification runs: `POST /run` with `kind=verify` (the landing page's
-  "Verify only" button) starts a run that may execute only verify-kind
-  steps and `verify.md`. Run ids get a `-verify` suffix and `run.json` a
-  `kind` field.
-- A Checks page (`GET /verify`) gathers every verify document with a
-  "Run all" button that executes each check in order.
-- Run history: `RunRecord#latest_executions`, `unresolved_failures`,
-  `last_step`. The history list shows kind, status, start time, duration, counts, and the step a run stopped at.
-- Drift: a finished run's page shows a line diff for every block whose
-  code has changed since it ran, or that is gone (`Runsheets::Diff`,
-  `RunRecord#drift`).
-- The runbook is re-read on the next GET whenever one of its markdown
-  files changes on disk.
-- `examples/hello` gains a `verify` step.
-
-### Added (milestone 2: the full block set)
-
-- `background` blocks execute: Start and Stop buttons, no timeout, output
-  streamed, a Running panel in the sidebar on every page, and everything
-  still running is stopped when the run finishes. A new execution state
-  `stopped`, which is not a failure.
-- `terminal` blocks have an "I ran this" button. The confirmation and an
-  optional note are recorded as an `ack` event and in `run.json`'s `acks`.
-- Destructive confirmation is checked server-side: `POST /blocks/:id/execute`
-  answers 428 with a per-block code, and runs the block only when the code
-  comes back in `confirm`. The `execute` event carries `confirmed: true`.
-- `expect` blocks are linked to the executable block above them and shown
-  beside its real output with a matches/differs hint.
-- Secret input values are redacted from captured output before it is
-  written, including secrets split across two writes (`Runsheets::Redactor`).
-- Output is captured through a pipe and a reader thread instead of a file
-  handle passed to the child.
-- `POST /executions/:id/stop` and `POST /blocks/:id/acknowledge`.
-- Execution JSON gains `background` and `output_truncated`; the page marks
-  output shown from its tail.
-- Manual steps get acknowledgement wording in the step panel; the active
-  run panel shows secret inputs as set without their values.
-- `examples/hello` gains a background step and a redaction check in
-  `verify.md`.
-
-### Added (milestone 1)
-
-- `runsheets RUNBOOK_DIR` serves a runbook directory on loopback; `--check`
-  loads it and reports authoring warnings.
-- Runbook model: `runbook.md` front matter and preamble, ordered `steps/`,
-  optional `verify.md` and `rollback.md`, `inputs` with secrets,
-  `interpreters` mapping.
-- Fenced block convention: `run`, `destructive`, `terminal`, `expect`
-  parsed from the info string; `background` recognised but not executable.
-- Execution of `bash`, `sh`, `zsh` and `ruby` blocks as fresh processes in
-  their own process group, with per-step timeouts that kill the group.
-- Run records under `~/.local/share/runsheets/runs/<slug>/<timestamp>/`
-  with `run.json`, `run.md`, and per-execution `.cmd` and `.out` files.
-- Landing page with inputs form, step list, run history; step pages with
-  Run buttons, live output polling, step done/skipped acknowledgements with
-  notes, and the rollback document in the sidebar.
-- Per-process session token and loopback host authorization on every
-  state-changing request.
+- `examples/` holds directory and single-file runbooks: `hello`,
+  `staging-teardown`, `db-maintenance.md`, `disk-space-triage.md` with the
+  plain documents it links to, and `asgard-tasks.md`, whose blocks call
+  asgard tasks.
