@@ -26,9 +26,23 @@ module Runsheets
 
     def self.compare(expected, actual)
       patterns = Hash.new { |cache, line| cache[line] = pattern(line) }
-      ops = Diff.ops(lines(expected), lines(actual), same: ->(want, got) { patterns[want].match?(got) })
-      Result.new(rows(ops))
+      Result.new(rows(ops(lines(expected), lines(actual), ->(want, got) { patterns[want].match?(got) })))
     end
+
+    # The edit script, with the lines that match at the start and at the
+    # end taken out before the diff, whose cost grows with the product of
+    # the two line counts. Output that mostly matches leaves it little to do.
+    def self.ops(wants, gots, same)
+      head = matching_run(wants, gots, same)
+      tail = matching_run(wants.drop(head).reverse, gots.drop(head).reverse, same)
+      middle = Diff.ops(wants[head...(wants.size - tail)], gots[head...(gots.size - tail)], same:)
+      paired(wants.first(head), gots.first(head)) + middle + paired(wants.last(tail), gots.last(tail))
+    end
+
+    # How many lines from the start match, pair by pair.
+    def self.matching_run(wants, gots, same) = wants.zip(gots).take_while { |want, got| got && same.call(want, got) }.size
+
+    def self.paired(wants, gots) = wants.zip(gots).map { |want, got| [" ", want, got] }
 
     # The comparison as a page wants it, or nil when there is nothing to
     # compare: no expect block, or an execution still running or that never

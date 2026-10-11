@@ -30,7 +30,7 @@ module Runsheets
 
       # A coercion that hands the stripped text to the block, or gives nil for
       # a blank so the bundled default fills it (see fill_blanks_from_defaults).
-      def unless_blank(&convert) = ->(v) { blank?(v) ? nil : convert.call(v.to_s.strip) }
+      def unless_blank = ->(v) { blank?(v) ? nil : yield(v.to_s.strip) }
 
       def whole_number(text)
         port = Integer(text, 10)

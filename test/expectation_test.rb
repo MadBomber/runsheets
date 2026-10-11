@@ -7,6 +7,11 @@ class TestExpectation < Minitest::Test
 
   Expectation = Runsheets::Expectation
 
+  # 2000 lines of output, and an expected text with {{any}} on every other line.
+  LONG_LINES    = Array.new(2_000) { "row #{it}: id #{it * 7919} ok" }.freeze
+  LONG_OUTPUT   = LONG_LINES.join("\n").freeze
+  LONG_EXPECTED = LONG_LINES.each_with_index.map { |line, i| i.odd? ? "row #{i}: {{any}} ok" : line }.join("\n").freeze
+
   def test_identical_output_matches_with_trailing_whitespace_ignored
     result = Expectation.compare("one\ntwo\n", "one  \ntwo\n\n")
     assert result.match?
@@ -55,6 +60,27 @@ class TestExpectation < Minitest::Test
     result = Expectation.compare("a\nx\ny\nz", "a\n1\n2")
     assert_equal(%w[same changed changed expected], result.rows.map { it.tag.to_s })
     refute result.match?
+  end
+
+  def test_matching_ends_are_trimmed_before_the_diff
+    ops = Expectation.ops(%w[a b x c d], %w[a b y z c d], ->(want, got) { want == got })
+    assert_equal [[" ", "a", "a"], [" ", "b", "b"]], ops.first(2)
+    assert_equal [[" ", "c", "c"], [" ", "d", "d"]], ops.last(2)
+    assert_equal [["-", "x", nil], ["+", nil, "y"], ["+", nil, "z"]], ops[2..-3]
+  end
+
+  def test_trimming_never_counts_a_line_twice
+    same = ->(want, got) { want == got }
+    assert_equal [[" ", "a", "a"], ["+", nil, "a"]], Expectation.ops(%w[a], %w[a a], same)
+    assert_equal [[" ", "a", "a"], ["-", "a", nil]], Expectation.ops(%w[a a], %w[a], same)
+  end
+
+  def test_a_long_matching_output_is_cheap
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result  = Expectation.compare(LONG_EXPECTED, LONG_OUTPUT)
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    assert result.match?
+    assert_operator elapsed, :<, 0.5, "without trimming the diff builds a 2000 x 2000 table"
   end
 
   def test_to_h_is_what_the_page_reads
