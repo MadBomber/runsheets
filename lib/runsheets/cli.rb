@@ -2,6 +2,7 @@
 
 require "optparse"
 require "fileutils"
+require "socket"
 
 module Runsheets
   # The `runsheets` command: load a runbook (a directory or a single markdown
@@ -171,7 +172,7 @@ module Runsheets
       library = target.is_a?(Library) ? target : nil
       runbook = library ? nil : target
       options = session_options(config, out:)
-      session = (Session.new(engineer: config.engineer, why: config.why, library:, runbook:, **options) if config.engineer && config.why)
+      session = early_session(config, library:, runbook:, options:)
       Web.configure_for(session, bind:, port:, library:, runbook:).prepare_start(session_options: options, engineer: default_engineer(config))
       url = "http://#{bind}:#{port}/"
       err.puts bind_warning(bind) unless Web.loopback?(bind)
@@ -192,6 +193,18 @@ module Runsheets
       end
     ensure
       shutdown(Web.session) if Web.session
+    end
+
+    # Raise Errno::EADDRINUSE now when +port+ is taken, before a session and
+    # its record exist. The server binds the port again a moment later.
+    def self.ensure_port_free(bind, port) = TCPServer.new(bind, port).close
+
+    # The session, started now when --engineer and --why say who and why;
+    # nil leaves it to the start page. The port is checked first, so a
+    # start that cannot serve records no session.
+    def self.early_session(config, library:, runbook:, options:)
+      ensure_port_free(config.bind, config.port)
+      Session.new(engineer: config.engineer, why: config.why, library:, runbook:, **options) if config.engineer && config.why
     end
 
     # What every session this process starts is built with: where records

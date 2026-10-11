@@ -489,4 +489,23 @@ class TestWeb < Minitest::Test
     assert_equal 422, verify.status
     assert_equal 0, @session.run.steps_done
   end
+
+  def test_local_path_accepts_only_same_origin_paths
+    assert_equal "/steps/010-a", Runsheets::Web.local_path("/steps/010-a", "/session")
+    ["//evil.example", "/\\evil.example", "https://evil.example", "", nil, "steps"].each do |back|
+      assert_equal "/session", Runsheets::Web.local_path(back, "/session"), back.inspect
+    end
+  end
+
+  def test_a_note_never_redirects_off_site
+    back = post "/session/notes", { "_token" => "tok", "note" => "n", "back" => "//evil.example/x" }
+    here = post "/session/notes", { "_token" => "tok", "note" => "n", "back" => "/steps/010-say-hello" }
+    assert_equal "/session", URI(back.location).path
+    assert_equal "notes", URI(back.location).fragment
+    assert_equal "/steps/010-say-hello", URI(here.location).path
+  end
+
+  def test_the_server_process_is_tagged_runsheets
+    assert_equal "runsheets", Runsheets::Web.server_settings[:tag]
+  end
 end

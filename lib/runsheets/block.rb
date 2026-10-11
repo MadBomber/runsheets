@@ -60,13 +60,8 @@ module Runsheets
       warnings << "unknown flag#{'s' if unknown.size > 1}: #{unknown.join(', ')}" if unknown.any?
 
       kinds = flags.filter_map { FLAG_KINDS[it] }.uniq
-      kind  = if kinds.include?(:destructive) then :destructive
-              elsif kinds.empty?              then :display
-              else                                 kinds.first
-              end
-
-      extra = kinds - [:run, kind]
-      warnings << "conflicting flags: #{kinds.join(', ')}; using #{kind}" if extra.any?
+      kind  = kind_for(kinds)
+      warnings << "conflicting flags: #{kinds.join(', ')}; using #{kind}" if conflicting?(kinds, kind)
 
       if EXECUTABLE_KINDS.include?(kind) && !interpreters.key?(lang)
         warnings << if lang.empty?
@@ -77,6 +72,24 @@ module Runsheets
       end
 
       [kind, warnings.freeze]
+    end
+
+    # The kind a list of flag kinds asks for, whatever their order:
+    # destructive wins, then the first kind other than run, then run.
+    def self.kind_for(kinds)
+      others = kinds - [:run]
+      if others.include?(:destructive) then :destructive
+      elsif others.any?                then others.first
+      elsif kinds.any?                 then :run
+      else                                  :display
+      end
+    end
+
+    # True when a flag asks for something +kind+ does not do. run beside
+    # destructive or background is redundant (both run); run beside
+    # terminal or expect is a contradiction.
+    def self.conflicting?(kinds, kind)
+      (kinds - [:run, kind]).any? || (kinds.include?(:run) && !EXECUTABLE_KINDS.include?(kind))
     end
 
     def executable?  = EXECUTABLE_KINDS.include?(kind) && interpreters.key?(lang)

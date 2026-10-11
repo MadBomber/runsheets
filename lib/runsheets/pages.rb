@@ -609,13 +609,14 @@ module Runsheets
       runbook = session.runbook
       docs    = runbook.verify_documents
       checks  = runbook.verify_blocks.size
+      runnable = runbook.runnable_checks.size
       banner = if session.active?
                  ""
                else
                  "<div class=\"banner info\">#{ICONS[:alert]}<div>No run for this runbook yet. <a href=\"/\">Start the run</a> to run these checks.</div></div>"
                end
-      toolbar = if session.active? && checks.positive?
-                  "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\">#{ICONS[:check]} Run all #{checks} check#{'s' unless checks == 1}</button><span class=\"meta\" data-role=\"run-all-status\" role=\"status\" aria-live=\"polite\"></span></div>"
+      toolbar = if session.active? && runnable.positive?
+                  "<div class=\"btn-row verify-toolbar\"><button type=\"button\" class=\"btn primary\" data-action=\"run-all\">#{ICONS[:check]} Run all #{runnable} check#{'s' unless runnable == 1}</button><span class=\"meta\" data-role=\"run-all-status\" role=\"status\" aria-live=\"polite\"></span></div>"
                 else
                   ""
                 end

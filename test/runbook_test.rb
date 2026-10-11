@@ -229,4 +229,17 @@ class TestRunbookSlug < Minitest::Test
   def test_a_runbook_loaded_from_its_main_file_takes_the_directory_name
     assert_equal "hello", Runsheets::Runbook.load(File.join(RunsheetsTest::EXAMPLE_DIR, "runbook.md")).slug
   end
+
+  MIXED_CHECKS = {
+    "runbook.md"     => "---\ntitle: T\n---\n",
+    "steps/010-a.md" => "a",
+    "verify.md"      => "```bash run\ntrue\n```\n\n```bash destructive\ntrue\n```\n\n```bash background\nsleep 1\n```\n"
+  }.freeze
+
+  def test_runnable_checks_are_the_run_kind_verify_blocks
+    with_runbook(MIXED_CHECKS) do |rb|
+      assert_equal %w[verify-1 verify-2 verify-3], rb.verify_blocks.map(&:id)
+      assert_equal %w[verify-1], rb.runnable_checks.map(&:id)
+    end
+  end
 end

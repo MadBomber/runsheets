@@ -47,4 +47,25 @@ class TestFences < Minitest::Test
     rewritten, = Fences.extract("text")
     assert_equal "text\n", rewritten
   end
+
+  # Fences are found where kramdown finds them: in list items, in
+  # blockquotes, and never in an indented code block. Markdown => [the code
+  # of every fence found, a line the rewritten markdown keeps].
+  FOUND = {
+    "10. Do it\n\n    ```bash run\n    echo hi\n    ```\n\nAfter.\n" => [["echo hi\n"], "    ```bash?rs=0"],
+    "- a\n  - b\n\n    ```bash run\n    echo hi\n    ```\n" => [["echo hi\n"], "    ```bash?rs=0"],
+    "> Note:\n>\n> ```bash run\n> echo hi\n>   echo two\n> ```\n" => [["echo hi\n  echo two\n"], "> ```bash?rs=0"],
+    "> ```bash run\n> echo hi\n\n```ruby run\nputs 1\n```\n" => [["echo hi\n", "puts 1\n"], "```ruby?rs=1"],
+    "```bash run\n> out.txt\n```\n" => [["> out.txt\n"], "> out.txt"],
+    "Para.\n\n    ```bash run\n    echo hi\n    ```\n" => [[], "    ```bash run"],
+    "- a\n\nPara.\n\n    ```bash run\n    echo hi\n    ```\n" => [[], "    ```bash run"]
+  }.freeze
+
+  def test_fences_are_found_where_kramdown_finds_them
+    FOUND.each do |md, (codes, kept)|
+      rewritten, fences = Fences.extract(md)
+      assert_equal codes, fences.map(&:code), md
+      assert_includes rewritten, kept, md
+    end
+  end
 end

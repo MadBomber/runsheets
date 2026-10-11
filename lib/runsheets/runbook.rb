@@ -126,6 +126,11 @@ module Runsheets
 
     def verify_blocks = verify_documents.flat_map(&:executable_blocks)
 
+    # The checks "Run all" runs: plain run blocks. A destructive check needs
+    # its code typed and a background one never finishes, so both are left
+    # for the operator to run by hand.
+    def runnable_checks = verify_blocks.select { it.kind == :run }
+
     # The markdown files this runbook was built from (those that exist).
     def source_files
       return [main_path].select { File.file?(it) } if single_file?

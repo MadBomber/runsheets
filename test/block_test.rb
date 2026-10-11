@@ -96,4 +96,23 @@ class TestBlock < Minitest::Test
     assert_equal ["run"], h[:flags]
     assert h[:executable]
   end
+
+  def test_run_beside_a_kind_that_implies_it_is_redundant_in_any_order
+    ["bash background run", "bash run background"].each do |info|
+      b = block(info)
+      assert_equal :background, b.kind, info
+      assert_empty b.warnings, info
+    end
+    assert_equal :destructive, block("bash run destructive").kind
+    assert_empty block("bash run destructive").warnings
+  end
+
+  def test_run_beside_expect_or_terminal_conflicts
+    expect = block("text expect run")
+    assert_equal :expect, expect.kind
+    assert_equal ["conflicting flags: expect, run; using expect"], expect.warnings
+    terminal = block("bash run terminal")
+    assert_equal :terminal, terminal.kind
+    assert_equal ["conflicting flags: run, terminal; using terminal"], terminal.warnings
+  end
 end

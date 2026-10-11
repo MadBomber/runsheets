@@ -34,6 +34,10 @@ module Runsheets
     set :dump_errors, false
     set :logging, false
     set :server, %w[puma webrick]
+    # Puma titles its process "puma <version> (<bind>) [<tag>]" and guesses
+    # the tag from the working directory; name it so `pgrep -f runsheets`
+    # finds the server wherever it was started.
+    set :server_settings, { tag: "runsheets" }
     set :rs_bind, "127.0.0.1"
     # The loopback names are always permitted. Anything the bind address
     # adds is decided per request (see .bind_allows?), because the
@@ -88,6 +92,10 @@ module Runsheets
       set :rs_session, Session.new(engineer:, why:, library: settings.rs_library, runbook: settings.rs_runbook,
                                    token: settings.rs_token, **settings.rs_session_options)
     end
+
+    # +path+ when it is a path on this server, else +fallback+. "//host" and
+    # "/\host" are rejected: browsers read both as another site.
+    def self.local_path(path, fallback) = path.to_s.match?(%r{\A/(?![/\\])}) ? path : fallback
 
     # Does the bind address let this request's Host through, beyond the
     # loopback names? A non-loopback bind permits its own address. A
@@ -298,7 +306,7 @@ module Runsheets
         next page { Pages.session(rs, library, settings.rs_token, error: "A note needs some text.", nonce: it) }
       end
       rs.note!(params["note"])
-      redirect(params["back"].to_s.start_with?("/") ? params["back"] : "/session#notes")
+      redirect(Web.local_path(params["back"], "/session#notes"))
     end
 
     # End the session: every run closes with the status its work earns,

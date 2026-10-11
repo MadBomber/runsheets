@@ -338,4 +338,17 @@ class TestCLI < Minitest::Test
       assert_includes run.err, "no runbooks in"
     end
   end
+
+  def test_a_busy_port_fails_before_a_session_is_recorded
+    taken = TCPServer.new("127.0.0.1", 0)
+    port  = taken.addr[1]
+    with_runs_dir do |runs|
+      run = run_cli("--port", port.to_s, "--runs-dir", runs, "--engineer", "T", "--why", "w", EXAMPLE_DIR)
+      assert_equal 1, run.status
+      assert_includes run.err, "port #{port} on 127.0.0.1 is already in use"
+      assert_empty Runsheets::Session.past(runs)
+    end
+  ensure
+    taken&.close
+  end
 end
