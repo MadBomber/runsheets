@@ -922,7 +922,7 @@ output over 64 KB with non-ASCII text broke the record and the session's end;
 `require "time"` was missing outside the web layer; one redactor was shared by
 concurrent executions; a second tab could make the first act on the wrong
 runbook (actions now name their runbook). All fixed with regression tests in
-`test/test_hardening.rb` and alongside; 287 tests, the quality gate passes. Left
+`test/hardening_test.rb` and alongside; 287 tests, the quality gate passes. Left
 for later: incremental output polling (`?since=`), warning on fences hidden in
 HTML blocks, a collapsed sidebar by default on phones, and the tree highlighting
 "All runbooks" on the session and search pages.

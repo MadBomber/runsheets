@@ -59,6 +59,8 @@ module Runsheets
     def number       = slug[/\A\d+/]
 
     def block(id)         = blocks.find { it.id == id }
+    # The text of the expect block that illustrates block +id+, or nil.
+    def expected_output(id) = blocks.find { it.expect_for == id }&.code
     def executable_blocks = blocks.select(&:executable?)
 
     def to_h

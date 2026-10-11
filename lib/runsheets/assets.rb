@@ -181,7 +181,7 @@ module Runsheets
       .rs-status { font: 600 12px var(--mono); color: var(--muted); min-width: 6em; text-align: right; }
       .rs-status.ok { color: var(--ok); } .rs-status.failed { color: var(--danger); } .rs-status.running { color: var(--accent); }
       .rs-result { border-top: 1px solid var(--border); background: #0b0e14; }
-      .rs-output { margin: 0; padding: 12px 16px; max-height: 420px; overflow: auto; font: 12.5px/1.5 var(--mono); color: #c9d1d9; white-space: pre-wrap; word-break: break-word; border: 0 !important; border-radius: 0 !important; }
+      .rs-output { margin: 0; padding: 12px 16px; overflow-x: auto; font: 12.5px/1.5 var(--mono); color: #c9d1d9; white-space: pre-wrap; word-break: break-word; border: 0 !important; border-radius: 0 !important; }
       .rs-output:empty::before { content: "(no output)"; color: var(--muted); font-style: italic; }
       .rs-exit { padding: 6px 16px; border-top: 1px solid var(--border); font: 11.5px var(--mono); color: var(--muted); }
       .rs-block.rs-stopped { border-color: rgba(255,180,84,.5); }
@@ -189,13 +189,23 @@ module Runsheets
       .rs-status.stopped { color: var(--warn); } .rs-status.acked { color: var(--ok); }
       .rs-stop { background: rgba(255,180,84,.14); border-color: rgba(255,180,84,.6); }
       .rs-ack { background: rgba(61,220,151,.14); border-color: rgba(61,220,151,.5); }
-      .rs-panes { display: grid; grid-template-columns: 1fr; }
-      .rs-panes.has-expected { grid-template-columns: 1fr 1fr; }
-      .rs-expected { border-left: 1px solid var(--border); min-width: 0; }
-      .rs-expected .rs-pane-title { padding: 4px 16px 0; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); }
-      .rs-expected pre { margin: 0; padding: 8px 16px 12px; max-height: 420px; overflow: auto; font: 12.5px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-word; border: 0 !important; border-radius: 0 !important; }
-      .rs-expected.match { border-left-color: rgba(61,220,151,.5); } .rs-expected.match .rs-pane-title { color: var(--ok); }
-      .rs-expected.mismatch { border-left-color: rgba(255,180,84,.5); } .rs-expected.mismatch .rs-pane-title { color: var(--warn); }
+      /* Output and expected side by side: one vertical scroll for both, the
+         same title row and padding on each, and no wrapping, so line N of
+         one pane always sits beside line N of the other. */
+      .rs-panes { display: grid; grid-template-columns: 1fr; max-height: 420px; overflow-y: auto; }
+      .rs-panes.has-expected { grid-template-columns: 1fr 1fr; align-items: start; }
+      .rs-pane { min-width: 0; }
+      .rs-pane-title { padding: 6px 16px 0; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+      .rs-panes:not(.has-expected) .rs-pane-title { display: none; }
+      .rs-expected { border-left: 1px solid rgba(255,180,84,.5); }
+      .rs-expected .rs-pane-title { color: var(--warn); }
+      .rs-expected pre { margin: 0; font: 12.5px/1.5 var(--mono); color: var(--muted); border: 0 !important; border-radius: 0 !important; }
+      .rs-panes.has-expected pre { padding: 6px 16px 12px; white-space: pre; word-break: normal; overflow-x: auto; }
+      .rs-row { display: block; min-height: 1.5em; min-width: 100%; width: max-content; }
+      .rs-row-changed, .rs-row-expected, .rs-row-actual { background: rgba(255,180,84,.08); }
+      .rs-row.rs-gap { background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.04) 4px 8px); }
+      .rs-diff { background: rgba(255,180,84,.28); color: #ffe2b8; border-radius: 2px; }
+      .rs-any { color: var(--accent-2); background: rgba(167,139,250,.14); border-radius: 3px; }
       .rs-sidebar .running h2 { color: var(--ok); }
       .rs-sidebar .running li { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; padding: 6px 8px; border-radius: 6px; }
       .rs-sidebar .running li a { display: inline; padding: 0; }
@@ -238,7 +248,7 @@ module Runsheets
       .verify-toolbar .meta.ok { color: var(--ok); } .verify-toolbar .meta.failed { color: var(--danger); }
       .check-doc { margin: 0 0 32px; padding: 0 0 8px; border-bottom: 1px solid var(--border); }
       .check-doc > h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
-      @media (max-width: 700px) { .rs-panes.has-expected { grid-template-columns: 1fr; } .rs-expected { border-left: 0; border-top: 1px solid var(--border); } }
+      @media (max-width: 700px) { .rs-panes.has-expected { grid-template-columns: 1fr; } .rs-expected { border-left: 0; border-top: 1px solid rgba(255,180,84,.5); } }
 
       /* ---------- library: the tree ---------- */
       .lib-tree { padding-top: 12px; }
@@ -413,21 +423,41 @@ module Runsheets
           return { res, data };
         };
         const TRUNCATED = '[… earlier output omitted; the .out file in the run directory is complete]\n';
-        const norm = s => (s || '').replace(/[ \t]+$/gm, '').replace(/\s+$/, '');
 
-        // Fill the "expected" pane from the expect block that follows this one
-        // and say whether the actual output matches it. A hint, not a verdict.
-        const compare = (block, id, actual) => {
+        // One row of the side-by-side view: [text, mark] segments, or a gap
+        // where the other pane has a line this one lacks.
+        const drawRow = (pre, segments, tag) => {
+          const row = document.createElement('span');
+          row.className = 'rs-row rs-row-' + tag + (segments ? '' : ' rs-gap');
+          (segments || []).forEach(([text, mark]) => {
+            const part = document.createElement('span');
+            part.textContent = text;
+            if (mark) part.className = 'rs-' + mark;
+            row.append(part);
+          });
+          pre.append(row);
+        };
+
+        // Show the output against its expect block, which the server has
+        // compared (Runsheets::Expectation). A match only says so; otherwise
+        // both panes are drawn row by row with the differences marked. The
+        // expect block itself is hidden, since the result now shows it.
+        // A hint, not a verdict.
+        const compare = (block, id, data) => {
+          const expected = data.expected;
+          if (!expected) return null;
+          const source = document.querySelector('.rs-expect[data-expect-for="' + CSS.escape(id) + '"]');
+          if (source) source.hidden = true;
           const pane   = block.querySelector('[data-role="expected"]');
           const panes  = block.querySelector('.rs-panes');
-          const source = document.querySelector('.rs-expect[data-expect-for="' + CSS.escape(id) + '"] pre');
-          if (!pane || !source) return null;
-          const expected = source.innerText;
-          pane.querySelector('pre').textContent = expected;
-          pane.hidden = false; panes.classList.add('has-expected');
-          const match = norm(actual) === norm(expected);
-          pane.classList.toggle('match', match); pane.classList.toggle('mismatch', !match);
-          return match ? 'matches expected' : 'differs from expected';
+          const output = block.querySelector('[data-role="output"]');
+          pane.hidden = expected.match; panes.classList.toggle('has-expected', !expected.match);
+          if (expected.match) return '✓ matches expected';
+          const want = pane.querySelector('pre');
+          want.replaceChildren(); output.replaceChildren();
+          if (data.output_truncated) { drawRow(output, [[TRUNCATED.trim(), null]], 'note'); drawRow(want, null, 'note'); }
+          expected.rows.forEach(row => { drawRow(want, row.expected, row.tag); drawRow(output, row.actual, row.tag); });
+          return 'differs from expected';
         };
 
         // The sidebar mark of the step this page shows, unless the operator marked it.
@@ -446,9 +476,12 @@ module Runsheets
           const button  = block.querySelector('[data-action="execute"]');
           const stop    = block.querySelector('[data-action="stop"]');
           const id      = block.dataset.block;
+          const panes   = block.querySelector('.rs-panes');
           result.hidden = false;
+          block.querySelector('[data-role="expected"]').hidden = true;
+          panes.classList.remove('has-expected');
           output.textContent = (data.output_truncated ? TRUNCATED : '') + (data.output || '');
-          output.scrollTop = output.scrollHeight;
+          panes.scrollTop = panes.scrollHeight;
           block.classList.remove('rs-ok', 'rs-failed', 'rs-stopped');
           status.className = 'rs-status';
           if (data.state === 'running') {
@@ -464,7 +497,7 @@ module Runsheets
           block.classList.add(ok ? 'rs-ok' : stopped ? 'rs-stopped' : 'rs-failed');
           status.classList.add(ok ? 'ok' : stopped ? 'stopped' : 'failed');
           status.textContent = data.state === 'timed_out' ? 'timed out' : data.state === 'failed' ? 'failed to start' : stopped ? 'stopped' : (ok ? 'ok' : 'exit ' + data.exit_status);
-          const verdict = data.state === 'failed' ? null : compare(block, id, data.output);
+          const verdict = compare(block, id, data);
           exit.textContent = [
             data.state === 'failed' ? data.error : (stopped ? 'stopped' : 'exit ' + data.exit_status),
             data.duration != null ? fmt(data.duration) : null,

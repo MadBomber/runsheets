@@ -35,6 +35,6 @@ aws rds describe-db-snapshots --db-snapshot-identifier "$SNAPSHOT_ID" \
 +-----------+----------+-------------+
 | Encrypted | SizeGB   |   Status    |
 +-----------+----------+-------------+
-|  True     |  100     |  available  |
+|  True     |  {{any}} |  available  |
 +-----------+----------+-------------+
 ```

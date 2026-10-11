@@ -25,6 +25,12 @@ class TestDiff < Minitest::Test
     assert_empty Diff.lines("", "")
   end
 
+  def test_ops_pair_both_sides_and_take_a_custom_sameness
+    loose = Diff.ops(%w[A b], %w[a c], same: ->(x, y) { x.casecmp?(y) })
+    assert_equal [[" ", "A", "a"], ["-", "b", nil], ["+", nil, "c"]], loose
+    assert_equal [["-", "A", nil], ["-", "b", nil], ["+", nil, "a"], ["+", nil, "c"]], Diff.ops(%w[A b], %w[a c])
+  end
+
   def test_line_predicates
     line = Diff.lines("a\n", "b\n")
     assert line[0].removed?

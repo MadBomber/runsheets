@@ -53,10 +53,13 @@ own from the Checks page.
 select current_database() as database, current_user as role, version();
 ```
 
+The version string, and so the width of its column, depends on the
+server; `{{any}}` stands in for both:
+
 ```text expect
- database |   role    |                    version
-----------+-----------+-----------------------------------------------
- app      | app_owner | PostgreSQL 16.4 on x86_64-pc-linux-gnu, ...
+ database |   role    |{{any}}version
+----------+-----------+{{any}}
+ app      | app_owner | PostgreSQL {{any}}
 ```
 
 ## Find the bloated tables

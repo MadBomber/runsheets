@@ -109,6 +109,27 @@ A review of the whole application found the following; each has a test.
 - `Pages` requires `rack/utils` itself, so it works without `Web` loaded;
   `step.kind` is HTML-escaped in badges.
 
+### Added (expected output)
+
+- `{{any}}` in a `text expect` block matches any characters within one
+  line, for output that changes on every run (ids, timestamps, PIDs). The
+  hello example uses it for the run id, so it now matches.
+- Output is compared with its expect block on the server
+  (`Runsheets::Expectation`); `/executions/:id` and the step page's restored
+  executions carry the result. A match shows the output alone with
+  `✓ matches expected`. A mismatch shows **Output** and **Expected** panes
+  with the same title row and padding, no wrapping and one shared scroll, so
+  line N sits beside line N; differing rows are tinted, differing characters
+  highlighted, and a line only one side has faces a hatched gap.
+- Once a block's result is compared, its expect block is hidden instead of
+  repeating the expected text below.
+
+### Changed (sidebar)
+
+- On a step page the rollback document appears only in the collapsible
+  Rollback panel, not also under **Also**; the rollback page itself has no
+  panel.
+
 ### Added (milestone 5: sessions)
 
 - The session page lists earlier sessions; a "Session & notes" link sits in

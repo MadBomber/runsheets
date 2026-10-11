@@ -199,7 +199,7 @@ flags. A block with no flag is display only, whatever its language.
 | ```` ```ruby run ```` | Same, executed with `ruby` (or the runbook's `interpreters.ruby`). |
 | ```` ```bash background ```` | Start and Stop buttons. No timeout; output streams into the page; listed in the sidebar's Running panel; stopped when the run ends. |
 | ```` ```bash terminal ```` | No Run button. "Run this in your own terminal, then confirm." An **I ran this** button records the confirmation, with an optional note. |
-| ```` ```text expect ```` | Not executed. Shown beside the output of the executable block above it, with a matches/differs hint. |
+| ```` ```text expect ```` | Not executed. Compared with the output of the executable block above it; a mismatch is shown side by side with the differences marked. `{{any}}` matches anything within a line. |
 
 An unknown flag, or `run` on a language that cannot execute, renders with a
 visible warning instead of being ignored. `runsheets --check` lists them.

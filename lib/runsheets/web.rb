@@ -224,10 +224,13 @@ module Runsheets
         rs.run_for(slug) or raise RunError, "#{slug} has no run in this session; start it first"
       end
 
+      # An execution as the page polls it, with its output compared against
+      # the block's expect block once it has ended.
       def execution_json(execution)
-        size = execution.output_size
-        execution.to_h.merge(output: execution.output(tail: OUTPUT_TAIL), output_size: size,
-                             output_truncated: size > OUTPUT_TAIL, success: execution.success?)
+        size   = execution.output_size
+        output = execution.output(tail: OUTPUT_TAIL)
+        execution.to_h.merge(output:, output_size: size, output_truncated: size > OUTPUT_TAIL, success: execution.success?,
+                             expected: Expectation.for_page(rs.expected_output(execution), output, execution.state))
       end
 
       # The runbook POST /runs selects: by slug from the library, freshly

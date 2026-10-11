@@ -20,16 +20,25 @@ aws rds describe-db-snapshots --db-snapshot-identifier "$SNAPSHOT_ID" \
   --output table
 ```
 
-The second table is what you want to see, with `Status` at `available`:
+The first table shows the snapshot `creating`; the second is what you
+want to see, with `Status` at `available`. The borders, the time, the
+size and the snapshot id differ from run to run, so they are `{{any}}`:
 
 ```text expect
--------------------------------------------------------------------
-|                       DescribeDBSnapshots                       |
-+----------------------------+---------------------+--------+-----+
-|  Created                   |  Id                 | SizeGB |Status|
-+----------------------------+---------------------+--------+-----+
-|  2026-10-01T14:02:11+00:00 |  acme-staging-final-preteardown | 100 | available |
-+----------------------------+---------------------+--------+-----+
+{{any}}
+|{{any}}CreateDBSnapshot{{any}}|
+{{any}}
+|{{any}}Id{{any}}Status{{any}}|
+{{any}}
+|  {{any}}|  creating  |
+{{any}}
+{{any}}
+|{{any}}DescribeDBSnapshots{{any}}|
+{{any}}
+|{{any}}Created{{any}}Id{{any}}SizeGB{{any}}Status{{any}}|
+{{any}}
+|  {{any}}|  available  |
+{{any}}
 ```
 
 If `create-db-snapshot` fails with `DBSnapshotAlreadyExists`, someone ran

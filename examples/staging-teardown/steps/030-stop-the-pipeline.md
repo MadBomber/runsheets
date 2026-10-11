@@ -14,10 +14,12 @@ gh workflow disable deploy-staging.yml --repo acme/platform
 gh workflow list --repo acme/platform --all | grep -i staging
 ```
 
-Expect the staging workflow to show `disabled_manually`:
+Expect the staging workflow to show `disabled_manually`. The columns are
+separated by tabs or spaces depending on the terminal, and the last one
+is the workflow id:
 
 ```text expect
-Deploy to staging   disabled_manually   12345678
+Deploy to staging{{any}}disabled_manually{{any}}
 ```
 
 Some teams also have a bot that re-enables workflows it finds disabled.

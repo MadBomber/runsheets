@@ -23,7 +23,7 @@ aws sts get-caller-identity
 | ```` ```ruby run ```` | <span class="kind run">run</span> | Same as `bash run`, executed with `ruby` or the runbook's `interpreters.ruby`. |
 | ```` ```bash background ```` | <span class="kind background">background</span> | Start and Stop buttons for long-running processes such as a tunnel or a log tail. No timeout. Output streams into the page; the process is listed in the sidebar's **Running** panel on every page; anything still running is stopped when the run ends and recorded as `stopped`, not as a failure. |
 | ```` ```bash terminal ```` | <span class="kind terminal">terminal</span> | No Run button. Labelled "run this in your own terminal, then confirm". For anything interactive: `read -s`, an SSO login that opens a browser, an interactive `psql` session. An **I ran this** button records the operator's confirmation, with an optional note. |
-| ```` ```text expect ```` | <span class="kind expect">expect</span> | Never executed. Linked to the nearest executable block above it and shown beside that block's real output with a "matches expected" or "differs from expected" hint. A hint for the operator; it does not gate pass or fail. |
+| ```` ```text expect ```` | <span class="kind expect">expect</span> | Never executed. Linked to the nearest executable block above it and compared with that block's real output once it has run: a match says "matches expected", a mismatch shows both side by side with the differences marked. `{{any}}` matches anything within a line. A hint for the operator; it does not gate pass or fail. |
 
 Flags are additive where it makes sense: `bash run destructive` and
 `bash destructive` are the same thing.
@@ -32,10 +32,34 @@ Flags are additive where it makes sense: `bash run destructive` and
 
 An `expect` block illustrates the executable block nearest above it in the
 same document, whatever prose sits between them. Its toolbar says which
-block it belongs to and links to it. When that block has run, the page
-shows the expected text in a pane beside the actual output and compares
-them with trailing whitespace ignored. An expect block with no executable
+block it belongs to and links to it. An expect block with no executable
 block above it is just displayed.
+
+When that block has run, its output is compared with the expected text
+line by line, ignoring trailing whitespace, and the expect block is hidden,
+since the result now shows what it said:
+
+- A match shows the output alone, with `✓ matches expected` in the footer.
+- A mismatch shows the output and the expected text in two panes, titled
+  **Output** and **Expected**. Lines do not wrap, so each line sits beside
+  the line it is compared with. Rows that differ are tinted and the
+  characters that differ are highlighted. A line only one side has faces
+  a hatched gap on the other. The footer says `differs from expected`.
+
+Output often holds something that changes on every run: a timestamp, an id,
+a PID, a duration. Write `{{any}}` in its place. It matches any characters,
+including none, within one line, so this expect block matches whatever the
+run id is:
+
+````markdown
+```text expect
+Running block 010-say-hello-1 of step 010-say-hello in run {{any}}
+```
+````
+
+`{{any}}` does not match across lines, and a line that is only `{{any}}`
+matches exactly one line of output. In the side-by-side view each `{{any}}`
+is shown as a tag.
 
 ### Background blocks
 

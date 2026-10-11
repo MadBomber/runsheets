@@ -19,7 +19,17 @@ aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table
 aws rds describe-db-snapshots --db-snapshot-identifier "$SNAPSHOT_ID" --query 'DBSnapshots[0].Status' --output text
 ```
 
+The caller identity table comes first, then the snapshot status. The
+account and ARN are yours to check by eye, so they are `{{any}}` here:
+
 ```text expect
+{{any}}
+|{{any}}GetCallerIdentity{{any}}|
+{{any}}
+|{{any}}Account{{any}}Arn{{any}}|
+{{any}}
+|  {{any}}|  arn:aws:{{any}}|
+{{any}}
 available
 ```
 

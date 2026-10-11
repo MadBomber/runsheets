@@ -32,10 +32,10 @@ psql -h localhost -p 15432 -U app -d app -X -At -c "
 ```
 
 ```text expect
-users|48213
-orders|172045
-events|9120044
+events|{{any}}
+orders|{{any}}
+users|{{any}}
 ```
 
-The numbers will differ; the point is that the query runs and the record
-keeps whatever it printed.
+The counts are `{{any}}` because they differ every time; the point is
+that the query runs and the record keeps whatever it printed.

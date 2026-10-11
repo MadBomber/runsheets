@@ -120,7 +120,7 @@ module Runsheets
         #{pad}<div class="#{classes.join(' ')}" #{attrs}>
         #{pad}<div class="rs-toolbar">#{toolbar(block)}</div>
         #{code_html.chomp}
-        #{pad}<div class="rs-result" hidden><div class="rs-panes"><pre class="rs-output" data-role="output"></pre><div class="rs-expected" data-role="expected" hidden><div class="rs-pane-title">expected</div><pre></pre></div></div><div class="rs-exit" data-role="exit"></div></div>
+        #{pad}<div class="rs-result" hidden><div class="rs-panes"><div class="rs-pane rs-actual"><div class="rs-pane-title">output</div><pre class="rs-output" data-role="output"></pre></div><div class="rs-pane rs-expected" data-role="expected" hidden><div class="rs-pane-title">expected</div><pre></pre></div></div><div class="rs-exit" data-role="exit"></div></div>
         #{pad}</div>
       HTML
     end

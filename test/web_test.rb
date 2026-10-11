@@ -104,7 +104,14 @@ class TestWeb < Minitest::Test
     verify  = get "/steps/verify"
     assert_includes inspect, "<summary>Rollback</summary>"
     assert_includes inspect, "nothing to undo"
+    refute_includes inspect, 'href="/steps/rollback"', "the panel replaces the Also link"
     assert verify.ok?
+  end
+
+  def test_the_rollback_page_links_itself_instead_of_its_panel
+    rollback = get("/steps/rollback").body
+    refute_includes rollback, "<summary>Rollback</summary>"
+    assert_includes rollback, '<li class="active"><a href="/steps/rollback">'
   end
 
   def test_unknown_step_is_404
@@ -158,6 +165,35 @@ class TestWeb < Minitest::Test
     assert_equal 0, data["exit_status"]
     assert data["success"]
     assert_includes data["output"], "Hello, web!"
+  end
+
+  def test_a_finished_execution_that_matches_its_expect_block
+    start_run("NAME" => "world")
+    expected = finish(json(execute("010-say-hello-1"))["id"])["expected"]
+    assert expected["match"], "{{any}} stands in for the run id"
+    assert_equal(%w[same same], expected["rows"].map { it["tag"] })
+  end
+
+  def test_a_finished_execution_that_differs_from_its_expect_block
+    start_run("NAME" => "web")
+    expected = finish(json(execute("010-say-hello-1"))["id"])["expected"]
+    refute expected["match"]
+    assert_equal %w[eb diff], expected["rows"].first["actual"][1]
+  end
+
+  def test_a_block_without_an_expect_block_has_nothing_to_compare
+    start_run
+    data = finish(json(execute("020-inspect-ruby-1"))["id"])
+    assert_equal "finished", data["state"]
+    assert_nil data["expected"]
+  end
+
+  def test_a_step_page_restores_the_comparison_of_its_last_execution
+    start_run("NAME" => "world")
+    finish(json(execute("010-say-hello-1"))["id"])
+    prior = JSON.parse(get("/steps/010-say-hello").body[%r{<script[^>]*id="rs-prior"[^>]*>(.*?)</script>}m, 1])
+    assert prior["executions"]["010-say-hello-1"]["expected"]["match"]
+    assert_includes prior["executions"]["010-say-hello-1"]["output"], "Hello, world!"
   end
 
   def test_a_step_page_shows_the_output_of_its_last_execution

@@ -161,7 +161,7 @@ module Runsheets
             <ol class="steps">#{step_items(session, step).join}</ol>
           </section>
           #{"<section><h2>Also</h2><ul>#{extras.join}</ul></section>" unless extras.empty?}
-          #{rollback_panel(session, kind)}
+          #{rollback_panel(session, step, kind)}
           <section class="outline"><h2>On this page</h2><ol id="outline"></ol></section>
         </aside>
       HTML
@@ -182,9 +182,12 @@ module Runsheets
     end
 
     # The "Also" entries: checks, extra documents, the active runsheet.
+    # Rollback is left out where the sidebar already shows its panel.
     def self.also_items(session, current, kind)
       runbook = session.runbook
-      items = runbook.extras.values.map { also_item(step_href(it), ICONS[:book], it.title, active: it == current) }
+      extras  = runbook.extras.values
+      extras -= [runbook.rollback] if rollback_panel?(session, current, kind)
+      items = extras.map { also_item(step_href(it), ICONS[:book], it.title, active: it == current) }
       items.unshift(also_item("/verify", ICONS[:check], "Checks", active: kind == :verify)) if runbook.verify_documents.any?
       items << also_item("/run", ICONS[:log], "Runsheet") if session.active?
       items << also_item("/session", ICONS[:file], "Session & notes", active: kind == :session)
@@ -195,9 +198,17 @@ module Runsheets
       "<li#{' class="active"' if active}><a href=\"#{h href}\"><span class=\"num\">#{icon}</span><span class=\"name\">#{h name}</span><span></span></a></li>"
     end
 
-    def self.rollback_panel(session, kind)
+    # The rollback document, collapsed in the sidebar of every step page
+    # but its own.
+    def self.rollback_panel?(session, current, kind)
       rollback = session.runbook.rollback
-      return "" unless rollback && kind == :step
+      !rollback.nil? && kind == :step && current != rollback
+    end
+
+    def self.rollback_panel(session, current, kind)
+      return "" unless rollback_panel?(session, current, kind)
+
+      rollback = session.runbook.rollback
 
       <<~HTML
         <section>
@@ -580,8 +591,11 @@ module Runsheets
       latest = {}
       run.executions.each { latest[it[:block_id]] = it if mine.call(it[:block_id]) }
       executions = latest.transform_values do |hash|
-        live = session.execution(hash[:id])
-        (live ? live.to_h : hash).merge(output: output_for(run, live, hash), success: hash[:state] == "finished" && hash[:exit_status] == 0)
+        live   = session.execution(hash[:id])
+        output = output_for(run, live, hash)
+        expected = steps.filter_map { it.expected_output(hash[:block_id]) }.first
+        (live ? live.to_h : hash).merge(output:, success: hash[:state] == "finished" && hash[:exit_status] == 0,
+                                        expected: Expectation.for_page(expected, output, live ? live.state : hash[:state]))
       end
       acks = run.acks.select { |block_id, _| mine.call(block_id) }
       JSON.generate({ executions:, acks: }).gsub("<", '\u003c') # a JSON escape: no "<!--" or "</script>" survives

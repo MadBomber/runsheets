@@ -230,6 +230,13 @@ module Runsheets
 
     def execution(id) = runs.lazy.filter_map { it.execution(id) }.first
 
+    # The text of the expect block for +execution+'s block, in the runbook
+    # of the run that started it, or nil.
+    def expected_output(execution)
+      run = runs.find { it.execution(execution.id) } or return
+      run.runbook.step(execution.step_slug)&.expected_output(execution.block_id)
+    end
+
     # Stop an execution, whichever runbook started it.
     def stop(execution_id)
       run = runs.find { it.execution(execution_id) } or raise RunError, "no execution #{execution_id}"

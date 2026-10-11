@@ -284,9 +284,12 @@ confirmed again; the record keeps every confirmation.
 ### Expected output
 
 When an executable block is followed by an `expect` block, the real output
-and the expected text are shown side by side once the block has run, and
-the footer says `matches expected` or `differs from expected` (trailing
-whitespace ignored). The expect block itself stays where the author put it.
+is compared with the expected text once the block has run (trailing
+whitespace ignored, `{{any}}` matching anything within a line), and the
+expect block is hidden. On a match the footer says `✓ matches expected`. On
+a mismatch the output and the expected text are shown side by side, line
+beside line, with the differing characters highlighted, and the footer says
+`differs from expected`. See [Expect blocks](../runbooks/blocks.md#expect-blocks).
 
 A block can be run again at any time while the session lasts. Each execution gets its
 own files and its own entry in the record. The page shows the most recent
