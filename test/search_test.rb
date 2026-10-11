@@ -4,12 +4,9 @@ require "test_helper"
 
 class TestSearch < Minitest::Test
   include RunsheetsTest
+  include RunsheetsTest::RunbookFixtures
 
   Search = Runsheets::Search
-
-  EXAMPLES = File.expand_path("../examples", __dir__)
-
-  def examples = Runsheets::Library.load(EXAMPLES).entries.map { [it.slug, it.runbook] }
 
   def test_terms_split_words_keep_quoted_phrases_and_lowercase
     assert_equal ["stop", "the pipeline", "ecs"], Search.terms('Stop "the pipeline"  ECS stop')
@@ -18,39 +15,31 @@ class TestSearch < Minitest::Test
   end
 
   def test_every_term_must_appear_somewhere_in_the_runbook
-    slugs = Search.run(examples, "vacuum").map(&:slug)
-    assert_equal ["db-maintenance"], slugs
-    assert_empty Search.run(examples, "vacuum hostname"), "no runbook has both"
-    assert_equal ["db-maintenance"], Search.run(examples, "VACUUM psql").map(&:slug), "case-insensitive, across documents and front matter"
+    assert_equal ["db-maintenance"], search_slugs("vacuum")
+    assert_empty search_slugs("vacuum hostname"), "no runbook has both"
+    assert_equal ["db-maintenance"], search_slugs("VACUUM psql"), "case-insensitive, across documents and front matter"
   end
 
-  def test_a_phrase_matches_across_a_wrapped_line
-    assert_includes Search.run(examples, '"kept elsewhere in the examples directory"').map(&:slug), "disk-space-triage"
+  def test_a_phrase_matches_across_a_wrapped_line_and_code_is_searched
+    assert_includes search_slugs('"kept elsewhere in the examples directory"'), "disk-space-triage"
+    assert_includes search_slugs("du -sh"), "disk-space-triage", "code in blocks is searched"
   end
 
   def test_a_stray_quote_is_not_part_of_a_word
     assert_equal ["disk"], Search.terms('"disk')
   end
 
-  def test_code_in_blocks_is_searched
-    assert_includes Search.run(examples, "du -sh").map(&:slug), "disk-space-triage"
-  end
-
-  def test_a_title_match_outranks_a_body_match
-    results = Search.run(examples, "disk")
-    assert_equal "disk-space-triage", results.first.slug
+  def test_a_title_match_outranks_a_body_match_and_an_empty_query_finds_nothing
+    assert_equal "disk-space-triage", search_slugs("disk").first
+    assert_empty search_slugs("  ")
   end
 
   def test_hits_name_the_matching_documents_best_first
-    result = Search.run(examples, "threshold").find { it.slug == "disk-space-triage" }
+    result = Search.run(example_entries, "threshold").find { it.slug == "disk-space-triage" }
     titles = result.hits.map(&:title)
     assert_includes titles, "Verify"
     refute_includes titles, "Find what is using it", "a document without the term is not a hit"
     assert_equal result.hits.map(&:score).sort.reverse, result.hits.map(&:score)
-  end
-
-  def test_an_empty_query_finds_nothing
-    assert_empty Search.run(examples, "  ")
   end
 
   def test_snippet_shows_context_around_the_first_match

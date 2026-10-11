@@ -4,6 +4,7 @@ require "test_helper"
 
 class TestRunbook < Minitest::Test
   include RunsheetsTest
+  include RunsheetsTest::RunbookFixtures
 
   def test_loads_the_example_without_warnings
     rb = example_runbook
@@ -39,13 +40,16 @@ class TestRunbook < Minitest::Test
     assert rb.step("verify").verify?
   end
 
-  def test_find_block_and_neighbors
+  def test_find_block_finds_a_block_and_its_step
     rb = example_runbook
     step, block = rb.find_block("020-inspect-ruby-1")
     assert_equal "020-inspect-ruby", step.slug
     assert_equal "ruby", block.lang
     assert_nil rb.find_block("nope")
+  end
 
+  def test_neighbors_are_the_steps_either_side
+    rb = example_runbook
     prev, nxt = rb.neighbors(rb.step("020-inspect-ruby"))
     assert_equal "010-say-hello", prev.slug
     assert_equal "030-take-a-breath", nxt.slug
@@ -65,7 +69,7 @@ class TestRunbook < Minitest::Test
   end
 
   def test_missing_runbook_md_raises
-    Dir.mktmpdir { |dir| assert_raises(Runsheets::RunbookError) { Runsheets::Runbook.load(dir) } }
+    with_files({}) { |dir| assert_raises(Runsheets::RunbookError) { Runsheets::Runbook.load(dir) } }
   end
 
   def test_warnings_are_collected
@@ -95,19 +99,23 @@ class TestRunbook < Minitest::Test
     refute Runsheets::Runbook.runbook_text?("---\ntags: [x]\n---\n# A document with other front matter\n")
   end
 
-  def test_links_resolve_against_the_root_which_defaults_to_the_runbook_directory
-    Dir.mktmpdir do |lib|
-      dir = File.join(lib, "deploy")
-      FileUtils.mkdir_p(File.join(dir, "steps"))
-      File.write(File.join(dir, "runbook.md"), "---\ntitle: T\n---\nSee [notes](../notes.md) and [local](local.md).\n")
-      File.write(File.join(dir, "steps", "010-a.md"), "Back to [notes](../../notes.md).\n")
+  LINKED_FILES = {
+    "deploy/runbook.md" => "---\ntitle: T\n---\nSee [notes](../notes.md) and [local](local.md).\n",
+    "deploy/steps/010-a.md" => "Back to [notes](../../notes.md).\n"
+  }.freeze
 
-      alone = Runsheets::Runbook.load(dir)
-      assert_equal File.expand_path(dir), alone.root
+  def test_links_resolve_against_the_root_which_defaults_to_the_runbook_directory
+    with_files(LINKED_FILES) do |lib|
+      alone = Runsheets::Runbook.load(File.join(lib, "deploy"))
+      assert_equal File.join(File.expand_path(lib), "deploy"), alone.root
       assert_includes alone.landing.html, 'href="../notes.md"', "climbing out of the root is left alone"
       assert_includes alone.landing.html, 'href="/docs/local.md"'
+    end
+  end
 
-      in_library = Runsheets::Runbook.load(dir, root: lib)
+  def test_links_resolve_against_a_given_library_root
+    with_files(LINKED_FILES) do |lib|
+      in_library = Runsheets::Runbook.load(File.join(lib, "deploy"), root: lib)
       assert_equal File.expand_path(lib), in_library.root
       assert_includes in_library.landing.html, 'href="/docs/notes.md"'
       assert_includes in_library.landing.html, 'href="/docs/deploy/local.md"'
@@ -115,29 +123,30 @@ class TestRunbook < Minitest::Test
     end
   end
 
+  LIBRARY_FILES = {
+    "notes.md" => "# Notes\n",
+    "guides/setup.md" => "# Setup\n",
+    "deploy.md" => "---\ntitle: Deploy\n---\n## Go\n",
+    "backup/runbook.md" => "---\ntitle: Backup\n---\n",
+    "backup/steps/010-dump.md" => "Dump it.\n",
+    "backup/extra.md" => "# Extra\n"
+  }.freeze
+
   def test_plain_document_is_markdown_outside_any_runbook
-    Dir.mktmpdir do |lib|
-      files = {
-        "notes.md" => "# Notes\n",
-        "guides/setup.md" => "# Setup\n",
-        "deploy.md" => "---\ntitle: Deploy\n---\n## Go\n",
-        "backup/runbook.md" => "---\ntitle: Backup\n---\n",
-        "backup/steps/010-dump.md" => "Dump it.\n",
-        "backup/extra.md" => "# Extra\n"
-      }
-      files.each do |rel, text|
-        FileUtils.mkdir_p(File.dirname(File.join(lib, rel)))
-        File.write(File.join(lib, rel), text)
-      end
-      plain = ->(rel) { Runsheets::Runbook.plain_document?(File.join(lib, rel), lib) }
-      assert plain.call("notes.md")
-      assert plain.call("guides/setup.md")
-      refute plain.call("deploy.md"), "a single-file runbook"
-      refute plain.call("backup/runbook.md")
-      refute plain.call("backup/steps/010-dump.md"), "a step of a runbook directory"
-      refute plain.call("backup/extra.md"), "inside a runbook directory"
-      refute plain.call("missing.md")
+    with_files(LIBRARY_FILES) do |lib|
+      assert Runsheets::Runbook.plain_document?(File.join(lib, "notes.md"), lib)
+      assert Runsheets::Runbook.plain_document?(File.join(lib, "guides/setup.md"), lib)
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "missing.md"), lib)
       refute Runsheets::Runbook.plain_document?(File.join(lib, "notes.md"), File.join(lib, "guides")), "outside the root"
+    end
+  end
+
+  def test_runbook_files_are_not_plain_documents
+    with_files(LIBRARY_FILES) do |lib|
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "deploy.md"), lib), "a single-file runbook"
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "backup/runbook.md"), lib)
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "backup/steps/010-dump.md"), lib), "a step of a runbook directory"
+      refute Runsheets::Runbook.plain_document?(File.join(lib, "backup/extra.md"), lib), "inside a runbook directory"
     end
   end
 
@@ -157,16 +166,22 @@ class TestRunbook < Minitest::Test
     assert_equal %w[045-check-the-greeting-1 verify-1 verify-2], rb.verify_blocks.map(&:id)
   end
 
-  def test_stale_when_a_source_file_changes_or_appears
+  def test_stale_when_a_source_file_changes
     with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a") do |rb|
-      refute rb.stale?
-      File.write(File.join(rb.dir, "steps", "010-a.md"), "b")
-      FileUtils.touch(File.join(rb.dir, "steps", "010-a.md"), mtime: Time.now + 2) # newer than the load, on any file system
+      stale_before = rb.stale?
+      write_file(File.join(rb.dir, "steps", "010-a.md"), "b", age: 2) # newer than the load, on any file system
+      refute stale_before
       assert rb.stale?
-      FileUtils.touch(File.join(rb.dir, "steps", "010-a.md"), mtime: Time.now - 2) # older than the next load
+    end
+  end
+
+  def test_stale_when_a_source_file_appears
+    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a") do |rb|
+      write_file(File.join(rb.dir, "steps", "010-a.md"), "b", age: -2) # older than the next load
       fresh = Runsheets::Runbook.load(rb.dir)
-      refute fresh.stale?
-      File.write(File.join(rb.dir, "verify.md"), "v")
+      stale_before = fresh.stale?
+      write_file(File.join(rb.dir, "verify.md"), "v")
+      refute stale_before
       assert fresh.stale?, "a new source file counts"
     end
   end
@@ -200,9 +215,12 @@ end
 class TestRunbookSlug < Minitest::Test
   include RunsheetsTest
 
-  def test_the_slug_is_the_directory_or_file_name_unless_given
+  def test_the_slug_is_the_directory_name_unless_given
     assert_equal "hello", example_runbook.slug
     assert_equal "ops/hello", Runsheets::Runbook.load(RunsheetsTest::EXAMPLE_DIR, slug: "ops/hello").slug
+  end
+
+  def test_the_slug_is_the_file_name_unless_given
     path = File.expand_path("../examples/db-maintenance.md", __dir__)
     assert_equal "db-maintenance", Runsheets::Runbook.load(path).slug
     assert_equal "database/maintenance", Runsheets::Runbook.load(path, slug: "database/maintenance").slug

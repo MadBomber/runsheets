@@ -4,6 +4,7 @@ require "test_helper"
 
 class TestConfig < Minitest::Test
   include RunsheetsTest
+  include RunsheetsTest::CliFixtures
 
   Config = Runsheets::Config
 
@@ -18,6 +19,12 @@ class TestConfig < Minitest::Test
       refute config.check
       refute config.init
       refute config.dump
+    end
+  end
+
+  def test_the_config_files_are_looked_for_in_the_usual_places
+    with_clean_home do |home|
+      config = Config.new
       assert_equal File.join(home, ".config/runsheets/runsheets.yml"), Config.xdg_path, "the XDG user config, absent is fine"
       assert_equal File.expand_path("config/runsheets.yml"), config.path, "the project config, absent is fine"
       assert_empty config.files
@@ -44,14 +51,22 @@ class TestConfig < Minitest::Test
 
   def test_an_explicit_config_file_layers_over_the_xdg_one
     with_clean_home do |home|
-      xdg   = write_yaml(Config.xdg_path, port: 4580, bind: "0.0.0.0")
-      other = write_yaml(File.join(home, "other.yml"), port: 4581)
+      xdg    = write_yaml(Config.xdg_path, port: 4580, bind: "0.0.0.0")
+      other  = write_yaml(File.join(home, "other.yml"), port: 4581)
       config = Config.new(path: other)
       assert_equal 4581, config.port
       assert_equal "0.0.0.0", config.bind, "the XDG file is still underneath"
       assert_equal [xdg, other], config.files
-      with_env("RUNSHEETS_CONFIG" => other) { assert_equal 4581, Config.new.port }
-      with_env("RUNSHEETS_CONFIG" => other) { assert_equal 4580, Config.new(path: xdg).port, "path: beats the variable" }
+    end
+  end
+
+  def test_runsheets_config_names_the_file_and_path_beats_it
+    with_clean_home do |home|
+      xdg   = write_yaml(Config.xdg_path, port: 4580)
+      other = write_yaml(File.join(home, "other.yml"), port: 4581)
+      ports = with_env("RUNSHEETS_CONFIG" => other) { [Config.new.port, Config.new(path: xdg).port] }
+      assert_equal 4581, ports.first
+      assert_equal 4580, ports.last, "path: beats the variable"
     end
   end
 
@@ -60,56 +75,68 @@ class TestConfig < Minitest::Test
       missing = File.join(home, "nope.yml")
       error = assert_raises(Runsheets::ConfigError) { Config.new(path: missing) }
       assert_match(/config file not found/, error.message)
-      with_env("RUNSHEETS_CONFIG" => missing) { assert_raises(Runsheets::ConfigError) { Config.new } }
-      with_env("RUNSHEETS_CONFIG" => "  ") { assert_equal 4567, Config.new.port, "a blank variable means the project file" }
     end
   end
 
-  def test_environment_beats_the_config_file_and_overrides_beat_the_environment
+  def test_runsheets_config_must_name_a_file_that_exists_unless_blank
+    with_clean_home do |home|
+      missing = File.join(home, "nope.yml")
+      assert_raises(Runsheets::ConfigError) { with_env("RUNSHEETS_CONFIG" => missing) { Config.new } }
+      assert_equal 4567, with_env("RUNSHEETS_CONFIG" => "  ") { Config.new.port }, "a blank variable means the project file"
+    end
+  end
+
+  def test_environment_beats_the_config_file
     with_clean_home do
       write_yaml(Config.xdg_path, port: 4580, bind: "0.0.0.0", open: true, check: true)
-      with_env("RUNSHEETS_PORT" => "4590", "RUNSHEETS_OPEN" => "off", "RUNSHEETS_DIR" => "/tmp/from-env") do
-        from_env = Config.new
-        assert_equal 4590, from_env.port
-        assert_equal "0.0.0.0", from_env.bind
-        refute from_env.open, "RUNSHEETS_OPEN=off beats open: true in the file"
-        assert from_env.check
-        assert_equal "/tmp/from-env", from_env.dir
+      config = with_env("RUNSHEETS_PORT" => "4590", "RUNSHEETS_OPEN" => "off", "RUNSHEETS_DIR" => "/tmp/from-env") { Config.new }
+      assert_equal 4590, config.port
+      assert_equal "0.0.0.0", config.bind
+      refute config.open, "RUNSHEETS_OPEN=off beats open: true in the file"
+      assert config.check
+      assert_equal "/tmp/from-env", config.dir
+    end
+  end
 
-        from_cli = Config.new({ port: 9000, bind: "127.0.0.1", check: false, dir: "/tmp/from-cli" })
-        assert_equal 9000, from_cli.port
-        assert_equal "127.0.0.1", from_cli.bind
-        refute from_cli.check
-        assert_equal "/tmp/from-cli", from_cli.dir
-        refute from_cli.open, "untouched layers still apply"
-      end
+  def test_overrides_beat_the_environment
+    with_clean_home do
+      write_yaml(Config.xdg_path, port: 4580, bind: "0.0.0.0", open: true, check: true)
+      overrides = { port: 9000, bind: "127.0.0.1", check: false, dir: "/tmp/from-cli" }
+      config = with_env("RUNSHEETS_PORT" => "4590", "RUNSHEETS_OPEN" => "off", "RUNSHEETS_DIR" => "/tmp/from-env") { Config.new(overrides) }
+      assert_equal 9000, config.port
+      assert_equal "127.0.0.1", config.bind
+      refute config.check
+      assert_equal "/tmp/from-cli", config.dir
+      refute config.open, "untouched layers still apply"
     end
   end
 
   def test_flags_accept_the_usual_words
     with_clean_home do
-      %w[1 true TRUE yes On].each { with_env("RUNSHEETS_OPEN" => it) { assert Config.new.open, it } }
-      %w[0 false no off maybe].each { with_env("RUNSHEETS_OPEN" => it) { refute Config.new.open, it } }
+      opens = %w[1 true TRUE yes On 0 false no off maybe].map { with_env("RUNSHEETS_OPEN" => it) { Config.new.open } }
+      assert_equal [true] * 5, opens.first(5), "1 true TRUE yes On"
+      assert_equal [false] * 5, opens.last(5), "0 false no off maybe"
     end
   end
 
   def test_blank_values_fall_back_to_the_bundled_default
     with_clean_home do
       write_yaml(Config.xdg_path, port: 4580)
-      with_env("RUNSHEETS_PORT" => "", "RUNSHEETS_RUNS_DIR" => " ") do
-        config = Config.new
-        assert_equal 4567, config.port
-        assert_equal Config.bundled_defaults[:runs_dir], config.runs_dir
-      end
+      config = with_env("RUNSHEETS_PORT" => "", "RUNSHEETS_RUNS_DIR" => " ") { Config.new }
+      assert_equal 4567, config.port
+      assert_equal Config.bundled_defaults[:runs_dir], config.runs_dir
     end
   end
 
-  def test_a_bad_port_is_a_config_error
+  def test_a_bad_port_in_the_environment_is_a_config_error
     with_clean_home do
-      with_env("RUNSHEETS_PORT" => "eighty") do
-        error = assert_raises(Runsheets::ConfigError) { Config.new }
-        assert_match(/port must be a whole number, got "eighty"/, error.message)
-      end
+      error = assert_raises(Runsheets::ConfigError) { with_env("RUNSHEETS_PORT" => "eighty") { Config.new } }
+      assert_match(/port must be a whole number, got "eighty"/, error.message)
+    end
+  end
+
+  def test_a_port_must_be_a_whole_number
+    with_clean_home do
       assert_raises(Runsheets::ConfigError) { Config.new({ port: "80x" }) }
       assert_equal 80, Config.new({ port: " 80 " }).port
     end
@@ -119,8 +146,16 @@ class TestConfig < Minitest::Test
     with_clean_home do |home|
       write_yaml(Config.xdg_path, runs_dir: "~/elsewhere")
       assert_equal File.join(home, "elsewhere"), Runsheets.runs_dir
+      assert_equal File.join(home, "elsewhere"), Runsheets.config.runs_dir
+    end
+  end
+
+  def test_an_explicit_runs_dir_beats_the_config
+    with_clean_home do |home|
+      write_yaml(Config.xdg_path, runs_dir: "~/elsewhere")
       Runsheets.runs_dir = "/explicit"
       assert_equal "/explicit", Runsheets.runs_dir
+      assert_equal File.join(home, "elsewhere"), Runsheets.config.runs_dir, "the config itself is unchanged"
     ensure
       Runsheets.runs_dir = nil
     end
@@ -129,9 +164,7 @@ class TestConfig < Minitest::Test
   def test_to_config_yaml_round_trips_through_a_config_file
     with_clean_home do |home|
       text = with_env("RUNSHEETS_PORT" => "4590") { Config.new({ bind: "127.0.0.2", open: true, dump: true }).to_config_yaml }
-      file = File.join(home, "saved.yml")
-      File.write(file, text)
-      reloaded = Config.new(path: file)
+      reloaded = reload_config_yaml(home, text)
       assert_equal 4590, reloaded.port
       assert_equal "127.0.0.2", reloaded.bind
       assert reloaded.open
@@ -141,9 +174,9 @@ class TestConfig < Minitest::Test
 
   def test_to_config_yaml_holds_every_setting_but_the_one_shot_actions_and_why
     with_clean_home do
-      text = Config.new({ port: 4590, open: "yes" }).to_config_yaml
-      assert_match(/\A# runsheets settings, written by `runsheets --dump`/, text)
+      text   = Config.new({ port: 4590, open: "yes" }).to_config_yaml
       loaded = YAML.safe_load(text)
+      assert_match(/\A# runsheets settings, written by `runsheets --dump`/, text)
       assert_equal (Config.config_attributes - %i[dump check init why]).map(&:to_s).sort, loaded.keys.sort
       assert_equal 4590, loaded["port"]
       assert loaded["open"]

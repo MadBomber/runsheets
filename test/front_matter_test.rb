@@ -5,10 +5,6 @@ require "test_helper"
 class TestFrontMatter < Minitest::Test
   FM = Runsheets::FrontMatter
 
-  def test_a_byte_order_mark_does_not_hide_the_front_matter
-    assert_equal "Hi", FM.parse("﻿---\ntitle: Hi\n---\nbody\n").data["title"]
-  end
-
   def test_unreadable_yaml_is_a_runbook_error
     assert_raises(Runsheets::RunbookError) { FM.parse("---\ntitle: !ruby/object:Object {}\n---\n") }
     assert_raises(Runsheets::RunbookError) { FM.parse("---\na: &x [1]\nb: *x\n---\n") }
@@ -20,12 +16,14 @@ class TestFrontMatter < Minitest::Test
     assert_equal "Hi", result.data["title"]
     assert_equal Date.new(2026, 9, 12), result.data["updated"]
     assert_equal "# Body\n", result.body
+    assert_equal "Hi", FM.parse("\uFEFF---\ntitle: Hi\n---\nbody\n").data["title"], "a byte order mark does not hide the front matter"
   end
 
   def test_no_front_matter
     result = FM.parse("# Just markdown\n")
     assert_equal({}, result.data)
     assert_equal "# Just markdown\n", result.body
+    assert_equal({}, FM.parse("intro\n\n---\n\nmore").data, "a rule later in the document is not front matter")
   end
 
   def test_empty_front_matter
@@ -34,16 +32,8 @@ class TestFrontMatter < Minitest::Test
     assert_equal "body", result.body
   end
 
-  def test_a_rule_later_in_the_document_is_not_front_matter
-    result = FM.parse("intro\n\n---\n\nmore")
-    assert_equal({}, result.data)
-  end
-
-  def test_non_mapping_raises
-    assert_raises(Runsheets::RunbookError) { FM.parse("---\n- a\n- b\n---\n") }
-  end
-
-  def test_invalid_yaml_raises
-    assert_raises(Runsheets::RunbookError) { FM.parse("---\ntitle: [unclosed\n---\n") }
+  def test_malformed_front_matter_raises
+    assert_raises(Runsheets::RunbookError, "not a mapping") { FM.parse("---\n- a\n- b\n---\n") }
+    assert_raises(Runsheets::RunbookError, "invalid yaml") { FM.parse("---\ntitle: [unclosed\n---\n") }
   end
 end

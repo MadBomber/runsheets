@@ -1,12 +1,21 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "rack/test"
 
 # Regression tests for the problems a review found: each test names the
 # failure it guards against.
 class TestHardening < Minitest::Test
-  include RunsheetsTest
+  include RunsheetsTest::HardeningFixtures
+
+  LONG_OUTPUT = {
+    "runbook.md" => "---\ntitle: T\n---\n",
+    "steps/010-a.md" => "```bash run\nfor i in $(seq 1 20000); do echo héllo; done\n```\n"
+  }.freeze
+
+  SECRET_AND_TWO_BLOCKS = {
+    "runbook.md" => "---\ntitle: T\ninputs:\n  - name: SECRET\n    secret: true\n---\n",
+    "steps/010-a.md" => "```bash run\nprintf %s hunt; sleep 0.3; printf %s er2-end\n```\n```bash run\necho B-out\n```\n"
+  }.freeze
 
   # --- records ------------------------------------------------------------
 
@@ -17,8 +26,8 @@ class TestHardening < Minitest::Test
       step = s.runbook.step("010-say-hello")
       run.mark_step(step.slug, status: "done", note: "<meta http-equiv=refresh content=0> *not em*")
       md = File.read(File.join(s.run.dir, "run.md"))
-      refute_includes md, "<meta"
       html = Runsheets::Renderer.render(md, id_prefix: "run").html
+      refute_includes md, "<meta"
       refute_includes html, "<meta"
       refute_includes html, "<em>not em</em>"
       refute_includes html, "<b>bold</b>", "the value is code, shown as text"
@@ -32,16 +41,15 @@ class TestHardening < Minitest::Test
   end
 
   def test_large_non_ascii_output_keeps_the_record_writable
-    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "```bash run\nfor i in $(seq 1 20000); do echo héllo; done\n```\n") do |rb|
-      with_runs_dir do |root|
-        s = open_session(root, runbook: rb)
-        assert s.execute("010-a-1").wait.success?
-        s.mark_step("010-a", status: "done")
-        assert_includes File.read(File.join(s.run.dir, "run.md")), "earlier bytes omitted"
-        s.end!("test")
-        assert s.ended?
-        assert_equal "completed", s.current.record.status
-      end
+    with_session_on(LONG_OUTPUT) do |s|
+      ran = s.execute("010-a-1").wait
+      s.mark_step("010-a", status: "done")
+      md = File.read(File.join(s.run.dir, "run.md"))
+      s.end!("test")
+      assert ran.success?
+      assert_includes md, "earlier bytes omitted"
+      assert s.ended?
+      assert_equal "completed", s.current.record.status
     end
   end
 
@@ -53,17 +61,13 @@ class TestHardening < Minitest::Test
   # --- runs and sessions ----------------------------------------------------
 
   def test_each_execution_gets_its_own_redactor
-    with_runbook("runbook.md" => "---\ntitle: T\ninputs:\n  - name: SECRET\n    secret: true\n---\n",
-                 "steps/010-a.md" => "```bash run\nprintf %s hunt; sleep 0.3; printf %s er2-end\n```\n```bash run\necho B-out\n```\n") do |rb|
-      with_runs_dir do |root|
-        s = open_session(root, runbook: rb, inputs: { "SECRET" => "hunter2" })
-        a = s.execute("010-a-1")
-        sleep 0.1
-        b = s.execute("010-a-2").wait
-        a.wait
-        assert_equal "B-out\n", b.output, "nothing of the other execution's output"
-        assert_equal "[redacted SECRET]-end", a.output
-      end
+    with_session_on(SECRET_AND_TWO_BLOCKS, inputs: { "SECRET" => "hunter2" }) do |s|
+      a = s.execute("010-a-1")
+      sleep 0.1
+      b = s.execute("010-a-2").wait
+      a.wait
+      assert_equal "B-out\n", b.output, "nothing of the other execution's output"
+      assert_equal "[redacted SECRET]-end", a.output
     end
   end
 
@@ -71,11 +75,10 @@ class TestHardening < Minitest::Test
     with_runs_dir do |root|
       s = open_session(root)
       bg = s.execute("035-keep-a-clock-running-1")
-      closer = Thread.new { s.end!("test") }
-      sleep 0.05
+      closer = end_in_background(s)
       error = assert_raises(Runsheets::RunError) { s.execute("010-say-hello-1") }
-      assert_match(/ended/, error.message)
       closer.join
+      assert_match(/ended/, error.message)
       assert bg.stopped?
       assert_empty s.running
     end
@@ -117,38 +120,23 @@ end
 
 # The web layer's share of the review.
 class TestWebHardening < Minitest::Test
-  include Rack::Test::Methods
-  include RunsheetsTest
+  include RunsheetsTest::WebFixtures
 
   BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
-  def setup
-    @runs_root = Dir.mktmpdir("runsheets-web")
-    @session   = start_session(@runs_root)
-    Runsheets::Web.configure_for(@session)
-    header "Host", "localhost"
-  end
+  def setup = serve_web
 
-  def teardown
-    @session.end!("teardown")
-    FileUtils.rm_rf(@runs_root)
-  end
-
-  def app = Runsheets::Web
+  def teardown = stop_web
 
   def test_served_files_cannot_run_script
-    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a\n", "pwn.html" => "<script>alert(1)</script>", "pic.svg" => "<svg/>") do |rb|
-      @session.end!("switch")
-      @session = start_session(@runs_root, runbook: rb)
-      Runsheets::Web.configure_for(@session)
-      get "/files/pwn.html"
-      assert_includes last_response.headers["Content-Security-Policy"], "sandbox"
-      assert_equal "nosniff", last_response.headers["X-Content-Type-Options"]
-      assert_match(/\Aattachment/, last_response.headers["Content-Disposition"])
-      get "/files/pic.svg"
-      assert_match(/\Ainline/, last_response.headers["Content-Disposition"])
-      assert_includes last_response.headers["Content-Security-Policy"], "default-src 'none'"
-    end
+    serve_files("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "a\n", "pwn.html" => "<script>alert(1)</script>", "pic.svg" => "<svg/>")
+    html = get "/files/pwn.html"
+    svg  = get "/files/pic.svg"
+    assert_includes html.headers["Content-Security-Policy"], "sandbox"
+    assert_equal "nosniff", html.headers["X-Content-Type-Options"]
+    assert_match(/\Aattachment/, html.headers["Content-Disposition"])
+    assert_match(/\Ainline/, svg.headers["Content-Disposition"])
+    assert_includes svg.headers["Content-Security-Policy"], "default-src 'none'"
   end
 
   def test_secret_fields_never_carry_a_value
@@ -162,37 +150,34 @@ class TestWebHardening < Minitest::Test
 
   def test_a_browser_gets_an_error_page_with_the_specific_message
     header "Accept", BROWSER
-    get "/steps/nope"
-    assert_equal 404, last_response.status
-    assert_equal "text/html", last_response.media_type
-    assert_includes last_response.body, "<h1>Not found</h1>"
-    assert_includes last_response.body, "no step named nope"
+    page = get "/steps/nope"
     header "Accept", "application/json"
-    get "/steps/nope"
-    assert_equal({ "error" => "no step named nope" }, JSON.parse(last_response.body))
+    api = get "/steps/nope"
+    assert_equal 404, page.status
+    assert_equal "text/html", page.media_type
+    assert_includes page.body, "<h1>Not found</h1>"
+    assert_includes page.body, "no step named nope"
+    assert_equal({ "error" => "no step named nope" }, json(api))
   end
 
   def test_a_page_acts_on_its_own_runbook_after_another_tab_switched
-    post "/runs", "_token" => "tok"
+    start_run
     @session.open(Runsheets::Runbook.load(File.expand_path("../examples/disk-space-triage.md", __dir__)))
-    header "X-Runsheets-Token", "tok"
-    post "/blocks/010-say-hello-1/execute", "runbook" => "hello"
-    assert_equal 202, last_response.status, "the hello page still runs hello's block"
-    id = JSON.parse(last_response.body)["id"]
-    assert_equal "hello", @session.runs.find { it.execution(id) }.slug
-    post "/blocks/010-say-hello-1/execute", "runbook" => "nope"
-    assert_equal 409, last_response.status
+    own   = execute("010-say-hello-1", "runbook" => "hello")
+    owner = @session.runs.find { it.execution(json(own)["id"]) }
+    other = execute("010-say-hello-1", "runbook" => "nope")
+    assert_equal 202, own.status, "the hello page still runs hello's block"
+    assert_equal "hello", owner.slug
+    assert_equal 409, other.status
   end
 
   def test_embedded_json_cannot_break_out_of_its_script
-    post "/runs", "_token" => "tok"
-    with_runbook("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "```bash run\necho '<!--<script>'\n```\n") do |rb|
-      @session.open(rb)
-      @session.execute("010-a-1").wait
-      get "/steps/010-a"
-      prior = last_response.body[%r{<script type="application/json" id="rs-prior">(.*?)</script>}m, 1]
-      refute_includes prior, "<"
-    end
+    start_run
+    @session.open(runbook_from("runbook.md" => "---\ntitle: T\n---\n", "steps/010-a.md" => "```bash run\necho '<!--<script>'\n```\n"))
+    @session.execute("010-a-1").wait
+    prior = get("/steps/010-a").body[%r{<script type="application/json" id="rs-prior">(.*?)</script>}m, 1]
+    refute_nil prior
+    refute_includes prior, "<"
   end
 
   def test_end_session_asks_first

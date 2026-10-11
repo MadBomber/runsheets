@@ -3,7 +3,7 @@
 require "test_helper"
 
 class TestBlock < Minitest::Test
-  def block(info, code = "echo\n") = Runsheets::Block.new(id: "s-1", index: 0, info:, code:)
+  include RunsheetsTest::RenderFixtures
 
   def test_display_by_default
     b = block("bash")

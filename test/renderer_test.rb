@@ -18,10 +18,18 @@ class TestRenderer < Minitest::Test
     refute_includes html, "?rs="
   end
 
-  def test_display_block_has_copy_but_no_run_button
-    html = Renderer.render("```bash\necho hi\n```\n", id_prefix: "x").html
-    assert_includes html, 'data-action="copy"'
-    refute_includes html, 'data-action="execute"'
+  def test_each_kind_of_block_gets_its_own_toolbar
+    [
+      ["bash", ['data-action="copy"'], ['data-action="execute"']],
+      ["bash run bogus", ["rs-warning", "unknown flag: bogus"], []],
+      ["bash destructive", ["Run (destructive)", "rs-danger"], []],
+      ["bash background", [">Start</button>", 'data-action="stop"'], ["not executable"]],
+      ["bash terminal", ['data-action="acknowledge"'], ['data-action="execute"']]
+    ].each do |info, present, absent|
+      html = Renderer.render("```#{info}\nx\n```\n", id_prefix: "s").html
+      present.each { assert_includes html, it, info }
+      absent.each { refute_includes html, it, info }
+    end
   end
 
   def test_bare_fence_renders_as_plain_code
@@ -39,18 +47,6 @@ class TestRenderer < Minitest::Test
     assert_equal 3, result.html.scan("rs-block").size
   end
 
-  def test_warnings_show_in_the_toolbar
-    html = Renderer.render("```bash run bogus\nx\n```\n", id_prefix: "s").html
-    assert_includes html, "rs-warning"
-    assert_includes html, "unknown flag: bogus"
-  end
-
-  def test_destructive_button_label
-    html = Renderer.render("```bash destructive\nx\n```\n", id_prefix: "s").html
-    assert_includes html, "Run (destructive)"
-    assert_includes html, "rs-danger"
-  end
-
   def test_expect_blocks_link_to_the_nearest_executable_block_above
     md = "```text expect\norphan\n```\n```bash run\none\n```\nprose\n```text expect\n1\n```\n```bash\nshown\n```\n```text expect\nalso 1\n```\n```ruby run\ntwo\n```\n```text expect\n2\n```\n"
     result = Renderer.render(md, id_prefix: "s")
@@ -60,16 +56,6 @@ class TestRenderer < Minitest::Test
     assert_includes result.html, 'data-role="expected"'
   end
 
-  def test_background_and_terminal_toolbars
-    html = Renderer.render("```bash background\nx\n```\n", id_prefix: "s").html
-    assert_includes html, ">Start</button>"
-    assert_includes html, 'data-action="stop"'
-    refute_includes html, "not executable"
-    html = Renderer.render("```bash terminal\nx\n```\n", id_prefix: "s").html
-    assert_includes html, 'data-action="acknowledge"'
-    refute_includes html, 'data-action="execute"'
-  end
-
   def test_html_in_code_is_escaped
     html = Renderer.render("```bash run\necho '<b>'\n```\n", id_prefix: "s").html
     refute_includes html, "<b>"
@@ -77,12 +63,13 @@ class TestRenderer < Minitest::Test
   end
 
   def test_relative_urls_are_rewritten_to_files_route
-    html = '<img src="../assets/a.svg"><img src="https://x/y.png"><a href="#top">t</a><a href="notes.md">n</a>'
+    html = '<img src="../assets/a.svg"><img src="https://x/y.png"><a href="#top">t</a><a href="notes.md">n</a><img src="../../etc/passwd">'
     out  = Renderer.rewrite_relative_urls(html, "steps")
     assert_includes out, 'src="/files/assets/a.svg"'
     assert_includes out, 'src="https://x/y.png"'
     assert_includes out, 'href="#top"'
     assert_includes out, 'href="/docs/steps/notes.md"'
+    assert_includes out, 'src="../../etc/passwd"', "a url escaping the root is left alone"
   end
 
   def test_links_to_markdown_go_to_the_docs_route_and_other_files_to_files
@@ -109,21 +96,13 @@ class TestRenderer < Minitest::Test
     assert_equal "Deploy", Renderer.title_of("```bash\n# not this\n```\n\n# Deploy\r\n")
     assert_equal "Upgrade to C#", Renderer.title_of("# Upgrade to C#\n")
     assert_equal "Closed", Renderer.title_of("# Closed ##\n")
-  end
-
-  def test_a_fence_is_closed_only_by_its_own_kind_of_fence
-    md = "```bash\n# no\n~~~\n# still code\n```\n\n# Yes\n"
-    assert_equal "Yes", Renderer.title_of(md)
+    assert_equal "Yes", Renderer.title_of("```bash\n# no\n~~~\n# still code\n```\n\n# Yes\n"), "a fence is closed only by its own kind"
   end
 
   def test_meta_tags_are_removed_from_rendered_markdown
     html = Renderer.render_plain("hi\n\n<meta http-equiv=\"refresh\" content=\"0;url=/x\">\n")
     refute_includes html, "<meta"
-  end
-
-  def test_relative_url_escaping_root_is_left_alone
-    out = Renderer.rewrite_relative_urls('<img src="../../etc/passwd">', "steps")
-    assert_includes out, 'src="../../etc/passwd"'
+    assert_includes html, "<p>hi</p>"
   end
 
   def test_title_of

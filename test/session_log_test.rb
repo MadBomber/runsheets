@@ -4,16 +4,9 @@ require "test_helper"
 require "stringio"
 
 class TestSessionLog < Minitest::Test
-  SessionLog = Runsheets::SessionLog
+  include RunsheetsTest::CliFixtures
 
-  def with_log(**)
-    Dir.mktmpdir do |dir|
-      log = SessionLog.new(File.join(dir, "session.log"), **)
-      yield log, -> { File.read(log.path) }
-    ensure
-      log&.close
-    end
-  end
+  SessionLog = Runsheets::SessionLog
 
   def test_a_line_is_time_level_tags_and_text
     time = Time.new(2026, 10, 10, 14, 2, 41.2)
@@ -27,7 +20,8 @@ class TestSessionLog < Minitest::Test
       log.info("one\ntwo", tags: ["session"])
       lines = text.call.lines
       assert_equal 2, lines.size
-      assert(lines.all? { it.include?("INFO  [session] ") })
+      assert_includes lines.first, "INFO  [session] one"
+      assert_includes lines.last, "INFO  [session] two"
     end
   end
 
@@ -56,28 +50,32 @@ class TestSessionLog < Minitest::Test
     assert_raises(Runsheets::ConfigError) { SessionLog.level_name("chatty") }
   end
 
-  def test_output_stream_writes_complete_lines_and_the_rest_on_close
+  def test_output_stream_writes_only_complete_lines_until_closed
     with_log do |log, text|
       stream = log.output_stream(["#ab12"])
       stream.write("first li")
       stream.write("ne\nsecond\r\nlast bit")
-      assert_equal 2, text.call.lines.size, "only complete lines so far"
+      lines = text.call.lines
+      assert_equal 2, lines.size, "only complete lines so far"
+      assert_includes lines.last, "[#ab12] > second"
+    end
+  end
+
+  def test_output_stream_writes_the_rest_on_close
+    with_log do |log, text|
+      stream = log.output_stream(["#ab12"])
+      stream.write("first li")
+      stream.write("ne\nsecond\r\nlast bit")
       stream.close
-      lines = text.call.lines.map { it.split("] ", 2).last.chomp }
-      assert_equal ["> first line", "> second", "> last bit"], lines
+      lines = text.call.lines
+      assert_equal(["> first line", "> second", "> last bit"], lines.map { it.split("] ", 2).last.chomp })
+      assert_includes lines.first, "[#ab12] "
     end
   end
 
   def test_appends_to_an_existing_file_without_a_header
-    Dir.mktmpdir do |dir|
-      path = File.join(dir, "session.log")
-      File.write(path, "earlier\n")
-      log = SessionLog.new(path)
-      log.info("later")
-      log.close
-      lines = File.read(path).lines
-      assert_equal "earlier\n", lines.first
-      assert_equal 2, lines.size
-    end
+    lines = appended_log_lines
+    assert_equal "earlier\n", lines.first
+    assert_equal 2, lines.size
   end
 end

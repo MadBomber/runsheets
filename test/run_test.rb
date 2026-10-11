@@ -6,6 +6,7 @@ require "test_helper"
 # stopping, and how it closes.
 class TestRun < Minitest::Test
   include RunsheetsTest
+  include RunsheetsTest::SessionFixtures
 
   def test_resolve_inputs_uses_given_then_earlier_in_the_session_then_env_then_default
     rb = example_runbook
@@ -28,30 +29,53 @@ class TestRun < Minitest::Test
     end
   end
 
-  def test_full_flow
+  def test_opening_a_run_makes_the_session_active
     with_runs_dir do |root|
       s = open_session(root, inputs: { "NAME" => "tester" })
       assert s.active?
       assert_equal s.id, s.run.id, "the run directory is named by the session"
+    end
+  end
 
-      ex = s.execute("010-say-hello-1").wait
+  def test_executing_a_block_captures_its_output_and_marks_the_step_ran
+    with_runs_dir do |root|
+      s    = open_session(root, inputs: { "NAME" => "tester" })
+      ex   = s.execute("010-say-hello-1").wait
+      mark = Runsheets::Pages.step_mark(s, s.runbook.step("010-say-hello"))
+      s.mark_step("010-say-hello", status: "done", note: "  ")
       assert ex.success?
       assert_includes ex.output, "Hello, tester!"
       assert_includes ex.output, "Running block 010-say-hello-1 of step 010-say-hello in run #{s.run.id}"
       assert_same ex, s.execution(ex.id)
-      assert_equal "ran", Runsheets::Pages.step_mark(s, s.runbook.step("010-say-hello"))
-
-      s.mark_step("010-say-hello", status: "done", note: "  ")
+      assert_equal "ran", mark
       assert_equal "done", s.step_status("010-say-hello")
+    end
+  end
 
-      error = assert_raises(Runsheets::Session::ConfirmationRequired) { s.execute("040-exercise-failure-1") }
+  def test_a_destructive_block_refuses_to_run_without_its_challenge
+    with_runs_dir do |root|
+      s = open_session(root)
+      assert_raises(Runsheets::Session::ConfirmationRequired) { s.execute("040-exercise-failure-1") }
       assert_raises(Runsheets::Session::ConfirmationRequired) { s.execute("040-exercise-failure-1", confirm: "wrong") }
-      failed = s.execute("040-exercise-failure-1", confirm: error.challenge).wait
+    end
+  end
+
+  def test_a_destructive_block_runs_with_the_challenge_it_asked_for
+    with_runs_dir do |root|
+      s      = open_session(root)
+      failed = s.execute("040-exercise-failure-1", confirm: challenge_from(s, "040-exercise-failure-1")).wait
       assert_equal 3, failed.exit_status
       assert_equal "failed", Runsheets::Pages.step_mark(s, s.runbook.step("040-exercise-failure"))
+    end
+  end
 
-      wait_for { JSON.parse(File.read(File.join(s.run.dir, "run.json")))["executions"].all? { it["state"] != "running" } }
-      data = JSON.parse(File.read(File.join(s.run.dir, "run.json")))
+  def test_the_reaper_saves_the_record_when_an_execution_ends
+    with_runs_dir do |root|
+      s = open_session(root, inputs: { "NAME" => "tester" })
+      s.execute("010-say-hello-1").wait
+      s.execute("040-exercise-failure-1", confirm: challenge_from(s, "040-exercise-failure-1")).wait
+      wait_until_recorded(s)
+      data = run_json(s)
       assert_equal 2, data["executions"].size
       assert_equal([0, 3], data["executions"].map { it["exit_status"] }, "the reaper saves the record when an execution ends")
       assert_equal s.id, data["session"]
@@ -83,32 +107,49 @@ class TestRun < Minitest::Test
       assert ex.success?
       assert_equal({ "NAME" => "world" }, s.run.inputs)
       refute_includes File.read(File.join(s.run.dir, "run.json")), "swordfish"
-      refute_includes File.read(s.log.path), "swordfish"
-      assert_includes File.read(s.log.path), "SECRET_WORD=[secret]"
+      refute_includes session_log(s), "swordfish"
+      assert_includes session_log(s), "SECRET_WORD=[secret]"
     end
   end
 
-  def test_destructive_confirmation_is_a_per_block_challenge
+  def test_destructive_challenge_is_stable_until_used
     with_runs_dir do |root|
-      s = open_session(root)
-      run = s.current
+      run = open_session(root).current
       a = run.challenge_for("040-exercise-failure-1")
       assert_match(/\A[0-9a-f]{4}\z/, a)
       assert_equal a, run.challenge_for("040-exercise-failure-1")
-      ex = s.execute("040-exercise-failure-1", confirm: " #{a} ").wait
+    end
+  end
+
+  def test_a_used_destructive_challenge_is_retired_and_the_confirmation_recorded
+    with_runs_dir do |root|
+      s   = open_session(root)
+      a   = s.current.challenge_for("040-exercise-failure-1")
+      ex  = s.execute("040-exercise-failure-1", confirm: " #{a} ").wait
       assert_equal 3, ex.exit_status
-      refute_equal a, run.challenge_for("040-exercise-failure-1"), "a used challenge is retired"
+      refute_equal a, s.current.challenge_for("040-exercise-failure-1"), "a used challenge is retired"
       assert_equal true, s.run.events.find { it[:type] == "execute" }[:confirmed]
     end
   end
 
-  def test_background_block_runs_without_timeout_until_stopped
+  def test_a_background_block_runs_without_a_timeout
     with_runs_dir do |root|
-      s = open_session(root)
+      s  = open_session(root)
       ex = s.execute("035-keep-a-clock-running-1")
+      running = s.running_executions
+      wait_for { ex.output.include?("still here") }
+      s.stop(ex.id)
+      ex.wait(10)
       assert ex.background?
       assert_nil ex.timeout
-      assert_equal [ex], s.running_executions
+      assert_equal [ex], running
+    end
+  end
+
+  def test_a_background_block_runs_until_stopped
+    with_runs_dir do |root|
+      s  = open_session(root)
+      ex = s.execute("035-keep-a-clock-running-1")
       wait_for { ex.output.include?("still here") }
       s.stop(ex.id)
       ex.wait(10)
@@ -119,18 +160,30 @@ class TestRun < Minitest::Test
     end
   end
 
-  def test_acknowledge_records_terminal_blocks_only
+  def test_acknowledge_needs_an_open_run
     with_runs_dir do |root|
       s = start_session(root)
       assert_raises(Runsheets::RunError) { s.acknowledge("020-inspect-ruby-3") }
-      s.open(s.runbook)
+      refute s.active?
+    end
+  end
+
+  def test_acknowledge_records_terminal_blocks
+    with_runs_dir do |root|
+      s   = open_session(root)
       ack = s.acknowledge("020-inspect-ruby-3", note: "  pressed enter ")
       assert_equal "pressed enter", ack[:note]
       assert_equal "pressed enter", s.ack("020-inspect-ruby-3")[:note]
       assert_equal "ran", Runsheets::Pages.step_mark(s, s.runbook.step("020-inspect-ruby"))
+      assert_includes run_md(s), "confirmed run in the operator's terminal — pressed enter"
+    end
+  end
+
+  def test_acknowledge_refuses_blocks_that_are_not_terminal_blocks
+    with_runs_dir do |root|
+      s = open_session(root)
       assert_raises(Runsheets::RunError) { s.acknowledge("020-inspect-ruby-1") }
       assert_raises(Runsheets::RunError) { s.acknowledge("nope") }
-      assert_includes File.read(File.join(s.run.dir, "run.md")), "confirmed run in the operator's terminal — pressed enter"
     end
   end
 
@@ -141,7 +194,7 @@ class TestRun < Minitest::Test
       assert ex.success?
       assert_includes ex.output, "the secret is [redacted SECRET_WORD]"
       refute_includes File.binread(ex.log_path), "swordfish"
-      refute_includes File.read(File.join(s.run.dir, "run.md")), "swordfish"
+      refute_includes run_md(s), "swordfish"
       assert_equal %w[SECRET_WORD], s.secret_inputs_set
     end
   end
@@ -161,6 +214,7 @@ class TestRun < Minitest::Test
     with_runs_dir do |root|
       s = open_session(root)
       assert_equal s.runbook.dir, s.current.working_directory(s.runbook.step("010-say-hello"))
+      assert_equal s.runbook.dir, s.current.working_directory(s.runbook.step("020-inspect-ruby"))
     end
   end
 
@@ -174,29 +228,37 @@ class TestRun < Minitest::Test
     end
   end
 
-  def test_changing_inputs_is_recorded_and_used_from_then_on
+  def test_changing_inputs_is_used_from_then_on_and_recorded
     with_runs_dir do |root|
       s = open_session(root, inputs: { "NAME" => "first", "SECRET_WORD" => "one" })
       s.change_inputs("NAME" => "second", "SECRET_WORD" => "two")
-      assert_includes s.execute("010-say-hello-1").wait.output, "Hello, second!"
-      event = s.run.events.find { it[:type] == "inputs" }
-      assert_equal({ "NAME" => "second" }, event[:inputs])
-      assert_includes File.read(s.log.path), "inputs changed NAME=second SECRET_WORD=[secret]"
-      assert_includes File.read(File.join(s.run.dir, "run.md")), "inputs changed: `NAME` = `second`"
+      output = s.execute("010-say-hello-1").wait.output
+      assert_includes output, "Hello, second!"
+      assert_equal({ "NAME" => "second" }, s.run.events.find { it[:type] == "inputs" }[:inputs])
+      assert_includes session_log(s), "inputs changed NAME=second SECRET_WORD=[secret]"
+      assert_includes run_md(s), "inputs changed: `NAME` = `second`"
+    end
+  end
+
+  def test_a_blank_secret_keeps_its_value_when_inputs_change
+    with_runs_dir do |root|
+      s = open_session(root, inputs: { "NAME" => "first", "SECRET_WORD" => "two" })
       s.change_inputs("NAME" => "third", "SECRET_WORD" => "")
       assert_equal "two", s.current.inputs["SECRET_WORD"], "a blank secret keeps its value"
+      assert_equal "third", s.current.inputs["NAME"]
     end
   end
 
   def test_closing_stops_what_is_running_and_derives_the_status
     with_runs_dir do |root|
-      s = open_session(root)
+      s  = open_session(root)
       bg = s.execute("035-keep-a-clock-running-1")
       wait_for { bg.output.include?("still here") }
-      assert_equal "partial", s.current.close!
+      status = s.current.close!
+      data   = run_json(s)
+      assert_equal "partial", status
       assert bg.stopped?
       refute s.active?
-      data = JSON.parse(File.read(File.join(s.run.dir, "run.json")))
       assert_equal "stopped", data["executions"].first["state"]
       assert_equal "partial", data["status"]
       assert_raises(Runsheets::RunError) { s.execute("010-say-hello-1") }

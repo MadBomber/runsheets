@@ -9,6 +9,9 @@ require "tmpdir"
 require "fileutils"
 require "yaml"
 
+# Shared fixtures and assertion helpers, one file per area of the suite.
+Dir[File.join(__dir__, "support", "**", "*.rb")].each { require it }
+
 module RunsheetsTest
   # Stands in for the End session stopper: counts the calls.
   StopCounter = Struct.new(:calls) do
