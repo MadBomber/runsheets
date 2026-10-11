@@ -1,3 +1,9 @@
+---
+tags:
+  - Reference
+  - Security
+---
+
 # HTTP Endpoints
 
 The page's JavaScript and HTML forms are the intended clients, but the
@@ -40,14 +46,15 @@ same token, hence `-L`.
 Until the session has started, every `GET` (other than `/session/new`)
 redirects to `/session/new` with **302**, and every other request with a
 valid token gets **409**. After it has ended, every request but
-`GET /session` gets **410**.
+`GET /session` gets **410**, except `GET /session/new` and `POST /session`,
+which still redirect to `/session`.
 
 | Method and path | Returns |
 | --- | --- |
 | `GET /session/new` | The start page: who is starting the session, and why. Once the session has started, a **302** to `/session`. |
 | `POST /session` | Starts the session. Form fields: `_token`, `engineer`, `why`; `why` becomes the first note. Responds **303** to `/library` (or `/` for one runbook); **422** with the start page and a message if either is blank; **303** to `/session` if a session has already started. |
 | `GET /session` | The session page: engineer, host, start time, notes, runs, the end panel and the last 200 lines of `session.log`. |
-| `POST /session/notes` | Adds a timestamped note. Form fields: `_token`, `note`. Responds **303** to `/session#notes`; **422** with the session page and "A note needs some text." for a blank note. |
+| `POST /session/notes` | Adds a timestamped note. Form fields: `_token`, `note`, and `back` (optional; a path starting with `/` to return to). Responds **303** to `back`, or to `/session#notes` without it; **422** with the session page and "A note needs some text." for a blank note. |
 | `POST /session/end` | Ends the session: every run is closed with its derived status, anything running is stopped, and the server stops half a second later. Responds **200** with the Session ended page. |
 
 ## Pages
@@ -58,7 +65,7 @@ valid token gets **409**. After it has ended, every request but
 | `GET /steps/:slug` | A step page. `verify` and `rollback` are slugs too. 404 for an unknown slug. |
 | `GET /verify` | The Checks page: every verify step and `verify.md`. 404 if the runbook has none. |
 | `GET /run` | The transcript of the open run of the runbook on screen, or of its most recent run, with the drift panel for a closed run. 404 if the runbook has never had a run. |
-| `GET /runs/:id` | A transcript of the runbook on screen, by run id. The id must match `[\w.-]+`. |
+| `GET /runs/:id` | A transcript of the runbook on screen, by run id. The id must match `[\w.-]+`. 404 for a bad or unknown id. |
 | `GET /files/*path` | A regular, non-hidden file under the directory runsheets was started on, with its content type, `X-Content-Type-Options: nosniff` and a `Content-Security-Policy` that allows no script (see [File serving](security.md#file-serving)). `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.pdf` and `.txt` are served inline; anything else with `Content-Disposition: attachment`. 404 otherwise. |
 | `GET /docs/*path` | A markdown file under that directory, rendered as a page with nothing executable. One of the own files of the runbook on screen redirects to its page; another runbook in the library redirects to its library page. 404 for anything that is not a `.md` file. |
 | `GET /search?q=` | Full-text search over every runbook in the library (or the one runbook), best first. Works before a runbook is selected. An empty `q` shows the search form. |
@@ -114,8 +121,8 @@ Form fields: `_token`, `status` (`done` or `skipped`), `note` (optional),
 and `runbook` (optional; see [Which run](#which-run)). Responds **303** to
 the next step or the landing page, with that runbook put on screen;
 **422** for another status, or for a slug that is not a numbered step (the
-landing page, `verify` and `rollback` cannot be marked); **409** when the
-runbook has no run.
+landing page, `verify` and `rollback` cannot be marked); **404** for an
+unknown slug; **409** when the runbook has no run.
 
 ## Execution
 
@@ -133,7 +140,10 @@ of the runbook on screen. A `runbook` that has no run in the session gets
 
 Starts executing a `run`, `destructive` or `background` block. Responds
 **202** with the execution as JSON, including its initial (usually empty)
-output.
+output. `expected` is the comparison with the block's `expect` block
+(`match` and the side-by-side `rows`) once the execution has ended, and
+`null` while it runs, when it could not start, or when the block has no
+expect block.
 
 ```bash
 curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
@@ -159,7 +169,8 @@ curl -s -X POST -H "X-Runsheets-Token: $TOKEN" $B/blocks/010-say-hello-1/execute
   "output": "",
   "output_size": 0,
   "output_truncated": false,
-  "success": false
+  "success": false,
+  "expected": null
 }
 ```
 

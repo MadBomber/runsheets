@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.0.1] - 2026-10-09
+## [0.0.1] - 2026-10-11
 
 ### Fixed
 
@@ -27,6 +27,9 @@ A review of the whole application found the following; each has a test.
     aliases in front matter are refused; log tags cannot carry a newline;
     interrupted-session cleanup stays inside the runs directory; run history
     no longer expands glob characters in a slug.
+  - Adding a note redirected to any `back` value starting with `/`, so
+    `//other.site` sent the browser off site. Only paths on this server
+    are followed now; anything else returns to the session page.
 - Runs and sessions:
   - `runsheets --engineer --why` failed to start after a killed session
     (`Time.iso8601` without `require "time"`).
@@ -85,9 +88,10 @@ A review of the whole application found the following; each has a test.
 - Single-file runbooks are reloaded from their own file. Before, a session
   reloaded the containing directory, so edits to a single-file runbook were
   never picked up.
-- Stopping the server (Ctrl-C) ends the active run as `abandoned` and stops
-  everything it left running. Before, background blocks outlived the server
-  and the run record stayed `running` forever.
+- Stopping the server (Ctrl-C) ends the session: every run closes with the
+  status its work earns and everything left running is stopped. Before,
+  background blocks outlived the server and the run record stayed `running`
+  forever.
 - Every page carries a Content-Security-Policy with a per-response nonce on
   its own inline script and stylesheet, and `Cache-Control: no-store`. Raw
   HTML in runbook markdown still renders, but a `<script>` in it no longer
@@ -97,10 +101,23 @@ A review of the whole application found the following; each has a test.
 - `--bind` to a wildcard address (`0.0.0.0`, `::`) works. The Host check is
   off for a wildcard bind, since no host list can be right, and the CLI warns
   on any non-loopback bind. A specific non-loopback address permits itself.
-- `POST /run/finish` with a status other than `completed` or `abandoned` is
-  refused with 422 before anything is stopped. Before, every running
-  execution was stopped and then the request failed with 500, leaving the
-  run active.
+- A fenced block in a list item indented four or more spaces (a step under
+  `10.`, or a nested bullet) or inside a blockquote rendered as plain text
+  with no Run button and no warning. Fences are now found where kramdown
+  finds them, so those blocks execute; an indented code block outside a
+  list is still literal text.
+- `run` beside another flag was read by position: `bash run background`
+  became a `run` block with a warning while `bash background run` was a
+  `background` block. `run` is now redundant beside `background` or
+  `destructive` in any order, and `text expect run` or `bash run terminal`
+  warns about the conflict instead of silently dropping `run`.
+- The Checks page's "Run all N checks" counted destructive and background
+  checks, which Run all never runs. It counts only the checks it runs.
+- Starting with `--engineer` and `--why` on a port already in use created
+  a session record, marked ended, before failing. The port is checked
+  first, so a failed start records nothing.
+- The server process was titled after the directory runsheets was started
+  in, so `pgrep -f runsheets` could not find it. It is tagged `runsheets`.
 - Only numbered steps can be marked done or skipped (422 otherwise). Marking
   the landing page or the `verify`/`rollback` documents used to count toward
   "every step done".

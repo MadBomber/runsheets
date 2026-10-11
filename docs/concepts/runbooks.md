@@ -1,3 +1,9 @@
+---
+tags:
+  - Concepts
+  - Authoring
+---
+
 # Runbooks and Documents
 
 ## What a runbook is
@@ -40,7 +46,7 @@ staging-teardown/
   runbook.md          front matter (with a title) + preamble
   steps/
     010-confirm-nothing-to-preserve.md
-    020-stop-the-pipeline.md
+    020-snapshot-the-database.md
   verify.md           optional
   rollback.md         optional
 ```
@@ -115,7 +121,7 @@ the way it is.
     The link goes to `/docs/docs/bloat.md`, which renders the file. Every
     block in it is display only and nothing on the page executes; its own
     relative links and images resolve from its folder. A link to one of the
-    runbook's own files, such as `steps/020-stop-the-pipeline.md`, opens
+    runbook's own files, such as `steps/020-snapshot-the-database.md`, opens
     that step's page instead, and a link to another runbook in the library
     opens it in the library; both stay in the same tab. Inside a document
     tab, links to other documents stay in that tab.

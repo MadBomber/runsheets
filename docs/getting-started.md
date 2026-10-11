@@ -1,3 +1,11 @@
+---
+tags:
+  - Getting started
+  - Installation
+  - Web page
+  - Sessions
+---
+
 # Getting Started
 
 This page installs runsheets, serves the bundled examples, and walks
@@ -25,8 +33,10 @@ runbook of your own.
     git clone https://github.com/MadBomber/runsheets
     cd runsheets
     bundle install
-    bundle exec bin/runsheets --help
+    bin/runsheets --help
     ```
+
+    Use `bin/runsheets` wherever these pages say `runsheets`.
 
 Check it is on the path:
 
@@ -42,7 +52,7 @@ and `examples/single_md_file_runbooks/disk-space-triage.md` is a single-file run
 reads. If you installed from RubyGems, find the directory with:
 
 ```bash
-cd "$(gem contents runsheets | grep 'examples/directory_based_runbooks/hello/runbook.md' | xargs dirname)/.."
+cd "$(gem contents runsheets | grep 'examples/directory_based_runbooks/hello/runbook.md' | xargs dirname)/../.."
 ```
 
 Then serve it:
@@ -55,7 +65,7 @@ You will see:
 
 ```text
 runsheets 0.0.1
-Library: 4 runbooks under /path/to/examples
+Library: 5 runbooks in 3 folders under /path/to/examples
 Runs:    /Users/you/.local/share/runsheets/runs
 Config:  none (defaults)
 Session: starts in the browser (who and why)
@@ -70,13 +80,15 @@ The argument can also be one runbook, a directory or a single all-in-one
 markdown file:
 
 ```bash
-runsheets --open hello                  # one runbook directory
-runsheets --open db-maintenance.md      # one file, ## headings as steps
+runsheets --open directory_based_runbooks/hello                # one runbook directory
+runsheets --open single_md_file_runbooks/db-maintenance.md     # one file, ## headings as steps
 ```
 
 ## Walk through a session
 
 ### 1. Start the session
+
+![The start page asks who you are and why](assets/images/screenshots/start-session.png){ .screenshot loading=lazy }
 
 Everything from now until runsheets stops is one **session**. The browser
 opens on the **Start a session** page, which asks two things:
@@ -96,9 +108,12 @@ To skip this page next time, give both on the command line:
 ### 2. Choose a runbook
 
 The library shows the examples as a tree on the left and a card for each
-on the right. Click **Hello, runsheets** in the tree. Its pane shows when
+on the right. Click **Hello, runsheets** in the tree, under
+`directory_based_runbooks`. Its pane shows when
 to use it, its prerequisites and escalation, its steps, and a form with one
 field per declared input, pre-filled from defaults and your environment.
+
+![The library tree with the Hello runbook selected](assets/images/screenshots/library-runbook.png){ .screenshot loading=lazy }
 
 Nothing can be executed until the runbook has a run. Step pages are
 readable and blocks can be copied, but the Run buttons are greyed out;
@@ -107,11 +122,13 @@ every execution belongs to a run.
 
 ### 3. Start the run
 
+![The runbook's landing page with its run open](assets/images/screenshots/run-open.png){ .screenshot loading=lazy }
+
 Leave `NAME` as `world` or type your own, then click **Start run** (or
 press ++o++). Two things happen:
 
 - A run directory is created under the runs directory printed at startup,
-  in `hello/`, named by the session id.
+  in `directory_based_runbooks/hello/`, named by the session id.
 - You land on the runbook's landing page, which now shows a **Run open**
   panel: the run id, its progress, its inputs, and **Work through the
   steps**.
@@ -129,6 +146,8 @@ border turns green for exit status 0 or red for anything else, and the
 footer line shows the exit status, duration, finish time, and the name of
 the log file in the run directory. The terminal shows the same execution
 in the session log: the code that ran after `$`, the output after `>`.
+
+![A block after Run: output, exit status and a match against the expected output](assets/images/screenshots/step-after-run.png){ .screenshot loading=lazy }
 
 Click **Run** again if you like. Both executions are recorded, with separate
 `.cmd` and `.out` files.
@@ -154,6 +173,8 @@ click **Mark done and continue**. The acknowledgement goes into the record
 with a timestamp and you land on the next step. **Skip** records a skip
 instead.
 
+![A manual step waiting for acknowledgement, with a note](assets/images/screenshots/manual-step.png){ .screenshot loading=lazy }
+
 The sidebar marks each step: `✓` done, `↷` skipped, `•` ran with no
 failures, `✗` a block failed, `·` untouched.
 
@@ -165,12 +186,16 @@ the block has no timeout, and the sidebar grows a **Running** panel that
 follows you to every page, and to every runbook, with its own Stop button.
 Leave it running for now.
 
+![A background block streaming output, listed in the Running panel](assets/images/screenshots/background-block.png){ .screenshot loading=lazy }
+
 ### 7. See a failure and a timeout
 
 Step 5, *Exercise a failure*, is marked destructive in its front matter even
 though it is harmless, so you can see the confirmation flow. Clicking **Run
 (destructive)** asks the server to run the block; the server answers with a
 four-character code instead, and the block runs only once you type it back.
+
+![A destructive block that exited 3 and a block that timed out](assets/images/screenshots/failure-and-timeout.png){ .screenshot loading=lazy }
 
 The first block exits 3 on purpose. The second sleeps longer than the step's
 five second timeout; runsheets sends `TERM` to the whole process group,
@@ -185,6 +210,8 @@ checks** on the landing page: both documents are on one page. Click **Run
 all**; the checks run in order, inside the same run, and the status line
 reports the tally.
 
+![The Checks page after Run all checks](assets/images/screenshots/checks.png){ .screenshot loading=lazy }
+
 ### 9. Switch to another runbook
 
 Press ++r++ (or click **Runbooks**) to go back to the library. Hello now
@@ -193,7 +220,8 @@ carries a **run open** badge and a **Return to its run** button. Select
 first step.
 
 Switching finished nothing. The clock from Hello is still running: the
-Running panel lists it with the `hello` slug beside it, and its Stop button
+Running panel lists it with the `directory_based_runbooks/hello` slug
+beside it, and its Stop button
 works from here. Go back to the library and click **Return to its run** on
 Hello: you are back in the same run, with everything you did still marked.
 Inputs given when returning to a run are ignored; change them with the
@@ -207,6 +235,8 @@ each runbook's run with its status so far ("partial so far"); and the last
 200 lines of the session log. Type something under **Notes** ("clock left
 running on purpose") and click **Add note**. It is timestamped and written
 to the log.
+
+![The session page: notes, open runs and End session](assets/images/screenshots/session.png){ .screenshot loading=lazy }
 
 ### 11. End the session
 
@@ -225,7 +255,7 @@ the same.
   sessions/20261010T141502/
     session.json
     session.log
-  hello/20261010T141502/
+  directory_based_runbooks/hello/20261010T141502/
     run.json
     run.md
     blocks/
@@ -233,11 +263,13 @@ the same.
       010-say-hello-1.1.out
       040-exercise-failure-2.1.cmd
       040-exercise-failure-2.1.out
-  disk-space-triage/20261010T141502/
+  single_md_file_runbooks/disk-space-triage/20261010T141502/
     run.json
     run.md
     blocks/
 ```
+
+![The runsheet page: the run's record rendered in the browser](assets/images/screenshots/runsheet.png){ .screenshot loading=lazy }
 
 `run.md` is a runbook's transcript: every execution in order with the
 exact code that ran, its output and its verdict, interleaved with the step
@@ -246,7 +278,8 @@ whole session, every runbook, line by line. See
 [The Run Record](running/run-record.md) for the layout.
 
 Serve the examples again, select Hello, and its landing page lists the run
-under **Previous runs**. Edit `hello/steps/010-say-hello.md`, change the
+under **Previous runs**. Edit
+`directory_based_runbooks/hello/steps/010-say-hello.md`, change the
 greeting, and open that run: a **Runbook changed since this run** panel
 shows the diff between what ran and what the runbook says now.
 
@@ -278,5 +311,9 @@ were any. Useful in CI for a repository of runbooks.
 
 ## Next
 
+- [Example Runbooks](examples.md) for a tour of the other bundled runbooks.
 - [Writing Runbooks](runbooks/index.md) to build your own.
+- [Scripts with asgard](asgard.md) to keep long or reusable scripts out of
+  your blocks.
 - [The Web Page](running/web-ui.md) for everything the page can do.
+- [Troubleshooting and FAQ](troubleshooting.md) if something did not go as described.

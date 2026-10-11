@@ -86,7 +86,7 @@ Done.
 
 ## Milestone 5: sessions
 
-Done.
+Done, in 0.0.1.
 
 - **The session**: everything from `runsheets` starting to stopping is one
   session, belonging to one engineer and opened with a note saying why. A
@@ -111,6 +111,19 @@ Done.
 - **Records**: `sessions/<id>/session.json` and `session.log`; each run
   directory is named by the session id and its `run.json` names the
   session. Blocks see `RUNSHEETS_SESSION_ID`.
+
+## Milestone 6: activity database
+
+Designed, not built. SQLite as the record of sessions, runs, steps and
+executions, with output still kept in files, behind a `Store` interface,
+so questions that cut across runbooks and sessions are answered with a
+query instead of by reading every `run.json`.
+
+## Milestone 7: Rails engine
+
+Designed, not built. A `runsheets-rails` gem that a Rails application
+mounts in its admin panel: read-and-record by default, execution only by
+explicit policy.
 
 ## Open questions
 

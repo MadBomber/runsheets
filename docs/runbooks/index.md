@@ -1,3 +1,8 @@
+---
+tags:
+  - Authoring
+---
+
 # Writing Runbooks
 
 A runbook is a directory of markdown files, or a single markdown file

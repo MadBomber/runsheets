@@ -7,7 +7,13 @@
 > See the [CHANGELOG.md](https://github.com/MadBomber/runsheets/blob/main/CHANGELOG.md)
 > file to see latest changes.
 
-Executable runbooks. A directory of markdown files becomes a local web page
+**Full documentation:** <https://madbomber.github.io/runsheets>. This
+README is the overview; the documentation site covers authoring, the
+block convention, the web UI, the run record, settings and the security
+model in detail.
+
+Executable runbooks. A runbook (a directory of markdown files, or a single
+markdown file) becomes a local web page
 where the steps read like a doc site, the commands the author marked as
 runnable get a Run button, and everything that happens during a run is
 recorded: the exact command, its output, exit status, timing, and the
@@ -153,8 +159,9 @@ landing page.
 
 `inputs` become a form when a run starts. Values are exported as
 environment variables to every executed block, so blocks refer to them as
-`$NAME` and stay copy-pasteable into a terminal. Blank fields fall back to
-the process environment, then to `default`. A `secret` input is masked in
+`$NAME` and stay copy-pasteable into a terminal. A blank field falls back
+to the value given for the same name earlier in the session (never for a
+secret), then the process environment, then `default`. A `secret` input is masked in
 the form and never written to the run record.
 
 `interpreters` maps a language to the command that runs a file of it. The
@@ -253,12 +260,13 @@ process is closed as `interrupted` the next time runsheets starts.
 ```bash
 bundle install
 bundle exec rake test
-bundle exec bin/runsheets --open examples/directory_based_runbooks/hello
+bin/runsheets --open examples/directory_based_runbooks/hello
 ```
 
-The model (`Runbook`, `Step`, `Block`, `Renderer`, `Executor`,
-`RunRecord`, `Run`, `Session`, `SessionLog`) has no dependency on Sinatra and is tested in
-isolation; `Web` and `Pages` are tested with rack-test.
+The model (`Runbook`, `Library`, `Step`, `Block`, `Renderer`, `Executor`,
+`Expectation`, `Search`, `RunRecord`, `Run`, `Session`, `SessionLog`) has
+no dependency on Sinatra and is tested in isolation; `Web` and `Pages` are
+tested with rack-test.
 
 ## License
 

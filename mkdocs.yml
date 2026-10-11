@@ -93,6 +93,7 @@ markdown_extensions:
   - pymdownx.mark
   - pymdownx.smartsymbols
   - pymdownx.snippets:
+      base_path: ["."]
       check_paths: true
   - pymdownx.superfences
   - pymdownx.tabbed:
@@ -100,6 +101,15 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
 
 extra_css:
   - assets/css/custom.css
@@ -115,7 +125,11 @@ extra:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
+  - Getting Started:
+      - Why runsheets: why-runsheets.md
+      - Install and First Session: getting-started.md
+      - Example Runbooks: examples.md
+      - Troubleshooting and FAQ: troubleshooting.md
   - Concepts:
       - concepts/index.md
       - Runbooks and Documents: concepts/runbooks.md
@@ -127,6 +141,7 @@ nav:
       - Executable Blocks: runbooks/blocks.md
       - Inputs and Secrets: runbooks/inputs.md
       - Authoring Guide: runbooks/authoring.md
+      - Scripts with asgard: asgard.md
   - Running:
       - running/index.md
       - Command Line: running/cli.md
@@ -138,5 +153,7 @@ nav:
       - Architecture: reference/architecture.md
       - Ruby API: reference/ruby-api.md
       - HTTP Endpoints: reference/http-api.md
-  - Roadmap: roadmap.md
-  - Changelog: changelog.md
+  - Project:
+      - Roadmap: roadmap.md
+      - Changelog: changelog.md
+      - Tags: tags.md

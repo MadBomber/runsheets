@@ -1,3 +1,8 @@
+---
+tags:
+  - Running
+---
+
 # Running
 
 runsheets is a script an operator starts and stops. Everything between the

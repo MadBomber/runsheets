@@ -1,3 +1,10 @@
+---
+tags:
+  - Running
+  - Web page
+  - Sessions
+---
+
 # The Web Page
 
 Every page has the same frame: a sticky header, a sidebar, the content, and
@@ -8,7 +15,7 @@ after the session ends are the exceptions; they stand alone.
 
 Everything from `runsheets` starting to it stopping is one session (see
 [Sessions, Runs and Runsheets](../concepts/runs.md)). Unless the engineer
-and the reason were given on the command line, the browser opens on the
+and the reason were given on the command line, the first page is the
 **Start a session** page at `/session/new`, which asks:
 
 - **Who are you?** Pre-filled from the configured engineer, else
@@ -29,8 +36,9 @@ starts when the server does and this page is never shown. See
 ## Header
 
 - **Brand and slug** on the left link home.
-- **Breadcrumb**: runbook title, then the current step, or **Session** on
-  the session page.
+- **Breadcrumb**: in a library, **Runbooks** and the folders above the
+  runbook; then the runbook title, then the current step, or **Runsheet**,
+  **Checks** or **Session** on those pages.
 - **Prev / Next** move through the numbered steps. Disabled at the ends and
   on pages that are not steps.
 - **Session pill**: the engineer, how long the session has been open, and
@@ -75,7 +83,8 @@ block failed but was then marked done shows `✓`. The failure is still in
 the record.
 
 The mark of the step on screen updates as soon as one of its blocks
-finishes, without a reload: `•` when it ran, `✗` when it failed. A step
+finishes, without a reload: `•` when it ran, `✗` when it failed (a
+stopped block leaves the mark alone until the next reload). A step
 that has been marked done or skipped keeps its mark, and a `✗` is not
 turned back into `•` by a later block that succeeds.
 
@@ -92,6 +101,8 @@ runbook is selected, the library, the session page, search, and the
 documents and files runbooks link to work; every other page redirects to
 the library.
 
+![The library tree beside the selected runbook](../assets/images/screenshots/library-runbook.png){ .screenshot loading=lazy }
+
 The page has two panes:
 
 - **The tree**, on the left, under the **Running** panel when anything
@@ -106,12 +117,12 @@ The page has two panes:
   A folder shows its `README.md` (rendered, if it has one) and a card for
   each folder and runbook it holds directly; the root folder is what
   `/library` shows. A runbook shows its `when_to_use` text beside its
-  action, then its prerequisites, blast radius and escalation, its inputs
-  with their defaults, its steps with kind badges, its previous runs, and
-  its preamble. The URL is the runbook's path in the library
-  (`/library/platform/database/backup`), so it can be bookmarked. Before
-  any runbook is selected, the session page sits in the main pane beside
-  the tree.
+  action, then any authoring warnings, its prerequisites, blast radius and
+  escalation, its inputs with their defaults, its steps with kind badges,
+  its five most recent runs, and its preamble. The URL is the runbook's path in the library
+  (`/library/platform/database/backup`), so it can be bookmarked. The
+  session page and search results also sit in the main pane beside the
+  tree.
 
 What a runbook offers depends on where it stands in the session:
 
@@ -158,7 +169,8 @@ In order:
 4. The **Start a run** panel, or the **Run open** panel.
 5. **Step list** with kind badges, destructive badges, the number of
    executable blocks, and status marks.
-6. **Previous runs**, newest first, leaving out the run that is open now.
+6. **Previous runs**, the 20 most recent, newest first, leaving out the
+   run that is open now.
    Each row shows the run id (linking to the transcript), the status
    (`running`, `completed`, `partial`, `opened`, `interrupted`, or
    `abandoned` in records from before sessions), start time and duration, execution and failure counts, and
@@ -198,8 +210,8 @@ done out of the total), a link to the runsheet, and the inputs (values for
 plain inputs, `NAME=•••` for a secret that is set). Then:
 
 - **Work through the steps**, to step 1.
-- **Go to checks (N)**, when the runbook has verify steps or a
-  `verify.md`.
+- **Go to checks (N)**, where N is the number of executable blocks in
+  the verify steps and `verify.md`; shown when there is at least one.
 - **Change inputs**, a folded form for a runbook with inputs. Plain fields
   hold the current values. Secret fields are always empty, and a secret
   left empty keeps its current value, so a secret never comes back to the
@@ -212,12 +224,16 @@ There is no Finish or Abandon. The run stays open until the session ends.
 
 **Checks**, in the sidebar, gathers every verify step and `verify.md` in
 order on one page. With a run open, **Run all** executes each `run` block
-on the page one after another and reports how many passed. The checks run
+on the page one after another and reports how many passed; its label
+counts those `run` blocks. Destructive and background checks are left for
+you to run with their own buttons, and the button is not shown when there
+are no `run` checks. The checks run
 inside the runbook's run like any other block. Without a run the page is
 read-only.
 
-
 ## Step pages
+
+![A step page after a block has run](../assets/images/screenshots/step-after-run.png){ .screenshot loading=lazy }
 
 In order:
 
@@ -327,6 +343,8 @@ drifting away from it.
 
 ## Session page
 
+![The session page](../assets/images/screenshots/session.png){ .screenshot loading=lazy }
+
 `/session`, reached from the session pill, is the notebook so far:
 
 - **The heading**: the session id, the engineer, the host, the start time
@@ -350,8 +368,8 @@ drifting away from it.
   status, the reason it was started, and the slug and status of each of
   its runs.
 
-In a library, before any runbook is selected, the session page sits in the
-main pane beside the tree.
+In a library the session page always sits in the main pane beside the
+tree.
 
 ## Ending the session
 
@@ -382,6 +400,8 @@ the directory runsheets was started on, or of the one runbook when it was
 started on one. It works before any runbook is selected. Press ++f++ to jump
 to it.
 
+![Full-text search results grouped by runbook](../assets/images/screenshots/search.png){ .screenshot loading=lazy }
+
 - **What is searched**: each runbook's title, its front matter prose
   (when to use, prerequisites, blast radius, escalation, tags, input
   names and prompts), its preamble, and every step, `verify.md` and
@@ -394,8 +414,8 @@ to it.
   quote without a partner is ignored.
 - **Results**: one card per matching runbook, best first. A match in the
   title counts most, then the front matter, then step titles, then the
-  text. Under each runbook are the documents that matched, each with a
-  snippet and the words highlighted.
+  text. Under each runbook are the documents that matched, up to five
+  and then "and N more", each with a snippet and the words highlighted.
 - **Where results lead**: a step of the runbook on screen goes straight to
   its page. Any other runbook opens in the library with the matching
   step highlighted in its step list; start or return to its run from
@@ -442,7 +462,7 @@ library with no runbook open it sits beside the tree.
 
 | Status | Heading | Typical cause |
 | --- | --- | --- |
-| 403 | Not allowed | Missing session token on a POST, or a `Host` header that is not loopback. |
+| 403 | Not allowed | Missing session token on a POST. (A `Host` header that is not loopback or the bind address gets a plain-text "Host not permitted" instead of a page.) |
 | 404 | Not found | Unknown step, run, execution, file, or runbook slug. |
 | 409 | Not right now | A POST before the session has started, no run for the runbook the page acts on, block not executable, blank input referenced, unknown execution to stop, acknowledging a block that is not `terminal`. |
 | 410 | The session has ended | Only `GET /session` still answers. |

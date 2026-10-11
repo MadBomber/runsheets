@@ -34,9 +34,9 @@ interpreters:
 A single-file runbook: this one markdown file holds the front matter, this
 preamble, and one `##` heading per step. It also shows `sql run` blocks.
 They execute because the front matter maps `sql` to a `psql` command; the
-`.sql` file runsheets writes for each block is appended to that command,
-and `psql` picks the connection up from the `PG*` inputs in the
-environment. The password is a secret input: it reaches `psql`, never the
+file runsheets writes each block to (`<block-id>.<n>.cmd` in the run
+directory) is appended to that command, and `psql` picks the connection
+up from the `PG*` inputs in the environment. The password is a secret input: it reaches `psql`, never the
 run record, and is redacted if anything prints it.
 
 Step attributes live in an HTML comment right after each heading. GitHub

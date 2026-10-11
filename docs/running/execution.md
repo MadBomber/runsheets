@@ -1,3 +1,10 @@
+---
+tags:
+  - Running
+  - Blocks
+  - Security
+---
+
 # Execution Model
 
 ## One process per block
@@ -54,7 +61,8 @@ the execution's `.out` file, flushing after every chunk. The same redacted
 output goes to the session log, one line at a time, each marked `>` and
 tagged with the execution id (see
 [The session log](run-record.md#the-session-log)). The page polls the
-tail of that file every half second while the process runs, so a command
+tail of that file every half second while the process runs (every three
+seconds while the tab is hidden), so a command
 that prints progress is seen printing it. Up to 256 KB of the tail is shown
 in the page, with a marker when there is more; the file holds everything.
 

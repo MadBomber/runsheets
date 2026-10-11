@@ -1,3 +1,9 @@
+---
+tags:
+  - Authoring
+  - Inputs and secrets
+---
+
 # Front Matter Reference
 
 Front matter is a YAML mapping between `---` lines at the very top of a
@@ -39,7 +45,7 @@ interpreters:
 | `when_to_use` | string | none | Landing page metadata table. |
 | `prerequisites` | list of strings | `[]` | Landing page metadata table. |
 | `blast_radius` | string | none | Landing page table, and the red banner on every destructive step. Its presence marks the whole runbook destructive. |
-| `escalation` | string | none | Landing page table and the destructive banner. |
+| `escalation` | string | none | Landing page table, and the destructive banner when `blast_radius` is set. |
 | `tags` | list of strings | `[]` | Badges on the landing page. |
 | `inputs` | list of mappings | `[]` | The start-run form. See [Inputs and Secrets](inputs.md). |
 | `interpreters` | mapping of language to command | see below | How executable blocks of each language are run. See [Executable Blocks](blocks.md#interpreters). |
@@ -62,8 +68,12 @@ temporary file holding the block's code is appended.
 ```yaml
 interpreters:
   ruby: bin/rails runner -
-  sql: psql "$DATABASE_URL" -f
+  sql: psql -X -v ON_ERROR_STOP=1 -f
 ```
+
+There is no shell, so a `$VARIABLE` in the command is passed literally; see
+[Interpreters](blocks.md#interpreters) for the `bash -c` form that expands
+one.
 
 The defaults are:
 
@@ -94,7 +104,7 @@ cwd: .                   # working directory, relative to the runbook
 | `title` | string | first `# Heading`, else the slug | Page title, sidebar, step list, breadcrumb. |
 | `kind` | `automated`, `manual` or `verify` | `automated` if the body has an executable block, else `manual` | Badge on the step. Anything else is a warning. An `automated` step with no executable block is a warning. |
 | `destructive` | boolean | `false` | Marks the step destructive even if no block is. A step is also destructive when any of its blocks carries the `destructive` flag. Destructive steps show the blast-radius banner. |
-| `timeout` | number of seconds | `600` | Bounds every execution of a block in this step. Must be positive. |
+| `timeout` | whole number of seconds | `600` | Bounds every execution of a block in this step, except `background` blocks. Must be a positive whole number; anything else is a warning and `600` is used. |
 | `cwd` | path | the runbook directory | Working directory for executed blocks, resolved relative to the runbook directory. |
 
 ### What `kind` means

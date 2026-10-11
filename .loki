@@ -18,18 +18,10 @@ class Tasks
   @@gem_name ||= "runsheets".freeze
 
   header "runsheets v#{gem_version} — executable runbooks"
-  footer "Try: asgard serve   (serves examples/hello and opens the browser)"
 
   desc "Run the test suite"
   def test
     sh "bundle exec rake test"
-  end
-
-  desc "serve [RUNBOOK]", "Serve a runbook (default: examples/hello) and open the browser"
-  option :port, aliases: "-p", type: :numeric, default: 4567, desc: "Port to listen on"
-  option :open, type: :boolean, default: true, desc: "Open the browser once the server is up"
-  def serve(runbook = "examples/hello")
-    sh "bundle exec bin/runsheets --port #{options[:port]}#{' --open' if options[:open]} #{runbook}", exec: true
   end
 
   desc "Load every bundled example runbook and report authoring warnings"

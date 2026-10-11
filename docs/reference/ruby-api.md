@@ -1,3 +1,9 @@
+---
+tags:
+  - Reference
+  - Ruby API
+---
+
 # Ruby API
 
 The gem can be used without the web page: to validate runbooks in CI, to
@@ -29,7 +35,7 @@ runbook.escalation      # String or nil
 runbook.tags            # Array of String
 runbook.destructive?    # true if a blast radius is declared or any step is destructive
 runbook.inputs          # Array of Runbook::Input (name, prompt, default, secret?)
-runbook.interpreters    # { "bash" => ["bash"], "ruby" => ["bin/rails", "runner", "-"], ... }
+runbook.interpreters    # { "bash" => ["bash"], "sh" => ["sh"], "zsh" => ["zsh"], "ruby" => ["ruby"] } plus the front matter's entries
 runbook.warnings        # Array of String, empty for a clean runbook
 
 runbook.steps           # numbered steps, in order
@@ -43,7 +49,8 @@ runbook.neighbors(step)                          # => [previous, next]
 ```
 
 `Runbook.load` raises `Runsheets::RunbookError` when the path does not
-exist, a directory has no `runbook.md`, or front matter is invalid.
+exist, a directory has no `runbook.md`, or front matter is invalid or has
+no `title`.
 Authoring problems that do not prevent loading are collected in
 `warnings`. `Runsheets::SingleFile.split(markdown)` is the parser behind
 the single-file shape, returning the preamble and the sections with their
@@ -379,6 +386,28 @@ version; `Run` calls it. `change_inputs(inputs, runbook)` records an
 `inputs` event, and `finish!(status:)` closes the record with one of the
 final statuses.
 
+## Libraries
+
+```ruby
+library = Runsheets::Library.load("ops/runbooks")   # RunbookError if no runbooks are found
+Runsheets::Library.library?("ops/runbooks")         # a directory without its own runbook.md
+library.dir
+library.entries          # every runbook at any depth, by slug; Library::Entry
+library.folders          # every folder below the root; Library::Folder
+library.root             # the root Folder (slug "")
+library.find("database/maintenance")      # an Entry, or nil
+library.folder("database")                # a Folder, or nil
+library.node(slug)                        # an Entry, a Folder, or nil
+library.runbook("database/maintenance")   # the Runbook, loaded afresh with its library slug
+library.entry_at(path)                    # the Entry whose files include path, or nil
+library.refresh!                          # rescan if anything changed
+```
+
+An `Entry` has `slug`, `name`, `path`, `runbook` (nil when it does not
+load), `error`, `ok?`, `title` and `warnings`. A `Folder` has `slug`,
+`name`, `folders`, `entries`, `readme_html` and `runbooks` (everything
+beneath it).
+
 ## Searching
 
 ```ruby
@@ -410,6 +439,19 @@ result.blocks   # Array of Block
 
 `Runsheets::Renderer.rewrite_relative_urls(html, base_dir)` points relative
 `src` and `href` values at `/files/`, as the step pages do.
+
+## Comparing output with an expect block
+
+```ruby
+result = Runsheets::Expectation.compare("hello {{any}}\n", "hello world\n")
+result.match?   # => true
+result.rows     # Expectation::Row (tag :same, :changed, :expected or :actual), line by line
+result.to_h     # { match:, rows: [...] }, as /executions/:id sends it
+step.expected_output(block_id)   # the text of the expect block for that block, or nil
+```
+
+Lines are compared in order with trailing whitespace ignored; `{{any}}`
+matches any characters within one line.
 
 ## Serving
 
@@ -459,7 +501,7 @@ class. Its layers, lowest to highest: `lib/runsheets/config/defaults.yml` in the
 `~/.config/runsheets/runsheets.yml`, the project config (`./config/runsheets.yml`,
 or the file `path:` or `RUNSHEETS_CONFIG` names), `RUNSHEETS_*`
 variables, then the overrides hash. A `Runsheets::ConfigError` is raised
-for a port that is not a whole number, an unknown log level, or a named
+for a port that is not a whole number from 1 to 65535, an unknown log level, or a named
 config file that is missing. `engineer`, `why`, `log_level` and `quiet`
 are settings like the rest.
 
@@ -471,4 +513,4 @@ are settings like the rest.
 | `Runsheets::RunbookError` | A runbook cannot be loaded. |
 | `Runsheets::RunError` | A session or run operation is not allowed in the current state, or a session is started without an engineer or a reason. |
 | `Runsheets::Run::ConfirmationRequired` | A destructive block was executed without its code; a `RunError` carrying `challenge`. |
-| `Runsheets::ConfigError` | A setting is invalid: a port, a log level, a missing config file. |
+| `Runsheets::ConfigError` | A setting is invalid: a port, a log level, a missing config file. Also raised by `SessionLog` for an unknown level. |

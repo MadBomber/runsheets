@@ -1,3 +1,10 @@
+---
+tags:
+  - Authoring
+  - Blocks
+  - Expected output
+---
+
 # Executable Blocks
 
 Real runbooks mix runnable shell, interactive commands, SQL for another
@@ -125,7 +132,11 @@ a runbook; keep Ruby blocks few and meaningful.
   warning in the block's toolbar and are listed by `runsheets --check`. They
   are never silently ignored.
 - **Conflicting flags warn.** `bash background terminal` picks the first and
-  warns. `destructive` always wins because it is the safer reading.
+  warns. `destructive` always wins because it is the safer reading. `run`
+  beside `background` or `destructive` adds nothing and is not warned
+  about, in either order: `bash run background` and `bash background run`
+  are both `background`. `run` beside `terminal` or `expect` contradicts
+  it, so `text expect run` is an `expect` block, with a warning.
 - **The block's code is exactly the fence's contents.** Leading indentation
   inside a list item is removed, as GitHub does. Nothing is prepended: no
   `set -e`, no shebang. If you want bash to stop at the first failure, say

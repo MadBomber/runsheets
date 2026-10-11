@@ -1,3 +1,10 @@
+---
+tags:
+  - Authoring
+  - Inputs and secrets
+  - Security
+---
+
 # Inputs and Secrets
 
 Inputs are the values a runbook needs that differ from run to run: an AWS
@@ -50,8 +57,8 @@ puts ENV.fetch("AWS_PROFILE")
 When the start-run form is submitted, each input resolves in this order:
 
 1. What the operator typed in the form.
-2. If blank, a value given for an input of the same name by a runbook
-   selected earlier in the same session. Secrets are never carried from
+2. If blank, the value an input of the same name has in a run opened
+   earlier in the same session. Secrets are never carried from
    one run to another.
 3. If still blank, the environment variable of the same name in the process
    that started `runsheets`. A devcontainer with `AWS_PROFILE` already set

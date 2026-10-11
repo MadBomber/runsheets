@@ -1,3 +1,9 @@
+---
+tags:
+  - Authoring
+  - Blocks
+---
+
 # Authoring Guide
 
 The mechanics are in the other pages of this section. This page is about
@@ -53,9 +59,9 @@ costs the operator three seconds; a missed confirmation costs a lot more.
 ## Marking the whole runbook
 
 Fill in `blast_radius` and `escalation` in `runbook.md` whenever any step is
-destructive. The blast radius appears in a red banner on every destructive
-step, right above the Run button, so it is read at the moment it matters,
-not only on the landing page.
+destructive. The blast radius appears in a red banner at the top of every
+destructive step, so it is read at the moment it matters, not only on the
+landing page.
 
 ## Timeouts
 
@@ -120,15 +126,18 @@ Reports, with the file and block they belong to:
 - unknown or conflicting block flags
 - `run` on a language with no interpreter
 - `automated` steps with nothing executable, and unknown `kind` values
-- non-positive timeouts
-- missing `title`, invalid input names, duplicate step slugs
+- timeouts that are not a positive whole number
+- invalid input names, duplicate step slugs
 - a step file in `steps/` named `runbook.md`, `verify.md` or `rollback.md`
 - in a single-file runbook, a code fence that is opened in a section and
   never closed, which turns every later heading into part of that section
+- in a single-file runbook, an attribute comment that is not a valid YAML
+  mapping, an unknown `role`, or a second Verify or Rollback section
 - no steps at all
 
 Front matter that cannot be read (not valid YAML, a YAML alias, an
-unknown tag) is an error rather than a warning. It exits 1 when there are
+unknown tag), or a runbook with no `title`, is an error rather than a
+warning. It exits 1 when there are
 warnings or errors, so it can gate a pull request in a repository of
 runbooks. See [Checking runbooks](../running/cli.md#checking-runbooks).
 
@@ -140,7 +149,9 @@ runbooks. See [Checking runbooks](../running/cli.md#checking-runbooks).
 - **`export FOO=...` for a later block.** Same reason. Use an input, or
   compute the value again. A `capture` flag that stores a block's output as
   an input is on the roadmap.
-- **A fence inside a blockquote.** It renders, but runsheets does not parse
-  flags there. Keep executable blocks at the top level or inside list items.
+- **A fence indented four or more spaces outside a list.** That is an
+  indented code block, so the fence is literal text and nothing runs.
+  Fences inside list items (indented to the item's text, however deeply
+  nested) and inside `>` blockquotes are found and run as usual.
 - **Interactive prompts.** A `run` block has no stdin; `read` returns
   immediately with nothing. Use `terminal`.

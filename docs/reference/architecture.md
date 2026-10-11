@@ -1,3 +1,8 @@
+---
+tags:
+  - Reference
+---
+
 # Architecture
 
 runsheets is a small Ruby gem: a document model, an execution layer, a
@@ -7,6 +12,7 @@ on Sinatra and is tested in isolation.
 ```text
 lib/runsheets.rb              requires the model; autoloads the web layer and CLI
 lib/runsheets/
+  config.rb                   layered settings (myway_config); config/defaults.yml holds the defaults
   front_matter.rb             YAML front matter splitter
   fences.rb                   finds fenced blocks, rewrites info strings
   block.rb                    a fenced block and the kind its flags ask for
@@ -17,6 +23,7 @@ lib/runsheets/
   library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
   search.rb                   full-text search over runbooks
   diff.rb                     line diff for drift between a record and the runbook
+  expectation.rb              compares a block's output with its expect block, {{any}} wildcards
   redactor.rb                 replaces secret values in captured output
   execution.rb                one execution: state, pid, files, timing
   executor.rb                 spawns, pumps output through the redactor to the file and the log, reaps, times out, stops
@@ -30,7 +37,7 @@ lib/runsheets/
   pages/tree.rb               the folder tree in the library page's left pane
   pages/search.rb             the search results page
   assets.rb                   inline CSS and JavaScript
-  cli.rb                      option parsing and the exe entry point
+  cli.rb                      option parsing and the bin/runsheets entry point
 bin/runsheets
 examples/directory_based_runbooks/hello/               a safe runbook; also the test fixture
 ```
@@ -151,7 +158,7 @@ the terminal echo, each with its own level and the same formatter.
 
 `Web` is a `Sinatra::Base` subclass with a `before` filter that enforces
 the host and token checks, a handful of page routes that call into
-`Pages`, and two JSON endpoints for execute and poll. `Pages` is a module of
+`Pages`, and JSON endpoints to execute, acknowledge, poll and stop. `Pages` is a module of
 pure functions from a session to HTML, so every page can be rendered in a
 test without HTTP. `Assets` holds the CSS and JavaScript as strings; a
 page is one self-contained response and the gem serves no static files.

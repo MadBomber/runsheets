@@ -1,3 +1,10 @@
+---
+tags:
+  - Running
+  - Run record
+  - Sessions
+---
+
 # The Run Record
 
 The run record is the reason the tool exists. Every session writes a
@@ -95,8 +102,9 @@ session's log gets a `WARN` line for each one closed.
 ## The session log
 
 `session.log` is a plain text file, appended and flushed line by line as
-things happen. The same lines are echoed to the terminal that started
-`runsheets`, unless `--quiet` is given.
+things happen. The same lines, at `info` and above whatever the file's
+level, are echoed to the terminal that started `runsheets`, unless
+`--quiet` is given.
 
 ```text
 2026-10-10 01:17:19.579 INFO  [disk-space-triage] run opened TARGET_DIR=/tmp THRESHOLD=99
@@ -297,7 +305,7 @@ Four types:
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Twelve hex characters, unique within the process. |
+| `id` | Twelve random hex characters. |
 | `block_id`, `step` | Which block ran, and the step it belongs to. |
 | `command` | The interpreter command, before the `.cmd` path is appended. |
 | `background` | `true` for a `background` block. |

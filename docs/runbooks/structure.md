@@ -1,3 +1,9 @@
+---
+tags:
+  - Authoring
+  - Single-file runbooks
+---
+
 # Directory Structure
 
 A runbook is a directory, or a [single file](#single-file-runbooks). The
@@ -68,8 +74,9 @@ running tasks.
 ```
 
 A step's title comes from its front matter, else from the first `# Heading`
-in the body's prose, else from the slug with its number stripped and dashes
-turned into spaces. A `# comment` line inside a fenced code block is never
+in the body's prose, else from the slug with its number stripped, dashes
+and underscores turned into spaces, and only the first letter capitalized
+(`020-stop-the-pipeline` becomes "Stop the pipeline"). A `# comment` line inside a fenced code block is never
 taken for the title.
 
 ## `verify.md` and `rollback.md`
@@ -113,7 +120,8 @@ nothing served from `/files/` runs script. See
 
 A link to a markdown file is the exception. It goes to `/docs/`, which
 renders the file as a page: a link to one of the runbook's own files (a
-step, `verify.md`, `rollback.md`, `runbook.md`) opens that step's page, and
+step, `verify.md`, `rollback.md`, `runbook.md`) opens that step's page, a
+link to another runbook in the library opens that runbook's entry, and
 any other markdown file is shown, in a new tab, as a plain document with
 nothing executable. See [Runbooks and documents](../concepts/runbooks.md#plain-documents).
 
@@ -162,7 +170,8 @@ What to do when it fails partway, as rollback.md would hold.
 The rules:
 
 - The front matter is the runbook's, with the same keys as `runbook.md`,
-  and must have a `title`. Without one the file is a plain document.
+  and must have a `title`. Without one the file is not a runbook: passed
+  to `runsheets` it fails to load, and in a library it is a plain document.
 - Every `##` heading starts a step, in document order. Headings inside
   fenced code blocks are ignored. Deeper headings (`###`) belong to the
   step they sit under.
@@ -172,8 +181,9 @@ The rules:
 - A code fence opened in a section and never closed swallows every
   heading after it, so it is reported as an authoring warning on that
   section.
-- A step's attributes (`kind`, `timeout`, `destructive`, `cwd`) go in an
-  HTML comment on the line after the heading, written as a YAML flow
+- A step's attributes (`kind`, `timeout`, `destructive`, `cwd`, and
+  `title` to override the heading) go in an HTML comment on the first
+  non-blank line after the heading, written as a YAML flow
   mapping: `<!-- kind: verify, timeout: 30 -->`. GitHub and every other
   renderer hide it. A comment that does not start with `key:` is ordinary
   prose and is left alone.
