@@ -1712,7 +1712,7 @@ commands. runsheets therefore executes nothing unless a block opts in.</p>
 <tr>
 <td><code>```text expect</code></td>
 <td><span class="kind expect">expect</span></td>
-<td>Never executed. Linked to the nearest executable block above it and shown beside that block's real output with a "matches expected" or "differs from expected" hint. A hint for the operator; it does not gate pass or fail.</td>
+<td>Never executed. Linked to the nearest executable block above it and compared with that block's real output once it has run: a match says "matches expected", a mismatch shows both side by side with the differences marked. <code>{{any}}</code> matches anything within a line. A hint for the operator; it does not gate pass or fail.</td>
 </tr>
 </tbody>
 </table>
@@ -1721,10 +1721,30 @@ commands. runsheets therefore executes nothing unless a block opts in.</p>
 <h3 id="expect-blocks">Expect blocks<a class="headerlink" href="#expect-blocks" title="Permanent link">&para;</a></h3>
 <p>An <code>expect</code> block illustrates the executable block nearest above it in the
 same document, whatever prose sits between them. Its toolbar says which
-block it belongs to and links to it. When that block has run, the page
-shows the expected text in a pane beside the actual output and compares
-them with trailing whitespace ignored. An expect block with no executable
+block it belongs to and links to it. An expect block with no executable
 block above it is just displayed.</p>
+<p>When that block has run, its output is compared with the expected text
+line by line, ignoring trailing whitespace, and the expect block is hidden,
+since the result now shows what it said:</p>
+<ul>
+<li>A match shows the output alone, with <code>✓ matches expected</code> in the footer.</li>
+<li>A mismatch shows the output and the expected text in two panes, titled
+  <strong>Output</strong> and <strong>Expected</strong>. Lines do not wrap, so each line sits beside
+  the line it is compared with. Rows that differ are tinted and the
+  characters that differ are highlighted. A line only one side has faces
+  a hatched gap on the other. The footer says <code>differs from expected</code>.</li>
+</ul>
+<p>Output often holds something that changes on every run: a timestamp, an id,
+a PID, a duration. Write <code>{{any}}</code> in its place. It matches any characters,
+including none, within one line, so this expect block matches whatever the
+run id is:</p>
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="sb">```text</span><span class="w"> </span>expect
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Running block 010-say-hello-1 of step 010-say-hello in run {{any}}
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="sb">```</span>
+</span></code></pre></div>
+<p><code>{{any}}</code> does not match across lines, and a line that is only <code>{{any}}</code>
+matches exactly one line of output. In the side-by-side view each <code>{{any}}</code>
+is shown as a tag.</p>
 <h3 id="background-blocks">Background blocks<a class="headerlink" href="#background-blocks" title="Permanent link">&para;</a></h3>
 <p>A background block is for something that must stay up while later steps
 run. It has no timeout, so the step's <code>timeout</code> does not apply to it. Stop
@@ -1743,15 +1763,15 @@ mistake is visible rather than silent.</p>
 <h3 id="interpreters">Interpreters<a class="headerlink" href="#interpreters" title="Permanent link">&para;</a></h3>
 <p>The runbook's front matter can add or override entries, and a language it
 maps executes like any other:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">interpreters</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">ruby</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bin/rails runner -</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">psql -X -v ON_ERROR_STOP=1 -f</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python3</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">interpreters</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">ruby</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bin/rails runner -</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">psql -X -v ON_ERROR_STOP=1 -f</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python3</span>
 </span></code></pre></div>
 <p>When a block executes, its code is written to a file in the run directory
 and the interpreter command is run with that path appended. With the map
 above a <code>ruby run</code> block becomes:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bin/rails runner - &lt;run-dir&gt;/blocks/020-x-1.1.cmd
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>bin/rails runner - &lt;run-dir&gt;/blocks/020-x-1.1.cmd
 </span></code></pre></div>
 <p>and a <code>sql run</code> block becomes <code>psql -X -v ON_ERROR_STOP=1 -f &lt;path&gt;</code>, with
 <code>psql</code> taking its connection from the <code>PGHOST</code>, <code>PGUSER</code>, <code>PGPASSWORD</code> and
@@ -1761,8 +1781,8 @@ complete runbook built this way.</p>
 shell, but there is no shell: a <code>$VARIABLE</code> in the interpreter command is
 passed literally. If you need expansion there, go through <code>bash -c</code> and
 take the file as <code>$0</code>:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">interpreters</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash -c 'psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$0"'</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">interpreters</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash -c 'psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$0"'</span>
 </span></code></pre></div>
 <p>Because every block is a fresh process, a mapping like <code>bin/rails runner -</code>
 boots Rails for every Ruby block. That is the right trade for correctness in

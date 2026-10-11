@@ -1927,10 +1927,11 @@ in the session log: the code that ran after <code>$</code>, the output after <co
 <code>.cmd</code> and <code>.out</code> files.</p>
 <p>The second block on that page is marked <code>expect</code>. It shows what the output
 should look like and is never executed. Once the first block has run, the
-expected text appears in a pane beside the real output and the footer says
-whether they match. Here they never do, because the run id in the expected
-text is made up; that is the point of the example. The third block has no
-flag at all: it is the same command, display only.</p>
+page compares the two and the footer says <code>✓ matches expected</code>. The run id
+changes on every run, so the expected text has <code>{{any}}</code> in its place, which
+matches anything on that line. When output does differ, the page shows it
+beside the expected text with the differences marked. The third block has
+no flag at all: it is the same command, display only.</p>
 <p>Step 2, <em>Inspect the Ruby that will run things</em>, ends with a <code>terminal</code>
 block, for things that need a real terminal. Run it in your own shell, then
 click <strong>I ran this</strong>. The confirmation, with a note if you add one, goes

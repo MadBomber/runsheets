@@ -1348,6 +1348,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#added-expected-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (expected output)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed-sidebar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed (sidebar)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#added-milestone-5-sessions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1482,6 +1504,28 @@
     <span class="md-ellipsis">
       
         Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-expected-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (expected output)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed-sidebar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed (sidebar)
       
     </span>
   </a>
@@ -1709,6 +1753,27 @@
   instead of timing out at once.</li>
 <li><code>Pages</code> requires <code>rack/utils</code> itself, so it works without <code>Web</code> loaded;
   <code>step.kind</code> is HTML-escaped in badges.</li>
+</ul>
+<h3 id="added-expected-output">Added (expected output)<a class="headerlink" href="#added-expected-output" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>{{any}}</code> in a <code>text expect</code> block matches any characters within one
+  line, for output that changes on every run (ids, timestamps, PIDs). The
+  hello example uses it for the run id, so it now matches.</li>
+<li>Output is compared with its expect block on the server
+  (<code>Runsheets::Expectation</code>); <code>/executions/:id</code> and the step page's restored
+  executions carry the result. A match shows the output alone with
+  <code>✓ matches expected</code>. A mismatch shows <strong>Output</strong> and <strong>Expected</strong> panes
+  with the same title row and padding, no wrapping and one shared scroll, so
+  line N sits beside line N; differing rows are tinted, differing characters
+  highlighted, and a line only one side has faces a hatched gap.</li>
+<li>Once a block's result is compared, its expect block is hidden instead of
+  repeating the expected text below.</li>
+</ul>
+<h3 id="changed-sidebar">Changed (sidebar)<a class="headerlink" href="#changed-sidebar" title="Permanent link">&para;</a></h3>
+<ul>
+<li>On a step page the rollback document appears only in the collapsible
+  Rollback panel, not also under <strong>Also</strong>; the rollback page itself has no
+  panel.</li>
 </ul>
 <h3 id="added-milestone-5-sessions">Added (milestone 5: sessions)<a class="headerlink" href="#added-milestone-5-sessions" title="Permanent link">&para;</a></h3>
 <ul>

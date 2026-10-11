@@ -2218,9 +2218,12 @@ records the confirmation. The block's border turns green, the status reads
 confirmed again; the record keeps every confirmation.</p>
 <h3 id="expected-output">Expected output<a class="headerlink" href="#expected-output" title="Permanent link">&para;</a></h3>
 <p>When an executable block is followed by an <code>expect</code> block, the real output
-and the expected text are shown side by side once the block has run, and
-the footer says <code>matches expected</code> or <code>differs from expected</code> (trailing
-whitespace ignored). The expect block itself stays where the author put it.</p>
+is compared with the expected text once the block has run (trailing
+whitespace ignored, <code>{{any}}</code> matching anything within a line), and the
+expect block is hidden. On a match the footer says <code>✓ matches expected</code>. On
+a mismatch the output and the expected text are shown side by side, line
+beside line, with the differing characters highlighted, and the footer says
+<code>differs from expected</code>. See <a href="../../runbooks/blocks/#expect-blocks">Expect blocks</a>.</p>
 <p>A block can be run again at any time while the session lasts. Each execution gets its
 own files and its own entry in the record. The page shows the most recent
 one.</p>
