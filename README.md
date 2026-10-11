@@ -47,7 +47,7 @@ runsheets path/to/runbook.md      # serve a single all-in-one markdown file
 runsheets path/to/runbooks        # a directory of runbooks: choose one in the browser
 runsheets --open path/to/runbook  # and open the browser
 runsheets --check path/to/runbook # load it, print authoring warnings, exit
-runsheets --init path/to/new      # scaffold a runbook (a .md path makes a single file)
+runsheets --new path/to/runbooks  # answer a few questions, get a runbook from a template
 ```
 
 The argument is one of three things: a runbook directory, a single
@@ -76,7 +76,7 @@ runsheets --open examples/single_md_file_runbooks/disk-space-triage.md # links t
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
 records go; default `~/.local/share/runsheets/runs`), `--open`, `--check`,
-`--init`, `--config FILE`, `--dump` to print the settings in force as a
+`--new DIR`, `--config FILE`, `--dump` to print the settings in force as a
 config file (redirect it to save them), and for the session `--engineer`,
 `--why`, `--log-level`, `--verbose` and `--quiet`. Settings are layered: the command line beats
 `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`, `RUNSHEETS_DIR` for

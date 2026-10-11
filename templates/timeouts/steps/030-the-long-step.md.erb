@@ -1,0 +1,20 @@
+---
+title: The long step
+kind: automated
+timeout: 120
+---
+
+Give a slow step a timeout that fits it. If the block runs past 120
+seconds, its whole process group is stopped and the step fails.
+
+```bash run
+for chunk in 1 2 3 4 5 6 7 8 9 10; do
+  echo "chunk $chunk" >> "$WORK_DIR/progress.log"
+  sleep 1
+done
+echo "done"
+```
+
+```text expect
+done
+```

@@ -1,0 +1,15 @@
+---
+title: <%= yaml title %>
+when_to_use: <%= yaml when_to_use %>
+prerequisites:
+  - Nothing; every step only reads
+tags: [checks]
+escalation: <%= yaml escalation %>
+---
+
+# <%= title %>
+
+A runbook of checks only. Every step is `kind: verify`: it runs commands
+that read, never change, and compares what they print with what is
+expected. Run the steps in order, or all at once from the Checks page.
+

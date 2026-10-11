@@ -27,11 +27,11 @@ module RunsheetsTest
       FileUtils.rm_rf(@home)
     end
 
-    # Run the CLI on +argv+ with captured output.
-    def run_cli(*argv)
+    # Run the CLI on +argv+ with captured output; +input+ is what is typed.
+    def run_cli(*argv, input: "")
       out = StringIO.new
       err = StringIO.new
-      status = Runsheets::CLI.run(argv.flatten, out:, err:)
+      status = Runsheets::CLI.run(argv.flatten, out:, err:, input: StringIO.new(input))
       CliRun.new(status:, out: out.string, err: err.string)
     end
 

@@ -1,0 +1,16 @@
+---
+title: Do the work
+kind: automated
+timeout: 300
+---
+
+The runbook says when and why; the task says how. Change `work` in
+`tasks.loki`, not this block.
+
+```bash run
+asgard work
+```
+
+```text expect
+work: wrote {{any}}/last-run
+```

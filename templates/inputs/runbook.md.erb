@@ -1,0 +1,40 @@
+---
+title: <%= yaml title %>
+when_to_use: <%= yaml when_to_use %>
+prerequisites:
+  - python3 on the PATH, for the step in another language
+tags: []
+inputs:
+  - name: GREETING
+    prompt: A value with a default
+    default: hello
+  - name: TARGET
+    prompt: A value with no default; the operator types it
+  - name: API_TOKEN
+    prompt: A secret, masked in the form and kept out of the record
+    secret: true
+# Map a language to the command that runs its blocks. The block is written
+# to a file and the file's path is appended to the command. For a database:
+#   sql: psql -X -v ON_ERROR_STOP=1 -f
+interpreters:
+  python: python3
+escalation: <%= yaml escalation %>
+---
+
+# <%= title %>
+
+Checks and tasks driven by inputs. The start-run form asks for each
+input; every block gets them as environment variables. A blank field
+falls back to the same variable in the environment runsheets started in,
+then to the default. A `secret` is masked in the form, never written to
+the run record, and redacted wherever a block prints it.
+
+<% if single_file -%>
+Everything above the first `##` heading is the preamble. Each `##` heading
+below is a step, and its attributes (`kind`, `timeout`, ...) go in the HTML
+comment right after the heading.
+<% else -%>
+Everything above the first step is the preamble. The steps are the files in
+`steps/`, run in the order of their numbers, and each one's attributes
+(`kind`, `timeout`, ...) are in its front matter.
+<% end -%>

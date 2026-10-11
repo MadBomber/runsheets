@@ -1,0 +1,10 @@
+---
+title: Rollback
+---
+
+When a step fails partway, put the copy back, then run Verify.
+
+```bash destructive
+cp "$WORK_DIR/last-run.bak" "$WORK_DIR/last-run"
+echo "restored $WORK_DIR/last-run"
+```

@@ -1,0 +1,14 @@
+---
+title: Replace
+kind: automated
+timeout: 300
+---
+
+The change that cannot be taken back without the copy. A `destructive`
+block runs only after the operator types the confirmation code, and the
+step shows a warning banner.
+
+```bash destructive
+date -u > "$WORK_DIR/last-run"
+echo "replaced $WORK_DIR/last-run"
+```

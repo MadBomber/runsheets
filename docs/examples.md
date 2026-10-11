@@ -98,5 +98,5 @@ paths on this page work as written:
 cd "$(dirname "$(gem which runsheets)")/.."
 ```
 
-Next: [write your own](runbooks/index.md), or scaffold one with
-`runsheets --init path/to/new-runbook`.
+Next: [write your own](runbooks/index.md), or start one from a template
+with `runsheets --new path/to/runbooks`.

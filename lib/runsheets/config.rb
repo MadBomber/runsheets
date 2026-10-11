@@ -16,7 +16,7 @@ module Runsheets
   #   5. the overrides hash, which the CLI fills from the command line
   #
   # Every key in defaults.yml is an attribute here (dir, port, bind, runs_dir,
-  # open, check, init, dump, engineer, why, log_level, quiet). Paths are
+  # open, check, dump, engineer, why, log_level, quiet). Paths are
   # expanded; flags accept 1/true/yes/on.
   class Config < MywayConfig::Base
     config_name :runsheets
@@ -50,6 +50,20 @@ module Runsheets
       # The project config read when neither --config nor RUNSHEETS_CONFIG names a file.
       def project_path = File.expand_path(Anyway::Settings.default_config_path.call(config_name))
 
+      # The settings one config file holds, as a string-keyed Hash: the
+      # section for the current environment when the file has one (as
+      # myway_config reads it), else the whole file. {} when it is missing,
+      # unreadable or not a mapping.
+      def file_settings(path)
+        data = YAML.safe_load_file(path, aliases: false)
+        return {} unless data.is_a?(Hash)
+
+        env = (Anyway::Settings.current_environment || "development").to_s
+        data[env].is_a?(Hash) ? data[env] : data
+      rescue Psych::Exception, SystemCallError
+        {}
+      end
+
       # The bundled defaults, coerced, keyed by attribute. What the help text shows.
       def bundled_defaults = schema.to_h { |key, value| [key, type_caster.coerce(key, value)] }
 
@@ -63,8 +77,8 @@ module Runsheets
     PORT = unless_blank { whole_number(it) }
     FLAG = ->(v) { v == true || TRUE_WORDS.include?(v.to_s.strip.downcase) }
 
-    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :init, :dump, :engineer, :why, :log_level, :quiet
-    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, init: FLAG, dump: FLAG,
+    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :dump, :engineer, :why, :log_level, :quiet
+    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, dump: FLAG,
                  engineer: TEXT, why: TEXT, log_level: unless_blank { SessionLog.level_name(it) }, quiet: FLAG
 
     on_load :fill_blanks_from_defaults
@@ -83,6 +97,16 @@ module Runsheets
     # The config files that exist and were read, lowest layer first.
     def files = [self.class.xdg_path, path].select { File.file?(it) }
 
+    # The dir a config file sets, whatever RUNSHEETS_DIR or the command line
+    # say: from the highest file that has one, expanded, else nil.
+    def file_dir
+      files.reverse_each do |file|
+        value = self.class.file_settings(file)["dir"]
+        return File.expand_path(value.to_s) unless self.class.blank?(value)
+      end
+      nil
+    end
+
     # The bind address in force when it came from the project config found
     # in the current directory, else nil. That file arrives with whatever
     # repository was cloned, so the CLI will not let it alone open the
@@ -100,10 +124,10 @@ module Runsheets
 
     # The settings in force as the flat hash a config file holds. dump is
     # left out: it is an action for this run, and a saved `dump: true` would
-    # make every later run print and exit; check and init likewise. why is
+    # make every later run print and exit; check likewise. why is
     # left out too: it belongs to one session, and a saved one would start
     # every later session with it.
-    def settings = (self.class.config_attributes - %i[dump check init why]).to_h { [it.to_s, public_send(it)] }
+    def settings = (self.class.config_attributes - %i[dump check why]).to_h { [it.to_s, public_send(it)] }
 
     # The settings in force as the text of a config file: a comment header,
     # then one key per setting. `runsheets --dump` prints this.

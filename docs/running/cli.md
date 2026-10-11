@@ -19,9 +19,9 @@ or a directory holding several of either, in folders nested to any depth
 directory of runbooks, the page opens on a folder tree and the operator picks
 one; `runsheets examples` shows the five bundled example runbooks that way. It is
 the only positional argument. Leave it out and the bundled `examples/directory_based_runbooks/hello`
-is served, which is the quickest way to see the tool;
-`--init` is the one mode that always needs a path. `dir:` in the config file
-or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
+is served, which is the quickest way to see the tool. `dir:` in the config
+file or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
+`--new [DIR]` takes no `RUNBOOK`; see [New runbooks](#new-runbooks).
 
 ## Options
 
@@ -33,7 +33,7 @@ or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 | `--runs-dir DIR` | `~/.local/share/runsheets/runs` | Where session records, logs and run records are written. |
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
 | `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. See [Checking runbooks](#checking-runbooks). `--no-check` turns it off. |
-| `--init` | off | Create a starter runbook at `RUNBOOK` and exit: a directory with `runbook.md`, two steps, `verify.md` and `rollback.md`, or a single file when the path ends in `.md`. Refuses to touch an existing file or a non-empty directory. `--no-init` turns it off. |
+| `--new [DIR]` | | Ask what kind of runbook to make, write it into `DIR` from a template, and exit. Without `DIR`, ask for it too. See [New runbooks](#new-runbooks). |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-e`, `--engineer NAME` | ask | Who is starting the session. Without it the start page asks, pre-filled from `git config user.name`, else `$USER`. See [The session](#the-session). |
 | `-w`, `--why TEXT` | ask | Why the session is being started: its first note. With `--engineer` too, the session starts at once and the start page is skipped. |
@@ -48,8 +48,7 @@ or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 Start a new runbook, then serve it:
 
 ```bash
-runsheets --init ops/runbooks/db-refresh        # a directory
-runsheets --init ops/runbooks/db-refresh.md     # or a single file
+runsheets --new ops/runbooks                    # answer the questions; say db-refresh for the name
 runsheets --open ops/runbooks/db-refresh
 ```
 
@@ -85,6 +84,110 @@ as a whole):
 ```bash
 runsheets --check ops/runbooks
 ```
+
+## New runbooks
+
+`runsheets --new DIR` asks six questions, then writes a starter runbook into
+`DIR`, creating `DIR` if it does not exist. Enter accepts the default in
+brackets.
+
+Leave `DIR` out and the first question is where to put it. The default
+offered is the `dir:` a config file sets (the file `--config` names or
+`./config/runsheets.yml`, then the user config), else `RUNSHEETS_DIR`. Here
+a config file setting beats the environment, the reverse of the usual
+[layering](#settings), because the config file is where a standing choice
+of runbook directory belongs. With neither there is no default and an
+answer is needed. A `dir:` naming a single-file runbook offers the directory
+it is in, and `~` is expanded.
+
+```text
+$ RUNSHEETS_DIR=~/ops/runbooks runsheets --new
+Directory to create the runbook in [/Users/you/ops/runbooks]:
+New runbook in /Users/you/ops/runbooks
+...
+```
+
+With `DIR` given:
+
+```text
+$ runsheets --new ops/runbooks
+New runbook in ops/runbooks
+
+Shape:
+  1) directory    runbook.md, steps/, verify.md and rollback.md
+  2) single-file  one .md file; each ## heading is a step
+Choose [1]:
+Template:
+  1) checks    Checks only: verify steps that read and compare, never change
+  2) tasks     Checks and tasks: preflight, automated and manual steps, verify
+  3) rollback  Checks, tasks and rollback: a destructive step and the way back
+  4) timeouts  Checks, tasks and time: per-step timeouts, a background process, a terminal step
+  5) inputs    Checks, tasks and inputs: defaults, a secret, another language
+  6) asgard    Checks and tasks as asgard tasks in .loki files beside the runbook
+Choose [2]: 3
+Name (the directory name) [new-runbook]: DB Refresh
+Title [Db refresh]: Refresh staging from production
+When to use, in a sentence [edit later]: Before a release that needs production data
+Who to call when a step fails [edit later]: #data-platform
+
+Create directory runbook ops/runbooks/db-refresh from the rollback template? [Y/n]
+created ops/runbooks/db-refresh/runbook.md
+...
+```
+
+- **Shape** is the [runbook structure](../runbooks/structure.md): a
+  directory, or one markdown file whose `##` headings are the steps.
+- **Template** is the starting content, from the simplest structure to
+  richer ones; `tasks` is the default. Every template produces either
+  shape, and every one passes `--check` with no warnings as written.
+- **Name** becomes the directory or file name: lower case, with anything
+  but letters and digits turned into `-`, and `.md` added for a single
+  file. A name that is already taken (a file, or a directory with anything
+  in it) is asked for again.
+- **Title**, **When to use** and **Who to call** go into the front matter
+  as `title`, `when_to_use` and `escalation`. Left blank, the last two keep
+  a placeholder to fill in later.
+
+Answering `n` at the end creates nothing, as does Ctrl-C at any question.
+The answers can be piped in, one per line, and any missing at the end take
+their defaults:
+
+```bash
+printf '2\ninputs\nnightly-report\n' | runsheets --new ops/runbooks
+```
+
+### The bundled templates
+
+The templates are a ladder of structure, not of subject: each adds one
+thing to the one before, so pick the simplest that has what your procedure
+needs and replace the placeholder commands.
+
+| # | Template | Adds | What is in it |
+| --- | --- | --- | --- |
+| 1 | `checks` | checks only | Steps that are all `kind: verify`: commands that read, never change, each compared with a `text expect` block. Runnable all at once from the Checks page. |
+| 2 | `tasks` | doing work | A preflight check, an automated step, a manual step, and `verify.md`, with one input, `WORK_DIR`. The default. |
+| 3 | `rollback` | undoing work | `tasks`, plus a step that keeps a copy, a `destructive` step behind a typed confirmation, and `rollback.md` to put the copy back. |
+| 4 | `timeouts` | time | `tasks`, plus a `timeout` per step, a `background` block that runs while later steps do, and a `terminal` block for the operator's own shell. |
+| 5 | `inputs` | inputs | `tasks`, driven by inputs: one with a default, one without, a `secret` that is redacted from the output, and a `python` block run through `interpreters`. |
+| 6 | `asgard` | code beside the runbook | `tasks`, with every block a one-line [asgard](../asgard.md) call and the code in `.loki` files beside the runbook. |
+
+Rungs 4 to 6 each build on `tasks`, not on each other, so each shows only
+its own addition.
+
+The templates live in `templates/` in the gem, one directory each, written
+as a directory runbook (`runbook.md.erb`, `steps/*.md.erb`, `verify.md.erb`,
+`rollback.md.erb`) with a `template.yml` holding the menu `order` and
+`description`. Files ending in `.erb` have the answers filled in; any other
+file is copied as it is. The single-file shape is made from the same files:
+each step becomes a `##` section, and its front matter, less the title,
+becomes the attribute comment under the heading.
+
+A template that brings files besides the runbook, as `asgard` brings its
+`.loki` files, cannot drop them loose beside a single file: they would
+land in a folder other runbooks share, and asgard would use them for every
+one of those. So a single file from such a template gets a folder of its
+own, `NAME/NAME.md` with the support files beside it, and `--check` is
+given `NAME/NAME.md`.
 
 ## Checking runbooks
 
@@ -158,13 +261,14 @@ given, the session log is echoed to the terminal as it is written. Press
 
 | Status | When |
 | --- | --- |
-| `0` | Normal exit, or `--check` found no warnings. |
-| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, or `--check` found warnings or a runbook it could not read. |
+| `0` | Normal exit, `--check` found no warnings, or `--new` wrote a runbook. |
+| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, `--check` found warnings or a runbook it could not read, or `--new` was answered `n` or could not write. |
+| `130` | Ctrl-C at a `--new` question. |
 
 ## Settings
 
 Every option is a setting with the same name (`port`, `bind`, `runs_dir`,
-`open`, `check`, `init`, `dump`, `engineer`, `why`, `log_level`, `quiet`),
+`open`, `check`, `dump`, `engineer`, `why`, `log_level`, `quiet`),
 and the `RUNBOOK` argument is the setting `dir`. `--verbose` sets
 `log_level` to `debug`.
 Settings are layered with [myway_config](https://github.com/madbomber/myway_config);
@@ -241,8 +345,8 @@ runsheets                                                  # now serves db-refre
 
 Redirect to `config/runsheets.yml` instead for a project config to commit
 with a repository. `dump` itself is never in the output, so a saved file
-cannot make every later run print and exit, and neither are `check` and
-`init`, for the same reason. Nor is `why`: the reason for a session
+cannot make every later run print and exit, and neither is `check`, for
+the same reason. Nor is `why`: the reason for a session
 belongs to that session, not to every later one. `engineer` is saved.
 
 ## About `--bind`

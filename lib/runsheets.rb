@@ -25,10 +25,12 @@ module Runsheets
   class RunbookError < Error; end
   class RunError < Error; end
 
-  autoload :Assets, File.expand_path("runsheets/assets", __dir__)
-  autoload :CLI,    File.expand_path("runsheets/cli", __dir__)
-  autoload :Pages,  File.expand_path("runsheets/pages", __dir__)
-  autoload :Web,    File.expand_path("runsheets/web", __dir__)
+  autoload :Assets,   File.expand_path("runsheets/assets", __dir__)
+  autoload :CLI,      File.expand_path("runsheets/cli", __dir__)
+  autoload :Pages,    File.expand_path("runsheets/pages", __dir__)
+  autoload :Template, File.expand_path("runsheets/template", __dir__)
+  autoload :Web,      File.expand_path("runsheets/web", __dir__)
+  autoload :Wizard,   File.expand_path("runsheets/wizard", __dir__)
 
   class << self
     attr_writer :runs_dir

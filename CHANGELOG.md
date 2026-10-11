@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- `runsheets --new [DIR]` asks what kind of runbook to make (a directory or a
+  single file, a template, a name, a title, when to use it and who to call)
+  and writes it into `DIR`. Enter accepts each default, and answers can be
+  piped in. Without `DIR` it asks for one, offering the `dir:` a config file
+  sets, else `RUNSHEETS_DIR`.
+- Runbook templates in `templates/`, a ladder of structure: `checks` (checks
+  only), `tasks` (checks and tasks, the default), `rollback`, `timeouts`,
+  `inputs` and `asgard` (tasks in `.loki` files beside the runbook). Each is
+  written once as a directory runbook and produces either shape; a single
+  file from a template with support files gets a folder of its own.
+
+### Removed
+
+- `--init`, `--no-init`, `RUNSHEETS_INIT` and the `init` setting. Use
+  `--new`; the `tasks` template is the nearest to what `--init` wrote.
+
 ## [0.0.1] - 2026-10-11
 
 First release. runsheets turns a markdown runbook into a local web page

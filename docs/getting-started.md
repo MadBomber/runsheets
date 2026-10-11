@@ -276,10 +276,14 @@ shows the diff between what ran and what the runbook says now.
 ### 13. Start your own
 
 ```bash
-runsheets --init ops/runbooks/my-procedure       # a directory runbook
-runsheets --init ops/runbooks/my-procedure.md    # or one file, ## headings as steps
+runsheets --new ops/runbooks                  # asks: shape, template, name, title, ...
 runsheets --check ops/runbooks/my-procedure
 ```
+
+Leave the directory off and `--new` asks for it, offering the `dir:` in
+your config file or `RUNSHEETS_DIR`. It then asks whether you want a
+directory runbook or a single file, which template to start from, and the
+name and title. Enter accepts each default.
 
 For the shape of a real one, read `examples/directory_based_runbooks/staging-teardown` (a
 directory, every block kind, a blast radius and a rollback) and

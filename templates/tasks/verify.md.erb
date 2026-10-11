@@ -1,0 +1,15 @@
+---
+title: Verify
+kind: verify
+---
+
+Whole-procedure checks. They should pass after every run, and they run on
+their own from the Checks page.
+
+```bash run
+test -s "$WORK_DIR/last-run" && echo "last run: $(cat "$WORK_DIR/last-run")"
+```
+
+```text expect
+last run: {{any}}
+```

@@ -1,0 +1,13 @@
+---
+title: Verify
+kind: verify
+timeout: 15
+---
+
+```bash run
+tail -n 1 "$WORK_DIR/progress.log"
+```
+
+```text expect
+chunk 10
+```

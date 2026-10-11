@@ -1,0 +1,15 @@
+---
+title: Preflight
+kind: verify
+timeout: 30
+---
+
+An input with no default may arrive empty. Check for it first.
+
+```bash run
+test -n "$TARGET" && echo "TARGET is $TARGET"
+```
+
+```text expect
+TARGET is {{any}}
+```

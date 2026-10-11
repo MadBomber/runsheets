@@ -1,0 +1,23 @@
+---
+title: <%= yaml title %>
+when_to_use: <%= yaml when_to_use %>
+prerequisites:
+  - The asgard command on the PATH (gem install asgard)
+tags: [asgard]
+inputs:
+  - name: WORK_DIR
+    prompt: Where this runbook writes its files
+    default: /tmp/<%= name %>
+escalation: <%= yaml escalation %>
+---
+
+# <%= title %>
+
+Checks and tasks whose code lives in [asgard](https://github.com/MadBomber/asgard)
+tasks, so each block stays one line. The tasks are in `tasks.loki`; `.loki`
+is asgard's entry point and imports it. Blocks run in this runbook's
+directory, and asgard uses the nearest `.loki`, so these are the tasks they
+get. Inputs reach the tasks as environment variables: `env(:work_dir)`.
+
+Run `asgard --help` in this directory to list the tasks.
+

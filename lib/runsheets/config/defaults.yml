@@ -21,8 +21,6 @@ defaults:
   open: false
   # Load the runbook, report authoring warnings, and exit. (--check, RUNSHEETS_CHECK)
   check: false
-  # Create a runbook skeleton at dir and exit. (--init, RUNSHEETS_INIT)
-  init: false
   # Print the settings in force as a config file to stdout and exit. (--dump, RUNSHEETS_DUMP)
   dump: false
   # Who is starting the session. Empty means ask, prefilled from
