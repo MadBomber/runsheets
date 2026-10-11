@@ -1853,11 +1853,11 @@ runbook of your own.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheets<span class="w"> </span>--version
 </span></code></pre></div>
 <h2 id="run-the-examples">Run the examples<a class="headerlink" href="#run-the-examples" title="Permanent link">&para;</a></h2>
-<p>The gem ships with an <code>examples</code> directory. <code>examples/hello</code> is a runbook
+<p>The gem ships with an <code>examples</code> directory. <code>examples/directory_based_runbooks/hello</code> is a runbook
 that exercises every block kind without touching anything on your machine,
-and <code>examples/disk-space-triage.md</code> is a single-file runbook that only
+and <code>examples/single_md_file_runbooks/disk-space-triage.md</code> is a single-file runbook that only
 reads. If you installed from RubyGems, find the directory with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>contents<span class="w"> </span>runsheets<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'examples/hello/runbook.md'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>dirname<span class="k">)</span><span class="s2">/.."</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>contents<span class="w"> </span>runsheets<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'examples/directory_based_runbooks/hello/runbook.md'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>dirname<span class="k">)</span><span class="s2">/.."</span>
 </span></code></pre></div>
 <p>Then serve it:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>.
@@ -2023,11 +2023,11 @@ shows the diff between what ran and what the runbook says now.</p>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure.md<span class="w">    </span><span class="c1"># or one file, ## headings as steps</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
 </span></code></pre></div>
-<p>For the shape of a real one, read <code>examples/staging-teardown</code> (a
+<p>For the shape of a real one, read <code>examples/directory_based_runbooks/staging-teardown</code> (a
 directory, every block kind, a blast radius and a rollback) and
-<code>examples/db-maintenance.md</code> (a single file whose <code>sql run</code> blocks go
+<code>examples/single_md_file_runbooks/db-maintenance.md</code> (a single file whose <code>sql run</code> blocks go
 through <code>psql</code>). Neither runs against your machine as written; they are
-there to copy from. <code>examples/disk-space-triage.md</code> is safe to run, and
+there to copy from. <code>examples/single_md_file_runbooks/disk-space-triage.md</code> is safe to run, and
 shows a runbook linking to plain markdown documents, which the library
 leaves out of its tree.</p>
 <h2 id="check-a-runbook-without-serving-it">Check a runbook without serving it<a class="headerlink" href="#check-a-runbook-without-serving-it" title="Permanent link">&para;</a></h2>

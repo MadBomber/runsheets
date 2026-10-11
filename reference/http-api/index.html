@@ -2114,7 +2114,7 @@ went wrong), the message, and links to Home, Session and, in a library,
 Runbooks. It sits in the runbook's frame, or beside the library tree when
 no runbook is open.</p>
 <h2 id="driving-a-whole-session-from-the-shell">Driving a whole session from the shell<a class="headerlink" href="#driving-a-whole-session-from-the-shell" title="Permanent link">&para;</a></h2>
-<p>Against a server started on <code>examples/hello</code> without <code>--engineer</code> and
+<p>Against a server started on <code>examples/directory_based_runbooks/hello</code> without <code>--engineer</code> and
 <code>--why</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">B</span><span class="o">=</span>http://127.0.0.1:4567
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-sL<span class="w"> </span><span class="nv">$B</span>/session/new<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'s/.*rs-token" content="\([a-f0-9]*\)".*/\1/p'</span><span class="k">)</span>

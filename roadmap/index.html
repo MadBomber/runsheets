@@ -1611,10 +1611,10 @@ keep their badge in history.</p>
 <li><strong>SQL through the interpreters map</strong>: a language the front matter maps
   now executes. Before this, <code>sql run</code> warned and stayed inert even with a
   mapping, because block classification only knew the built-in languages.</li>
-<li><strong>Two realistic samples</strong>: <code>examples/staging-teardown</code>, a directory
+<li><strong>Two realistic samples</strong>: <code>examples/directory_based_runbooks/staging-teardown</code>, a directory
   runbook with the shape of a real AWS teardown (manual, automated,
   terminal, background, destructive and verify steps, blast radius,
-  rollback), and <code>examples/db-maintenance.md</code>, a single-file PostgreSQL
+  rollback), and <code>examples/single_md_file_runbooks/db-maintenance.md</code>, a single-file PostgreSQL
   runbook whose blocks are <code>sql run</code> through <code>psql</code>. Neither can run
   against this machine; both load clean under <code>--check</code> and are test
   fixtures for the loader.</li>

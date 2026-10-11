@@ -1775,7 +1775,7 @@ above a <code>ruby run</code> block becomes:</p>
 </span></code></pre></div>
 <p>and a <code>sql run</code> block becomes <code>psql -X -v ON_ERROR_STOP=1 -f &lt;path&gt;</code>, with
 <code>psql</code> taking its connection from the <code>PGHOST</code>, <code>PGUSER</code>, <code>PGPASSWORD</code> and
-<code>PGDATABASE</code> inputs in the environment. <code>examples/db-maintenance.md</code> is a
+<code>PGDATABASE</code> inputs in the environment. <code>examples/single_md_file_runbooks/db-maintenance.md</code> is a
 complete runbook built this way.</p>
 <p>The command is split with <code>Shellwords</code>, so quoting works as it would in a
 shell, but there is no shell: a <code>$VARIABLE</code> in the interpreter command is
