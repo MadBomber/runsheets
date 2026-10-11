@@ -16,6 +16,8 @@ library tree:
   a `steps/` folder holding one file per step.
 - `single_md_file_runbooks/`: single-file runbooks, every step in one
   markdown file, together with the plain documents they link to.
+  `runbooks_with_scripts/` inside it holds a runbook whose blocks call
+  asgard tasks from the `.loki` files beside it.
 
 | Example | Shape | Safe to run |
 | --- | --- | --- |
@@ -23,6 +25,7 @@ library tree:
 | [Disk space triage](single_md_file_runbooks/disk-space-triage.md) | single file | yes, it only reads |
 | [Monthly PostgreSQL maintenance](single_md_file_runbooks/db-maintenance.md) | single file | needs a database |
 | [Staging infrastructure teardown](directory_based_runbooks/staging-teardown/runbook.md) | runbook directory | no, read it |
+| [Runbook tasks from local .loki files](single_md_file_runbooks/runbooks_with_scripts/asgard-tasks.md) | single file with `.loki` task files | yes, it only reads; needs asgard |
 
 ## Plain documents
 

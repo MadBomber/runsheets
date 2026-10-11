@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+class Tasks
+  desc "greet NAME", "Say hello to NAME"
+  def greet(name = "World") = puts "Hello, #{name}, from a task beside the runbook!"
+end

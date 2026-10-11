@@ -313,10 +313,11 @@ class TestCLI < Minitest::Test
     run   = run_cli("--check", EXAMPLES)
     lines = run.out.lines.map(&:chomp)
     assert_equal 0, run.status
-    assert_equal 4, lines.size
+    assert_equal 5, lines.size
     assert_includes lines, "Hello, runsheets [directory_based_runbooks/hello]: 6 steps, 0 warnings", "a library's lines name the slug"
     assert_includes lines, "Disk space triage [single_md_file_runbooks/disk-space-triage]: 3 steps, 0 warnings"
     assert_includes lines, "Monthly PostgreSQL maintenance [single_md_file_runbooks/db-maintenance]: 5 steps, 0 warnings"
+    assert_includes lines, "Runbook tasks from local .loki files [single_md_file_runbooks/runbooks_with_scripts/asgard-tasks]: 4 steps, 0 warnings"
     assert_empty run.err
   end
 

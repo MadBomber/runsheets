@@ -57,7 +57,7 @@ search box in the header searches the full text of every runbook. Try the
 bundled examples:
 
 ```bash
-runsheets --open examples                                              # all four, pick one in the browser
+runsheets --open examples                                              # all five, pick one in the browser
 runsheets --open examples/directory_based_runbooks/hello               # safe to run: every block kind
 runsheets --check examples/directory_based_runbooks/staging-teardown   # a realistic AWS teardown
 runsheets --open examples/single_md_file_runbooks/db-maintenance.md    # a single all-in-one file, sql blocks via psql

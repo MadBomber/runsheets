@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+# Asgard entry point for the asgard-tasks.md example runbook.
+#
+# asgard looks for a .loki file in its working directory, then in each
+# directory above it. runsheets runs a single-file runbook's blocks in the
+# runbook's own directory, so `asgard` in one of its blocks finds this file
+# first, ahead of the repository's own .loki further up.
+#
+# This file loads the task files beside it (the glob skips .loki itself):
+#   greet.loki    greet NAME
+#   checks.loki   ruby_check, disk_check [DIR], and health, which runs both
+
+import "*.loki"
+
+class Tasks
+  header "runbook tasks: defined beside asgard-tasks.md"
+end

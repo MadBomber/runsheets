@@ -132,6 +132,11 @@ A review of the whole application found the following; each has a test.
   the latter links to. Their library slugs gain the folder
   (`directory_based_runbooks/hello`). `runsheets` with no RUNBOOK still
   serves `hello`, from its new path.
+- `examples/single_md_file_runbooks/runbooks_with_scripts/asgard-tasks.md`:
+  a runbook whose blocks call asgard tasks defined in `.loki` files beside
+  it (`asgard greet "$NAME"`, `asgard health`). asgard finds the nearest
+  `.loki` above its working directory, and blocks run in the runbook's
+  directory, so the local task files are found before any other.
 
 ### Changed (sidebar)
 

@@ -1,0 +1,27 @@
+# frozen_string_literal: true
+
+require "shellwords"
+
+class Tasks
+  desc "ruby_check", "Report the Ruby that asgard runs on"
+  def ruby_check = puts "ruby_check: ruby #{RUBY_VERSION}"
+
+  # DIR defaults to TARGET_DIR from the environment, which is how a runbook
+  # input reaches a task run as a dependency, with no arguments.
+  desc "disk_check [DIR]", "Fail when the file system holding DIR is more than MAX_USE percent full"
+  def disk_check(dir = env(:target_dir, "."))
+    used  = disk_use(dir)
+    limit = env(:max_use, "95").to_i
+    puts "disk_check: #{dir} is #{used}% used, limit #{limit}%"
+    exit 1 if used > limit
+  end
+
+  depends_on [:ruby_check, :disk_check]
+  desc "Run every check, in parallel"
+  def health = puts "health: all checks passed"
+
+  private
+
+  # Percent used of the file system holding +dir+, from POSIX df output.
+  def disk_use(dir) = `df -P #{Shellwords.escape(dir)}`.lines.last.split[4].to_i
+end

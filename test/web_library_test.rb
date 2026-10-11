@@ -39,10 +39,10 @@ class TestWebLibrary < Minitest::Test
 
   def test_the_home_page_shows_the_tree_and_the_root_folder_with_nothing_open_yet
     body = get("/library").body
-    %w[single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage directory_based_runbooks/hello directory_based_runbooks/staging-teardown].each { assert_includes body, "data-slug=\"#{it}\"" }
+    %w[single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage directory_based_runbooks/hello directory_based_runbooks/staging-teardown single_md_file_runbooks/runbooks_with_scripts/asgard-tasks].each { assert_includes body, "data-slug=\"#{it}\"" }
     assert_includes body, 'href="/library/directory_based_runbooks/hello"'
     assert_includes body, "Monthly PostgreSQL maintenance"
-    assert_includes body, "4 runbooks"
+    assert_includes body, "5 runbooks"
     assert_includes body, 'id="lib-filter"'
   end
 

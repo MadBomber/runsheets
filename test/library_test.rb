@@ -15,11 +15,11 @@ class TestLibrary < Minitest::Test
     refute Library.library?("/nonexistent")
   end
 
-  def test_the_examples_directory_lists_its_four_runbooks_in_two_folders
+  def test_the_examples_directory_lists_its_five_runbooks_in_folders
     library = Library.load(EXAMPLES)
-    assert_equal %w[directory_based_runbooks/hello directory_based_runbooks/staging-teardown single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage], library.entries.map(&:slug)
-    assert_equal 4, library.size
-    assert_equal %w[directory_based_runbooks single_md_file_runbooks], library.folders.map(&:slug).sort
+    assert_equal %w[directory_based_runbooks/hello directory_based_runbooks/staging-teardown single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage single_md_file_runbooks/runbooks_with_scripts/asgard-tasks], library.entries.map(&:slug)
+    assert_equal 5, library.size
+    assert_equal %w[directory_based_runbooks single_md_file_runbooks single_md_file_runbooks/runbooks_with_scripts], library.folders.map(&:slug).sort
     assert_empty library.root.entries, "the root holds only folders and a plain document"
   end
 
