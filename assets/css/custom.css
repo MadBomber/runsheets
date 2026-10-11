@@ -22,6 +22,27 @@
   height: auto;
 }
 
+/* Home page tagline under the title. */
+.md-typeset .hero-tagline {
+  font-size: 1.35rem;
+  font-weight: 300;
+  line-height: 1.4;
+  margin-top: -0.6rem;
+  color: var(--md-accent-fg-color);
+}
+
+/* Screenshots of the runsheets web page: framed so the dark UI stands
+   apart from the page in either palette. */
+.md-typeset img.screenshot {
+  display: block;
+  margin: 1rem auto 1.5rem;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #273040;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
 /* Block-kind badges used in the executable-blocks reference. */
 .md-typeset .kind {
   display: inline-block;

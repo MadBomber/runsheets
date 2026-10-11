@@ -37,7 +37,7 @@
   <g>
     <rect x="820" y="190" width="140" height="70" rx="10" fill="#1b2130" stroke="#a78bfa" stroke-width="1.5"/>
     <text x="890" y="218" text-anchor="middle" fill="#a78bfa" font-weight="600">POST /blocks/:id</text>
-    <text x="890" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">with session token</text>
+    <text x="890" y="240" text-anchor="middle" fill="#8b95a8" font-size="12">…/execute + token</text>
 
     <rect x="620" y="190" width="150" height="70" rx="10" fill="#1b2130" stroke="#3ddc97" stroke-width="1.5"/>
     <text x="695" y="218" text-anchor="middle" fill="#3ddc97" font-weight="600">Session → Run</text>
