@@ -363,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../roadmap/" class="md-tabs__link">
+        <a href="../changelog/" class="md-tabs__link">
           
   
   
@@ -1671,8 +1671,6 @@
       
         
       
-        
-      
     
     
     
@@ -1715,34 +1713,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../roadmap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -2175,50 +2145,36 @@ runbook of your own.</p>
 <li>A browser on the same machine. The server binds to loopback.</li>
 </ul>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">RubyGems</label><label for="__tabbed_1_2">From source</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gem<span class="w"> </span>install<span class="w"> </span>runsheets
 </span></code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/MadBomber/runsheets
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>runsheets
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>bundle<span class="w"> </span>install
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>bin/runsheets<span class="w"> </span>--help
-</span></code></pre></div>
-<p>Use <code>bin/runsheets</code> wherever these pages say <code>runsheets</code>.</p>
-</div>
-</div>
-</div>
 <p>Check it is on the path:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheets<span class="w"> </span>--version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheets<span class="w"> </span>--version
 </span></code></pre></div>
 <h2 id="run-the-examples">Run the examples<a class="headerlink" href="#run-the-examples" title="Permanent link">&para;</a></h2>
 <p>The gem ships with an <code>examples</code> directory. <code>examples/directory_based_runbooks/hello</code> is a runbook
 that exercises every block kind without touching anything on your machine,
 and <code>examples/single_md_file_runbooks/disk-space-triage.md</code> is a single-file runbook that only
-reads. If you installed from RubyGems, find the directory with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>contents<span class="w"> </span>runsheets<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'examples/directory_based_runbooks/hello/runbook.md'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>dirname<span class="k">)</span><span class="s2">/../.."</span>
+reads. Change to the installed gem's directory:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>which<span class="w"> </span>runsheets<span class="k">)</span><span class="s2">"</span><span class="k">)</span><span class="s2">/.."</span>
 </span></code></pre></div>
-<p>Then serve it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>.
+<p>Then serve the examples:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>examples
 </span></code></pre></div>
 <p>You will see:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>runsheets 0.0.1
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Library: 5 runbooks in 3 folders under /path/to/examples
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Config:  none (defaults)
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Session: starts in the browser (who and why)
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>Open http://127.0.0.1:4567/ in your browser
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>Press Ctrl-C to end the session and stop
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>runsheets 0.0.1
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Library: 5 runbooks in 3 folders under /path/to/examples
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>Config:  none (defaults)
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Session: starts in the browser (who and why)
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>Open http://127.0.0.1:4567/ in your browser
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Press Ctrl-C to end the session and stop
 </span></code></pre></div>
 <p><code>--open</code> launches your default browser. Without it, open the printed URL
 yourself.</p>
 <p>The argument can also be one runbook, a directory or a single all-in-one
 markdown file:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>directory_based_runbooks/hello<span class="w">                </span><span class="c1"># one runbook directory</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>single_md_file_runbooks/db-maintenance.md<span class="w">     </span><span class="c1"># one file, ## headings as steps</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>directory_based_runbooks/hello<span class="w">                </span><span class="c1"># one runbook directory</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>single_md_file_runbooks/db-maintenance.md<span class="w">     </span><span class="c1"># one file, ## headings as steps</span>
 </span></code></pre></div>
 <h2 id="walk-through-a-session">Walk through a session<a class="headerlink" href="#walk-through-a-session" title="Permanent link">&para;</a></h2>
 <h3 id="1-start-the-session">1. Start the session<a class="headerlink" href="#1-start-the-session" title="Permanent link">&para;</a></h3>
@@ -2345,22 +2301,22 @@ is stopped and recorded as <code>stopped</code>, which is not a failure. The bro
 shows <strong>Session ended</strong>, and runsheets exits. Ctrl-C in the terminal does
 the same.</p>
 <h3 id="12-read-the-record">12. Read the record<a class="headerlink" href="#12-read-the-record" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>~/.local/share/runsheets/runs/
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  sessions/20261010T141502/
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    session.json
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    session.log
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>  directory_based_runbooks/hello/20261010T141502/
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    run.json
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    run.md
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    blocks/
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>      010-say-hello-1.1.cmd
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>      010-say-hello-1.1.out
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>      040-exercise-failure-2.1.cmd
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>      040-exercise-failure-2.1.out
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>  single_md_file_runbooks/disk-space-triage/20261010T141502/
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    run.json
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    run.md
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    blocks/
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.local/share/runsheets/runs/
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  sessions/20261010T141502/
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    session.json
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    session.log
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  directory_based_runbooks/hello/20261010T141502/
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    run.json
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    run.md
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    blocks/
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>      010-say-hello-1.1.cmd
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      010-say-hello-1.1.out
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>      040-exercise-failure-2.1.cmd
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>      040-exercise-failure-2.1.out
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  single_md_file_runbooks/disk-space-triage/20261010T141502/
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    run.json
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    run.md
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    blocks/
 </span></code></pre></div>
 <p><img alt="The runsheet page: the run's record rendered in the browser" class="screenshot" loading="lazy" src="../assets/images/screenshots/runsheet.png" /></p>
 <p><code>run.md</code> is a runbook's transcript: every execution in order with the
@@ -2374,9 +2330,9 @@ under <strong>Previous runs</strong>. Edit
 greeting, and open that run: a <strong>Runbook changed since this run</strong> panel
 shows the diff between what ran and what the runbook says now.</p>
 <h3 id="13-start-your-own">13. Start your own<a class="headerlink" href="#13-start-your-own" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure<span class="w">       </span><span class="c1"># a directory runbook</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure.md<span class="w">    </span><span class="c1"># or one file, ## headings as steps</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure<span class="w">       </span><span class="c1"># a directory runbook</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure.md<span class="w">    </span><span class="c1"># or one file, ## headings as steps</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
 </span></code></pre></div>
 <p>For the shape of a real one, read <code>examples/directory_based_runbooks/staging-teardown</code> (a
 directory, every block kind, a blast radius and a rollback) and
@@ -2386,7 +2342,7 @@ there to copy from. <code>examples/single_md_file_runbooks/disk-space-triage.md<
 shows a runbook linking to plain markdown documents, which the library
 leaves out of its tree.</p>
 <h2 id="check-a-runbook-without-serving-it">Check a runbook without serving it<a class="headerlink" href="#check-a-runbook-without-serving-it" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>path/to/runbook
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>path/to/runbook
 </span></code></pre></div>
 <p>Loads the runbook, prints every authoring warning (unknown block flags,
 automated steps with nothing to run, bad input names), and exits 1 if there

@@ -361,7 +361,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="roadmap/" class="md-tabs__link">
+        <a href="changelog/" class="md-tabs__link">
           
   
   
@@ -1504,8 +1504,6 @@
       
         
       
-        
-      
     
     
     
@@ -1548,34 +1546,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="roadmap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1818,10 +1788,10 @@ and to "date the last verification" by hand, and neither happens reliably.</p>
 </ul>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gem<span class="w"> </span>install<span class="w"> </span>runsheets
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/MadBomber/runsheets
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>runsheets/examples/directory_based_runbooks/hello<span class="w">            </span><span class="c1"># a runbook directory</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>runsheets/examples/single_md_file_runbooks/db-maintenance.md<span class="w"> </span><span class="c1"># a single all-in-one file</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>runsheets/examples<span class="w">                                           </span><span class="c1"># or choose from all of them</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>which<span class="w"> </span>runsheets<span class="k">)</span><span class="s2">"</span><span class="k">)</span><span class="s2">/.."</span><span class="w">                         </span><span class="c1"># the installed gem's directory</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>examples/directory_based_runbooks/hello<span class="w">            </span><span class="c1"># a runbook directory</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>examples/single_md_file_runbooks/db-maintenance.md<span class="w"> </span><span class="c1"># a single all-in-one file</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>examples<span class="w">                                           </span><span class="c1"># or choose from all of them</span>
 </span></code></pre></div>
 <p>The example runbook is safe to run end to end. Say who you are and why on
 the start page, click Start run, click Run on the first step, mark it done,
@@ -1866,16 +1836,14 @@ each block can be one line.</p>
 </ul>
 </div>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Milestones 1 through 5 of the <a href="roadmap/">roadmap</a> are built: rendering,
+<p>Built and working: rendering,
 executing <code>bash</code>, <code>ruby</code> and any mapped language such as <code>sql</code>, background
 processes with Start and Stop, destructive confirmation, terminal and
 manual acknowledgements, expected-output panels, secret redaction, a
 Checks page, run history with drift, single-file runbooks, a scaffold
 command, realistic sample runbooks, and sessions: one engineer, a reason,
 notes, many runbooks, and a log of everything. The block
-convention is settled unless real use argues otherwise. Milestone 6 (an
-activity database) and milestone 7 (a Rails engine) are designed but not
-built.</p>
+convention is settled unless real use argues otherwise.</p>
 
 
 

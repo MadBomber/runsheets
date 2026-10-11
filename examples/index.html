@@ -363,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../roadmap/" class="md-tabs__link">
+        <a href="../changelog/" class="md-tabs__link">
           
   
   
@@ -1522,8 +1522,6 @@
       
         
       
-        
-      
     
     
     
@@ -1566,34 +1564,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../roadmap/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1948,8 +1918,9 @@ and the structure:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>examples/directory_based_runbooks/staging-teardown
 </span></code></pre></div>
 <h2 id="where-are-they">Where are they?<a class="headerlink" href="#where-are-they" title="Permanent link">&para;</a></h2>
-<p>From a checkout, they're in <code>examples/</code>. From an installed gem:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>contents<span class="w"> </span>runsheets<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'examples/directory_based_runbooks/hello/runbook.md'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>dirname<span class="k">)</span><span class="s2">/../.."</span>
+<p>They ship inside the gem. Change to the installed gem's directory and the
+paths on this page work as written:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gem<span class="w"> </span>which<span class="w"> </span>runsheets<span class="k">)</span><span class="s2">"</span><span class="k">)</span><span class="s2">/.."</span>
 </span></code></pre></div>
 <p>Next: <a href="../runbooks/">write your own</a>, or scaffold one with
 <code>runsheets --init path/to/new-runbook</code>.</p>
