@@ -91,10 +91,11 @@ runsheets --check examples/directory_based_runbooks/staging-teardown
 
 ## Where are they?
 
-From a checkout, they're in `examples/`. From an installed gem:
+They ship inside the gem. Change to the installed gem's directory and the
+paths on this page work as written:
 
 ```bash
-cd "$(gem contents runsheets | grep 'examples/directory_based_runbooks/hello/runbook.md' | xargs dirname)/../.."
+cd "$(dirname "$(gem which runsheets)")/.."
 ```
 
 Next: [write your own](runbooks/index.md), or scaffold one with

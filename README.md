@@ -59,9 +59,10 @@ inputs, steps and previous runs in the main pane, with the inputs form and
 a **Start run** button.
 A `README.md` in a folder is shown as that folder's description. The
 search box in the header searches the full text of every runbook. Try the
-bundled examples:
+examples bundled with the gem:
 
 ```bash
+cd "$(dirname "$(gem which runsheets)")/.."                            # the installed gem's directory
 runsheets --open examples                                              # all five, pick one in the browser
 runsheets --open examples/directory_based_runbooks/hello               # safe to run: every block kind
 runsheets --check examples/directory_based_runbooks/staging-teardown   # a realistic AWS teardown
@@ -254,13 +255,7 @@ process is closed as `interrupted` the next time runsheets starts.
 - Stopping the server ends the session: every run is closed and whatever it
   left running is stopped. Secret values never reach the session log.
 
-## Development
-
-```bash
-bundle install
-bundle exec rake test
-bin/runsheets --open examples/directory_based_runbooks/hello
-```
+## Design
 
 The model (`Runbook`, `Library`, `Step`, `Block`, `Renderer`, `Executor`,
 `Expectation`, `Search`, `RunRecord`, `Run`, `Session`, `SessionLog`) has

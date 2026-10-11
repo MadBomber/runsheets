@@ -147,9 +147,9 @@ model.
 ## Try it in two minutes
 
 ```bash
-git clone https://github.com/MadBomber/runsheets
-cd runsheets && bundle install
-bin/runsheets --open examples
+gem install runsheets
+cd "$(dirname "$(gem which runsheets)")/.."
+runsheets --open examples
 ```
 
 Pick **Hello, runsheets**. It uses every block kind and touches nothing on

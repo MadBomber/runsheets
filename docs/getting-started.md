@@ -21,22 +21,9 @@ runbook of your own.
 
 ## Install
 
-=== "RubyGems"
-
-    ```bash
-    gem install runsheets
-    ```
-
-=== "From source"
-
-    ```bash
-    git clone https://github.com/MadBomber/runsheets
-    cd runsheets
-    bundle install
-    bin/runsheets --help
-    ```
-
-    Use `bin/runsheets` wherever these pages say `runsheets`.
+```bash
+gem install runsheets
+```
 
 Check it is on the path:
 
@@ -49,16 +36,16 @@ runsheets --version
 The gem ships with an `examples` directory. `examples/directory_based_runbooks/hello` is a runbook
 that exercises every block kind without touching anything on your machine,
 and `examples/single_md_file_runbooks/disk-space-triage.md` is a single-file runbook that only
-reads. If you installed from RubyGems, find the directory with:
+reads. Change to the installed gem's directory:
 
 ```bash
-cd "$(gem contents runsheets | grep 'examples/directory_based_runbooks/hello/runbook.md' | xargs dirname)/../.."
+cd "$(dirname "$(gem which runsheets)")/.."
 ```
 
-Then serve it:
+Then serve the examples:
 
 ```bash
-runsheets --open .
+runsheets --open examples
 ```
 
 You will see:

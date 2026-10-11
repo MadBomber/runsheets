@@ -64,10 +64,10 @@ runsheets closes that gap:
 
 ```bash
 gem install runsheets
-git clone https://github.com/MadBomber/runsheets
-runsheets --open runsheets/examples/directory_based_runbooks/hello            # a runbook directory
-runsheets --open runsheets/examples/single_md_file_runbooks/db-maintenance.md # a single all-in-one file
-runsheets --open runsheets/examples                                           # or choose from all of them
+cd "$(dirname "$(gem which runsheets)")/.."                         # the installed gem's directory
+runsheets --open examples/directory_based_runbooks/hello            # a runbook directory
+runsheets --open examples/single_md_file_runbooks/db-maintenance.md # a single all-in-one file
+runsheets --open examples                                           # or choose from all of them
 ```
 
 The example runbook is safe to run end to end. Say who you are and why on

@@ -291,9 +291,3 @@ any runbook (a `background` block, a block that was still going) is
 stopped, and the records are written, so nothing outlives the tool and no
 record is left saying `running`. If the process is killed instead, the
 next start closes its session as `interrupted`.
-
-## Running from a checkout
-
-```bash
-bin/runsheets --open examples/directory_based_runbooks/hello
-```
