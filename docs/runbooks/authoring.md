@@ -147,8 +147,7 @@ runbooks. See [Checking runbooks](../running/cli.md#checking-runbooks).
   in the runbook directory (or the step's `cwd`). Put the `cd` in each block
   that needs it, or set `cwd` on the step.
 - **`export FOO=...` for a later block.** Same reason. Use an input, or
-  compute the value again. A `capture` flag that stores a block's output as
-  an input is on the roadmap.
+  compute the value again.
 - **A fence indented four or more spaces outside a list.** That is an
   indented code block, so the fence is literal text and nothing runs.
   Fences inside list items (indented to the item's text, however deeply

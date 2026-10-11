@@ -154,6 +154,5 @@ nav:
       - Ruby API: reference/ruby-api.md
       - HTTP Endpoints: reference/http-api.md
   - Project:
-      - Roadmap: roadmap.md
       - Changelog: changelog.md
       - Tags: tags.md

@@ -21,10 +21,9 @@ operator's acknowledgements of the manual steps.
 
 The rendering is the vehicle. The run record, the *runsheet*, is the point.
 
-Status: milestones 1 to 5 of the [plan](PLAN.md) are built. Every block
-kind in the convention below is live, a runbook can be a directory or a
-single markdown file, and everything between starting runsheets and
-stopping it is one *session* with its own log. Vocabulary: the document is
+Every block kind in the convention below is live, a runbook can be a
+directory or a single markdown file, and everything between starting
+runsheets and stopping it is one *session* with its own log. Vocabulary: the document is
 the *runbook*; the record of one runbook's run is the *runsheet*.
 
 ## Install

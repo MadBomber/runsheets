@@ -27,8 +27,6 @@ block does not exist in the next. This is a deliberate trade:
 - A hung or killed block cannot poison the next one.
 
 Values that must flow between blocks go through inputs, or are recomputed.
-A `capture` flag that stores a block's stdout as an input for later blocks
-is on the [roadmap](../roadmap.md).
 
 ## Environment
 

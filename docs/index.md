@@ -116,13 +116,11 @@ and look at the run record that appears under
 
 ## Status
 
-Milestones 1 through 5 of the [roadmap](roadmap.md) are built: rendering,
+Built and working: rendering,
 executing `bash`, `ruby` and any mapped language such as `sql`, background
 processes with Start and Stop, destructive confirmation, terminal and
 manual acknowledgements, expected-output panels, secret redaction, a
 Checks page, run history with drift, single-file runbooks, a scaffold
 command, realistic sample runbooks, and sessions: one engineer, a reason,
 notes, many runbooks, and a log of everything. The block
-convention is settled unless real use argues otherwise. Milestone 6 (an
-activity database) and milestone 7 (a Rails engine) are designed but not
-built.
+convention is settled unless real use argues otherwise.
