@@ -1799,6 +1799,11 @@
   the latter links to. Their library slugs gain the folder
   (<code>directory_based_runbooks/hello</code>). <code>runsheets</code> with no RUNBOOK still
   serves <code>hello</code>, from its new path.</li>
+<li><code>examples/single_md_file_runbooks/runbooks_with_scripts/asgard-tasks.md</code>:
+  a runbook whose blocks call asgard tasks defined in <code>.loki</code> files beside
+  it (<code>asgard greet "$NAME"</code>, <code>asgard health</code>). asgard finds the nearest
+  <code>.loki</code> above its working directory, and blocks run in the runbook's
+  directory, so the local task files are found before any other.</li>
 </ul>
 <h3 id="changed-sidebar">Changed (sidebar)<a class="headerlink" href="#changed-sidebar" title="Permanent link">&para;</a></h3>
 <ul>
