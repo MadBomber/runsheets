@@ -11,19 +11,20 @@ class TestLibrary < Minitest::Test
   def test_a_directory_of_runbooks_is_a_library_and_a_runbook_is_not
     assert Library.library?(EXAMPLES)
     refute Library.library?(RunsheetsTest::EXAMPLE_DIR), "holds runbook.md"
-    refute Library.library?(File.join(EXAMPLES, "db-maintenance.md")), "a file"
+    refute Library.library?(File.join(EXAMPLES, "single_md_file_runbooks", "db-maintenance.md")), "a file"
     refute Library.library?("/nonexistent")
   end
 
-  def test_the_examples_directory_lists_its_four_runbooks_in_slug_order
+  def test_the_examples_directory_lists_its_four_runbooks_in_two_folders
     library = Library.load(EXAMPLES)
-    assert_equal %w[db-maintenance disk-space-triage hello staging-teardown], library.entries.map(&:slug)
+    assert_equal %w[directory_based_runbooks/hello directory_based_runbooks/staging-teardown single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage], library.entries.map(&:slug)
     assert_equal 4, library.size
-    assert_empty library.folders, "examples/docs holds only plain documents"
+    assert_equal %w[directory_based_runbooks single_md_file_runbooks], library.folders.map(&:slug).sort
+    assert_empty library.root.entries, "the root holds only folders and a plain document"
   end
 
   def test_a_single_file_entry_carries_its_front_matter
-    single = Library.load(EXAMPLES).find("db-maintenance")
+    single = Library.load(EXAMPLES).find("single_md_file_runbooks/db-maintenance")
     assert single.single_file?
     assert_equal "Monthly PostgreSQL maintenance", single.title
     assert_equal 5, single.steps
@@ -32,16 +33,16 @@ class TestLibrary < Minitest::Test
   end
 
   def test_a_directory_entry_carries_its_title_and_path
-    dir = Library.load(EXAMPLES).find("hello")
+    dir = Library.load(EXAMPLES).find("directory_based_runbooks/hello")
     refute dir.single_file?
     assert_equal "Hello, runsheets", dir.title
-    assert_equal File.join(EXAMPLES, "hello"), dir.path
+    assert_equal File.join(EXAMPLES, "directory_based_runbooks/hello"), dir.path
   end
 
   def test_runbook_loads_an_entry_and_unknown_slugs_raise
     library = Library.load(EXAMPLES)
-    assert_equal "Hello, runsheets", library.runbook("hello").title
-    assert library.runbook("db-maintenance").single_file?
+    assert_equal "Hello, runsheets", library.runbook("directory_based_runbooks/hello").title
+    assert library.runbook("single_md_file_runbooks/db-maintenance").single_file?
     assert_raises(Runsheets::RunbookError) { library.runbook("nope") }
   end
 

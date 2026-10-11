@@ -15,7 +15,7 @@ module Runsheets
     # The runbook served when none is named: the bundled hello example,
     # found relative to this file so it works from a checkout and from an
     # installed gem alike.
-    DEFAULT_RUNBOOK = File.expand_path("../../examples/hello", __dir__)
+    DEFAULT_RUNBOOK = File.expand_path("../../examples/directory_based_runbooks/hello", __dir__)
 
     # Parse argv into a hash holding only what was given: Config attribute
     # names for the options, :config for the config file. Raises

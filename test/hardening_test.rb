@@ -162,7 +162,7 @@ class TestWebHardening < Minitest::Test
 
   def test_a_page_acts_on_its_own_runbook_after_another_tab_switched
     start_run
-    @session.open(Runsheets::Runbook.load(File.expand_path("../examples/disk-space-triage.md", __dir__)))
+    @session.open(Runsheets::Runbook.load(File.expand_path("../examples/single_md_file_runbooks/disk-space-triage.md", __dir__)))
     own   = execute("010-say-hello-1", "runbook" => "hello")
     owner = @session.runs.find { it.execution(json(own)["id"]) }
     other = execute("010-say-hello-1", "runbook" => "nope")

@@ -9,7 +9,7 @@
 # Paths may start with ~. Flags accept true/false, yes/no, on/off or 1/0.
 defaults:
   # The runbook to serve: a directory holding runbook.md, or a single .md
-  # file. Empty means the bundled examples/hello. (RUNBOOK argument, RUNSHEETS_DIR)
+  # file. Empty means the bundled examples/directory_based_runbooks/hello. (RUNBOOK argument, RUNSHEETS_DIR)
   dir:
   # Port to listen on. (--port, RUNSHEETS_PORT)
   port: 4567

@@ -32,7 +32,7 @@ Requires Ruby 3.4 or newer.
 ## Run
 
 ```bash
-runsheets                         # serve the bundled examples/hello on http://127.0.0.1:4567/
+runsheets                         # serve the bundled examples/directory_based_runbooks/hello on http://127.0.0.1:4567/
 runsheets path/to/runbook         # serve a runbook directory (runbook.md + steps/)
 runsheets path/to/runbook.md      # serve a single all-in-one markdown file
 runsheets path/to/runbooks        # a directory of runbooks: choose one in the browser
@@ -57,11 +57,11 @@ search box in the header searches the full text of every runbook. Try the
 bundled examples:
 
 ```bash
-runsheets --open examples                      # all four, pick one in the browser
-runsheets --open examples/hello                # safe to run: every block kind
-runsheets --check examples/staging-teardown    # a realistic AWS teardown
-runsheets --open examples/db-maintenance.md    # a single all-in-one file, sql blocks via psql
-runsheets --open examples/disk-space-triage.md # links to plain documents, kept out of the tree
+runsheets --open examples                                              # all four, pick one in the browser
+runsheets --open examples/directory_based_runbooks/hello               # safe to run: every block kind
+runsheets --check examples/directory_based_runbooks/staging-teardown   # a realistic AWS teardown
+runsheets --open examples/single_md_file_runbooks/db-maintenance.md    # a single all-in-one file, sql blocks via psql
+runsheets --open examples/single_md_file_runbooks/disk-space-triage.md # links to plain documents, kept out of the tree
 ```
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
@@ -168,7 +168,7 @@ One markdown file works too: the front matter is the runbook's, every
 `##` heading is a step, attributes go in an HTML comment after the
 heading (`<!-- kind: verify, timeout: 30 -->`), and sections headed
 **Verify** and **Rollback** stand in for the extra files. See
-`examples/db-maintenance.md`.
+`examples/single_md_file_runbooks/db-maintenance.md`.
 
 ### Step files
 
@@ -253,7 +253,7 @@ process is closed as `interrupted` the next time runsheets starts.
 ```bash
 bundle install
 bundle exec rake test
-bundle exec bin/runsheets --open examples/hello
+bundle exec bin/runsheets --open examples/directory_based_runbooks/hello
 ```
 
 The model (`Runbook`, `Step`, `Block`, `Renderer`, `Executor`,

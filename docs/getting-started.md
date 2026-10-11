@@ -36,13 +36,13 @@ runsheets --version
 
 ## Run the examples
 
-The gem ships with an `examples` directory. `examples/hello` is a runbook
+The gem ships with an `examples` directory. `examples/directory_based_runbooks/hello` is a runbook
 that exercises every block kind without touching anything on your machine,
-and `examples/disk-space-triage.md` is a single-file runbook that only
+and `examples/single_md_file_runbooks/disk-space-triage.md` is a single-file runbook that only
 reads. If you installed from RubyGems, find the directory with:
 
 ```bash
-cd "$(gem contents runsheets | grep 'examples/hello/runbook.md' | xargs dirname)/.."
+cd "$(gem contents runsheets | grep 'examples/directory_based_runbooks/hello/runbook.md' | xargs dirname)/.."
 ```
 
 Then serve it:
@@ -258,11 +258,11 @@ runsheets --init ops/runbooks/my-procedure.md    # or one file, ## headings as s
 runsheets --check ops/runbooks/my-procedure
 ```
 
-For the shape of a real one, read `examples/staging-teardown` (a
+For the shape of a real one, read `examples/directory_based_runbooks/staging-teardown` (a
 directory, every block kind, a blast radius and a rollback) and
-`examples/db-maintenance.md` (a single file whose `sql run` blocks go
+`examples/single_md_file_runbooks/db-maintenance.md` (a single file whose `sql run` blocks go
 through `psql`). Neither runs against your machine as written; they are
-there to copy from. `examples/disk-space-triage.md` is safe to run, and
+there to copy from. `examples/single_md_file_runbooks/disk-space-triage.md` is safe to run, and
 shows a runbook linking to plain markdown documents, which the library
 leaves out of its tree.
 

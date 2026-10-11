@@ -72,10 +72,10 @@ Done.
 - **SQL through the interpreters map**: a language the front matter maps
   now executes. Before this, `sql run` warned and stayed inert even with a
   mapping, because block classification only knew the built-in languages.
-- **Two realistic samples**: `examples/staging-teardown`, a directory
+- **Two realistic samples**: `examples/directory_based_runbooks/staging-teardown`, a directory
   runbook with the shape of a real AWS teardown (manual, automated,
   terminal, background, destructive and verify steps, blast radius,
-  rollback), and `examples/db-maintenance.md`, a single-file PostgreSQL
+  rollback), and `examples/single_md_file_runbooks/db-maintenance.md`, a single-file PostgreSQL
   runbook whose blocks are `sql run` through `psql`. Neither can run
   against this machine; both load clean under `--check` and are test
   fixtures for the loader.

@@ -15,14 +15,14 @@ class TestSearch < Minitest::Test
   end
 
   def test_every_term_must_appear_somewhere_in_the_runbook
-    assert_equal ["db-maintenance"], search_slugs("vacuum")
+    assert_equal ["single_md_file_runbooks/db-maintenance"], search_slugs("vacuum")
     assert_empty search_slugs("vacuum hostname"), "no runbook has both"
-    assert_equal ["db-maintenance"], search_slugs("VACUUM psql"), "case-insensitive, across documents and front matter"
+    assert_equal ["single_md_file_runbooks/db-maintenance"], search_slugs("VACUUM psql"), "case-insensitive, across documents and front matter"
   end
 
   def test_a_phrase_matches_across_a_wrapped_line_and_code_is_searched
-    assert_includes search_slugs('"kept elsewhere in the examples directory"'), "disk-space-triage"
-    assert_includes search_slugs("du -sh"), "disk-space-triage", "code in blocks is searched"
+    assert_includes search_slugs('"kept elsewhere in the examples directory"'), "single_md_file_runbooks/disk-space-triage"
+    assert_includes search_slugs("du -sh"), "single_md_file_runbooks/disk-space-triage", "code in blocks is searched"
   end
 
   def test_a_stray_quote_is_not_part_of_a_word
@@ -30,12 +30,12 @@ class TestSearch < Minitest::Test
   end
 
   def test_a_title_match_outranks_a_body_match_and_an_empty_query_finds_nothing
-    assert_equal "disk-space-triage", search_slugs("disk").first
+    assert_equal "single_md_file_runbooks/disk-space-triage", search_slugs("disk").first
     assert_empty search_slugs("  ")
   end
 
   def test_hits_name_the_matching_documents_best_first
-    result = Search.run(example_entries, "threshold").find { it.slug == "disk-space-triage" }
+    result = Search.run(example_entries, "threshold").find { it.slug == "single_md_file_runbooks/disk-space-triage" }
     titles = result.hits.map(&:title)
     assert_includes titles, "Verify"
     refute_includes titles, "Find what is using it", "a document without the term is not a hit"

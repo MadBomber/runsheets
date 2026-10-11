@@ -11,7 +11,7 @@ or a directory holding several of either, in folders nested to any depth
 (see [Choosing a runbook](web-ui.md#choosing-a-runbook)). Given such a
 directory of runbooks, the page opens on a folder tree and the operator picks
 one; `runsheets examples` shows the three bundled examples that way. It is
-the only positional argument. Leave it out and the bundled `examples/hello`
+the only positional argument. Leave it out and the bundled `examples/directory_based_runbooks/hello`
 is served, which is the quickest way to see the tool;
 `--init` is the one mode that always needs a path. `dir:` in the config file
 or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
@@ -288,5 +288,5 @@ next start closes its session as `interrupted`.
 ## Running from a checkout
 
 ```bash
-bundle exec bin/runsheets --open examples/hello
+bundle exec bin/runsheets --open examples/directory_based_runbooks/hello
 ```

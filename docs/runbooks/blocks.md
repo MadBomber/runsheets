@@ -102,7 +102,7 @@ bin/rails runner - <run-dir>/blocks/020-x-1.1.cmd
 
 and a `sql run` block becomes `psql -X -v ON_ERROR_STOP=1 -f <path>`, with
 `psql` taking its connection from the `PGHOST`, `PGUSER`, `PGPASSWORD` and
-`PGDATABASE` inputs in the environment. `examples/db-maintenance.md` is a
+`PGDATABASE` inputs in the environment. `examples/single_md_file_runbooks/db-maintenance.md` is a
 complete runbook built this way.
 
 The command is split with `Shellwords`, so quoting works as it would in a

@@ -4,7 +4,7 @@ module RunsheetsTest
   # Fixtures for the session, run and single-file tests: reading back what a
   # session wrote, and building the files and states those tests start from.
   module SessionFixtures
-    DISK_RUNBOOK = File.expand_path("../../examples/disk-space-triage.md", __dir__)
+    DISK_RUNBOOK = File.expand_path("../../examples/single_md_file_runbooks/disk-space-triage.md", __dir__)
 
     def disk_runbook = Runsheets::Runbook.load(DISK_RUNBOOK)
 

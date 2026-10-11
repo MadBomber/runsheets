@@ -191,7 +191,7 @@ The rules:
   file's directory.
 
 `runsheets --init name.md` writes a starter file in this shape. The bundled
-`examples/db-maintenance.md` is a complete one.
+`examples/single_md_file_runbooks/db-maintenance.md` is a complete one.
 
 ## Several runbooks in one directory
 

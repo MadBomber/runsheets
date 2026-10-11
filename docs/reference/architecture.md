@@ -32,7 +32,7 @@ lib/runsheets/
   assets.rb                   inline CSS and JavaScript
   cli.rb                      option parsing and the exe entry point
 bin/runsheets
-examples/hello/               a safe runbook; also the test fixture
+examples/directory_based_runbooks/hello/               a safe runbook; also the test fixture
 ```
 
 <div class="diagram" markdown>

@@ -213,7 +213,7 @@ class TestSingleFile < Minitest::Test
   end
 
   def test_examples_load_clean
-    %w[staging-teardown db-maintenance.md].each do |name|
+    %w[directory_based_runbooks/staging-teardown single_md_file_runbooks/db-maintenance.md].each do |name|
       rb = Runsheets::Runbook.load(File.join(EXAMPLES, name))
       assert_empty rb.warnings, "#{name}: #{rb.warnings.join('; ')}"
       assert rb.steps.size >= 4
@@ -221,7 +221,7 @@ class TestSingleFile < Minitest::Test
   end
 
   def test_the_single_file_example_uses_sql_secrets_verify_and_rollback
-    db = Runsheets::Runbook.load(File.join(EXAMPLES, "db-maintenance.md"))
+    db = Runsheets::Runbook.load(File.join(EXAMPLES, "single_md_file_runbooks", "db-maintenance.md"))
     executable = db.steps.flat_map(&:blocks).select(&:executable?)
     assert db.single_file?
     assert_includes executable.map(&:lang), "sql", "sql blocks execute through the interpreters map"
@@ -231,7 +231,7 @@ class TestSingleFile < Minitest::Test
   end
 
   def test_the_teardown_example_uses_every_block_kind
-    teardown = Runsheets::Runbook.load(File.join(EXAMPLES, "staging-teardown"))
+    teardown = Runsheets::Runbook.load(File.join(EXAMPLES, "directory_based_runbooks", "staging-teardown"))
     kinds = teardown.steps.flat_map(&:blocks).map(&:kind).uniq
     assert_empty %i[run destructive terminal background expect] - kinds
     assert teardown.destructive?

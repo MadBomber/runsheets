@@ -127,7 +127,7 @@ engineer and a reason, like the start page; it creates its directory and
 log under `runs_root` as soon as it is built.
 
 ```ruby
-runbook = Runsheets::Runbook.load("examples/hello")
+runbook = Runsheets::Runbook.load("examples/directory_based_runbooks/hello")
 session = Runsheets::Session.new(engineer: "ci", why: "nightly check of the hello runbook",
                                  runs_root: "/tmp/runs", runbook:)
 
@@ -416,7 +416,7 @@ result.blocks   # Array of Block
 ```ruby
 require "runsheets"
 
-runbook = Runsheets::Runbook.load("examples/hello")
+runbook = Runsheets::Runbook.load("examples/directory_based_runbooks/hello")
 options = { runs_root: Runsheets.runs_dir, log_level: "info", echo: $stdout }
 
 # With the engineer and the reason known, start the session now:

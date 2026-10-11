@@ -124,6 +124,15 @@ A review of the whole application found the following; each has a test.
 - Once a block's result is compared, its expect block is hidden instead of
   repeating the expected text below.
 
+### Changed (examples)
+
+- The examples are grouped by shape: `examples/directory_based_runbooks/`
+  holds `hello` and `staging-teardown`; `examples/single_md_file_runbooks/`
+  holds `db-maintenance.md` and `disk-space-triage.md` with the documents
+  the latter links to. Their library slugs gain the folder
+  (`directory_based_runbooks/hello`). `runsheets` with no RUNBOOK still
+  serves `hello`, from its new path.
+
 ### Changed (sidebar)
 
 - On a step page the rollback document appears only in the collapsible

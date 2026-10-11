@@ -20,7 +20,7 @@ class TestWebLibrary < Minitest::Test
     restart_without_session
     library = get "/library"
     form    = get "/session/new"
-    refused = post "/runs", "_token" => "tok", "slug" => "hello"
+    refused = post "/runs", "_token" => "tok", "slug" => "directory_based_runbooks/hello"
     assert_match %r{/session/new\z}, library.location
     assert form.ok?
     assert_includes form.body, 'value="Prefilled"', "the engineer is prefilled"
@@ -39,25 +39,27 @@ class TestWebLibrary < Minitest::Test
 
   def test_the_home_page_shows_the_tree_and_the_root_folder_with_nothing_open_yet
     body = get("/library").body
-    %w[db-maintenance disk-space-triage hello staging-teardown].each { assert_includes body, "data-slug=\"#{it}\"" }
-    assert_includes body, 'href="/library/hello"'
+    %w[single_md_file_runbooks/db-maintenance single_md_file_runbooks/disk-space-triage directory_based_runbooks/hello directory_based_runbooks/staging-teardown].each { assert_includes body, "data-slug=\"#{it}\"" }
+    assert_includes body, 'href="/library/directory_based_runbooks/hello"'
     assert_includes body, "Monthly PostgreSQL maintenance"
     assert_includes body, "4 runbooks"
     assert_includes body, 'id="lib-filter"'
   end
 
-  def test_the_home_page_has_a_card_per_runbook_and_the_session_header
+  def test_the_home_page_has_a_card_per_folder_and_the_session_header
     response = get "/library"
     body = response.body
+    folder = get("/library/directory_based_runbooks").body
     assert response.ok?
     assert_includes body, ">Tester · ", "the session in the header"
-    assert_equal 4, body.scan(" Open</a>").size, "a card per runbook, each leading to its pane and inputs"
+    assert_includes body, 'class="lib-card folder" href="/library/single_md_file_runbooks"'
+    assert_equal 2, folder.scan(" Open</a>").size, "a card per runbook, each leading to its pane and inputs"
     refute_includes body, 'data-key="o"', "the o key belongs to the detail pane, not a card"
     assert_includes response.headers["Content-Security-Policy"], "nonce-"
   end
 
   def test_selecting_a_runbook_shows_its_details
-    response = get "/library/hello"
+    response = get "/library/directory_based_runbooks/hello"
     body = response.body
     assert response.ok?
     assert_includes body, "<title>Hello, runsheets · runsheets</title>"
@@ -70,11 +72,11 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_selecting_a_runbook_shows_the_open_button_and_its_inputs_form
-    body = get("/library/hello").body
+    body = get("/library/directory_based_runbooks/hello").body
     assert_includes body, 'data-key="o"'
     assert_equal 1, body.scan(" Start run</button>").size
     assert_includes body, 'name="inputs[NAME]"', "the pane carries the inputs form"
-    assert_includes body, 'name="slug" value="hello"'
+    assert_includes body, 'name="slug" value="directory_based_runbooks/hello"'
   end
 
   def test_runbook_pages_redirect_to_the_library_until_a_runbook_is_open
@@ -88,7 +90,7 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_opening_a_runbook_redirects_to_it_and_carries_the_token
-    response = open_runbook("hello")
+    response = open_runbook("directory_based_runbooks/hello")
     assert_equal 302, response.status
     assert_match %r{/\z}, response.headers["Location"]
     assert_same @library, Runsheets::Web.session.library
@@ -96,7 +98,7 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_an_open_runbook_is_served_and_the_header_links_back
-    open_runbook("hello")
+    open_runbook("directory_based_runbooks/hello")
     home = get "/"
     assert home.ok?
     assert_includes home.body, "Hello, runsheets"
@@ -104,37 +106,38 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_the_library_offers_to_continue_the_open_runbook
-    open_runbook("hello")
+    open_runbook("directory_based_runbooks/hello")
     library = get("/library").body
-    pane    = get("/library/hello").body
-    assert_includes library, "Continue"
+    folder  = get("/library/directory_based_runbooks").body
+    pane    = get("/library/directory_based_runbooks/hello").body
+    assert_includes folder, "Continue"
     assert_includes library, "Back to runbook"
-    assert_equal 3, library.scan(" Open</a>").size
+    assert_equal 1, folder.scan(" Open</a>").size, "the open runbook's card offers no Open"
     assert_includes pane, ">open now<"
     assert_includes pane, 'class="tree-runbook current active'
   end
 
   def test_plain_documents_anywhere_in_the_library_open_from_any_runbook
-    open_runbook("hello")
+    open_runbook("directory_based_runbooks/hello")
     home   = get("/").body
     about  = get "/docs/about-the-examples.md"
-    policy = get "/docs/policies/cleanup-policy.md"
-    image  = get "/files/policies/images/triage-flow.svg"
-    assert_includes home, 'href="/docs/about-the-examples.md"', "a runbook directory links one level up"
+    policy = get "/docs/single_md_file_runbooks/policies/cleanup-policy.md"
+    image  = get "/files/single_md_file_runbooks/policies/images/triage-flow.svg"
+    assert_includes home, 'href="/docs/about-the-examples.md"', "a runbook directory links two levels up"
     assert about.ok?
     assert_includes about.body, "<title>About these examples · Hello, runsheets</title>"
-    assert_includes about.body, 'href="/docs/policies/cleanup-policy.md"'
+    assert_includes about.body, 'href="/docs/single_md_file_runbooks/policies/cleanup-policy.md"'
     assert policy.ok?
-    assert_includes policy.body, 'src="/files/policies/images/triage-flow.svg"'
+    assert_includes policy.body, 'src="/files/single_md_file_runbooks/policies/images/triage-flow.svg"'
     assert image.ok?
   end
 
   def test_document_links_to_runbooks_go_to_the_runbook_not_the_markdown
-    open_runbook("hello")
-    other = get "/docs/disk-space-triage.md"
-    own   = get "/docs/hello/steps/010-say-hello.md"
+    open_runbook("directory_based_runbooks/hello")
+    other = get "/docs/single_md_file_runbooks/disk-space-triage.md"
+    own   = get "/docs/directory_based_runbooks/hello/steps/010-say-hello.md"
     assert_equal 302, other.status
-    assert_match %r{/library/disk-space-triage\z}, other.location, "another runbook opens in the library"
+    assert_match %r{/library/single_md_file_runbooks/disk-space-triage\z}, other.location, "another runbook opens in the library"
     assert_match %r{/steps/010-say-hello\z}, own.location, "the open runbook's own step"
   end
 
@@ -144,7 +147,7 @@ class TestWebLibrary < Minitest::Test
     assert response.ok?
     assert_includes body, "<title>Search · runsheets</title>"
     assert_includes body, "1 runbook match <strong>vacuum</strong>"
-    assert_includes body, 'href="/library/db-maintenance"'
+    assert_includes body, 'href="/library/single_md_file_runbooks/db-maintenance"'
     assert_includes body, "<mark>"
     assert_includes body, 'id="lib-tree-nav"', "results sit beside the tree"
     assert_includes body, 'value="vacuum"', "the header box keeps the query"
@@ -152,13 +155,13 @@ class TestWebLibrary < Minitest::Test
 
   def test_search_hits_link_to_the_step_rows_of_the_library_pane
     results = get("/search", "q" => "vacuum").body
-    pane    = get("/library/db-maintenance").body
-    assert_match %r{href="/library/db-maintenance#step-\d+-[a-z-]+"}, results, "a numbered step links to its row"
+    pane    = get("/library/single_md_file_runbooks/db-maintenance").body
+    assert_match %r{href="/library/single_md_file_runbooks/db-maintenance#step-\d+-[a-z-]+"}, results, "a numbered step links to its row"
     assert_match(/<li id="step-\d+-[a-z-]+">/, pane, "step rows carry the anchors")
   end
 
   def test_search_links_the_open_runbook_straight_to_its_steps
-    open_runbook("disk-space-triage")
+    open_runbook("single_md_file_runbooks/disk-space-triage")
     body = get("/search", "q" => "threshold").body
     assert_includes body, "open now"
     assert_includes body, 'href="/steps/verify"'
@@ -180,18 +183,18 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_documents_open_beside_the_tree_before_a_runbook_is_open
-    pane     = get("/library/disk-space-triage").body
-    glossary = get "/docs/disk-usage-glossary.md"
-    assert_includes pane, %(href="/docs/disk-usage-glossary.md")
+    pane     = get("/library/single_md_file_runbooks/disk-space-triage").body
+    glossary = get "/docs/single_md_file_runbooks/disk-usage-glossary.md"
+    assert_includes pane, %(href="/docs/single_md_file_runbooks/disk-usage-glossary.md")
     assert glossary.ok?, "no redirect to the library"
     assert_includes glossary.body, "<title>Disk usage glossary · runsheets</title>"
     assert_includes glossary.body, %(id="lib-tree-nav"), "shown beside the tree"
-    assert_includes glossary.body, %(href="/docs/policies/cleanup-policy.md")
+    assert_includes glossary.body, %(href="/docs/single_md_file_runbooks/policies/cleanup-policy.md")
   end
 
   def test_linked_documents_and_files_serve_before_a_runbook_is_open
-    policy  = get "/docs/policies/cleanup-policy.md"
-    image   = get "/files/policies/images/triage-flow.svg"
+    policy  = get "/docs/single_md_file_runbooks/policies/cleanup-policy.md"
+    image   = get "/files/single_md_file_runbooks/policies/images/triage-flow.svg"
     missing = get "/docs/missing.md"
     assert policy.ok?
     assert image.ok?
@@ -199,18 +202,18 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_runbook_links_and_pages_need_an_open_runbook
-    runbook = get "/docs/disk-space-triage.md"
+    runbook = get "/docs/single_md_file_runbooks/disk-space-triage.md"
     step    = get "/steps/010-say-hello"
-    assert_match %r{/library/disk-space-triage\z}, runbook.location, "a runbook opens in the library"
+    assert_match %r{/library/single_md_file_runbooks/disk-space-triage\z}, runbook.location, "a runbook opens in the library"
     assert_match %r{/library\z}, step.location, "runbook pages still need an open runbook"
   end
 
   def test_document_links_open_in_a_new_tab_and_runbook_links_do_not
-    pane  = get("/library/disk-space-triage").body
+    pane  = get("/library/single_md_file_runbooks/disk-space-triage").body
     about = get("/docs/about-the-examples.md").body
-    assert_includes pane, '<a href="/docs/disk-usage-glossary.md" target="_blank" rel="noopener">'
-    assert_includes about, '<a href="/docs/disk-space-triage.md">', "a runbook link stays in the tab"
-    assert_includes about, '<a href="/docs/disk-usage-glossary.md">', "inside a document tab, documents stay in that tab"
+    assert_includes pane, '<a href="/docs/single_md_file_runbooks/disk-usage-glossary.md" target="_blank" rel="noopener">'
+    assert_includes about, '<a href="/docs/single_md_file_runbooks/disk-space-triage.md">', "a runbook link stays in the tab"
+    assert_includes about, '<a href="/docs/single_md_file_runbooks/disk-usage-glossary.md">', "inside a document tab, documents stay in that tab"
   end
 
   def test_plain_documents_stay_out_of_the_tree
@@ -220,31 +223,31 @@ class TestWebLibrary < Minitest::Test
   end
 
   def test_switching_serves_the_new_runbook_and_keeps_the_earlier_run_open
-    open_runbook("hello", inputs: { "NAME" => "first" })
-    open_runbook("db-maintenance")
+    open_runbook("directory_based_runbooks/hello", inputs: { "NAME" => "first" })
+    open_runbook("single_md_file_runbooks/db-maintenance")
     home = get "/"
     session = Runsheets::Web.session
     assert home.ok?
     assert_includes home.body, "Monthly PostgreSQL maintenance"
     assert session.runbook.single_file?
-    assert session.run_for("hello").open?, "switching finishes nothing"
+    assert session.run_for("directory_based_runbooks/hello").open?, "switching finishes nothing"
   end
 
   def test_returning_to_an_earlier_runbook_finds_its_open_run
-    open_runbook("hello", inputs: { "NAME" => "first" })
-    open_runbook("db-maintenance")
-    pane = get("/library/hello").body
-    open_runbook("hello")
+    open_runbook("directory_based_runbooks/hello", inputs: { "NAME" => "first" })
+    open_runbook("single_md_file_runbooks/db-maintenance")
+    pane = get("/library/directory_based_runbooks/hello").body
+    open_runbook("directory_based_runbooks/hello")
     session = Runsheets::Web.session
     assert_includes pane, ">run open<"
     assert_includes pane, "Return to its run"
-    assert_equal "hello", session.runbook.slug
+    assert_equal "directory_based_runbooks/hello", session.runbook.slug
     assert_equal "first", session.current.inputs["NAME"], "the same run"
     assert_equal 2, session.runs.size
   end
 
   def test_opening_needs_the_token_and_a_known_slug
-    tokenless = post "/runs", "slug" => "hello"
+    tokenless = post "/runs", "slug" => "directory_based_runbooks/hello"
     unknown   = open_runbook("nope")
     assert_equal 403, tokenless.status
     assert_equal 404, unknown.status
@@ -261,7 +264,7 @@ class TestWebLibrary < Minitest::Test
   def test_the_library_is_404_when_serving_one_runbook
     serve_one_runbook
     library = get "/library"
-    pane    = get "/library/hello"
+    pane    = get "/library/directory_based_runbooks/hello"
     home    = get "/"
     assert_equal 404, library.status
     assert_equal 404, pane.status

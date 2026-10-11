@@ -183,7 +183,7 @@ class TestCLI < Minitest::Test
   end
 
   def test_check_accepts_a_single_file
-    run = run_cli("--check", File.join(EXAMPLES, "db-maintenance.md"))
+    run = run_cli("--check", File.join(EXAMPLES, "single_md_file_runbooks", "db-maintenance.md"))
     assert_equal 0, run.status
     assert_includes run.out, "0 warnings"
   end
@@ -314,9 +314,9 @@ class TestCLI < Minitest::Test
     lines = run.out.lines.map(&:chomp)
     assert_equal 0, run.status
     assert_equal 4, lines.size
-    assert_includes lines, "Hello, runsheets [hello]: 6 steps, 0 warnings", "a library's lines name the slug"
-    assert_includes lines, "Disk space triage [disk-space-triage]: 3 steps, 0 warnings"
-    assert_includes lines, "Monthly PostgreSQL maintenance [db-maintenance]: 5 steps, 0 warnings"
+    assert_includes lines, "Hello, runsheets [directory_based_runbooks/hello]: 6 steps, 0 warnings", "a library's lines name the slug"
+    assert_includes lines, "Disk space triage [single_md_file_runbooks/disk-space-triage]: 3 steps, 0 warnings"
+    assert_includes lines, "Monthly PostgreSQL maintenance [single_md_file_runbooks/db-maintenance]: 5 steps, 0 warnings"
     assert_empty run.err
   end
 

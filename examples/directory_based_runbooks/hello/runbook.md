@@ -36,5 +36,5 @@ hello/
 Start a run from the panel above, then walk the steps in the sidebar.
 
 This runbook sits in a directory of examples. [About these
-examples](../about-the-examples.md) is a plain document one level up,
+examples](../../about-the-examples.md) is a plain document two levels up,
 linked like any other markdown file.

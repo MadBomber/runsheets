@@ -221,7 +221,7 @@ class TestRunbookSlug < Minitest::Test
   end
 
   def test_the_slug_is_the_file_name_unless_given
-    path = File.expand_path("../examples/db-maintenance.md", __dir__)
+    path = File.expand_path("../examples/single_md_file_runbooks/db-maintenance.md", __dir__)
     assert_equal "db-maintenance", Runsheets::Runbook.load(path).slug
     assert_equal "database/maintenance", Runsheets::Runbook.load(path, slug: "database/maintenance").slug
   end

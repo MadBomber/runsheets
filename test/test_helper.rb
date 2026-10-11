@@ -18,7 +18,7 @@ module RunsheetsTest
     def call = self.calls += 1
   end
 
-  EXAMPLE_DIR = File.expand_path("../examples/hello", __dir__)
+  EXAMPLE_DIR = File.expand_path("../examples/directory_based_runbooks/hello", __dir__)
 
   def example_runbook = Runsheets::Runbook.load(EXAMPLE_DIR)
 

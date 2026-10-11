@@ -31,7 +31,7 @@ Those files have no front matter, so runsheets treats them as documents:
 they stay out of the library tree, and the links above open them as pages.
 A document can sit anywhere under the directory `runsheets` was started on;
 one is beside this file, the other in `policies/`. See also
-[about these examples](about-the-examples.md).
+[about these examples](../about-the-examples.md).
 
 Every block in this runbook only reads; nothing is deleted.
 

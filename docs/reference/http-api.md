@@ -253,7 +253,7 @@ no runbook is open.
 
 ## Driving a whole session from the shell
 
-Against a server started on `examples/hello` without `--engineer` and
+Against a server started on `examples/directory_based_runbooks/hello` without `--engineer` and
 `--why`:
 
 ```bash
