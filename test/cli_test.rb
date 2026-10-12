@@ -146,6 +146,79 @@ class TestCLI < Minitest::Test
     assert_match(/invalid option: --init/, run.err)
   end
 
+  def test_resolve_runbook_looks_here_then_under_the_runbook_directory
+    with_scratch_dir("here/a.md" => "x", "base/b.md" => "x", "base/a.md" => "x") do |dir|
+      here = File.join(dir, "here")
+      base = File.join(dir, "base")
+      assert_equal File.join(here, "a.md"), CLI.resolve_runbook("a.md", base:, cwd: here), "the current directory wins"
+      assert_equal File.join(base, "b.md"), CLI.resolve_runbook("b.md", base:, cwd: here)
+      assert_equal File.join(base, "b.md"), CLI.resolve_runbook("b.md", base: File.join(base, "a.md"), cwd: here), "a single-file dir gives its directory"
+      assert_equal File.join(here, "b.md"), CLI.resolve_runbook("b.md", base: nil, cwd: here), "with no base the missing path is left to the loader"
+      assert_equal "/nope/c.md", CLI.resolve_runbook("/nope/c.md", base:, cwd: here), "an absolute path is never looked for elsewhere"
+      error = assert_raises(Runsheets::RunbookError) { CLI.resolve_runbook("c.md", base:, cwd: here) }
+      assert_equal "no such runbook: #{File.join(here, 'c.md')}, nor #{File.join(base, 'c.md')} under the runbook directory #{base}", error.message
+    end
+  end
+
+  def test_a_relative_runbook_is_found_under_runsheets_dir
+    ENV["RUNSHEETS_DIR"] = EXAMPLES
+    run = run_cli("--check", "directory_based_runbooks/hello")
+    assert_equal 0, run.status
+    assert_includes run.out, HELLO_CLEAN
+  end
+
+  def test_run_runs_one_step_in_a_session_of_its_own
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "010", "--engineer", "me", "--why", "trying", "--runs-dir", runs)
+      sessions = Dir.glob(File.join(runs, "sessions", "*", "session.json")).map { JSON.parse(File.read(it)) }
+      assert_equal 0, run.status
+      assert_includes run.out, "Say hello [010-say-hello]"
+      assert_includes run.out, "> Hello, world!"
+      assert_equal([%w[me ended]], sessions.map { [it["engineer"], it["status"]] })
+    end
+  end
+
+  def test_run_without_a_step_asks_which_one
+    Dir.mktmpdir do |runs|
+      run = run_cli("-e", "me", "-w", "trying", "--runs-dir", runs, "--run", input: "1\n")
+      assert_equal 0, run.status
+      assert_includes run.out, "Steps in Hello, runsheets:"
+      assert_includes run.out, "Say hello [010-say-hello]"
+    end
+  end
+
+  def test_run_takes_a_path_as_the_runbook_not_the_step
+    assert_equal({ run: nil, dir: "ops/db-refresh" }, CLI.parse(%w[--run ops/db-refresh]))
+    assert_equal({ run: nil, dir: "db.md" }, CLI.parse(%w[--run db.md]))
+    assert_equal({ run: "020", dir: "ops/db-refresh" }, CLI.parse(%w[--run 020 ops/db-refresh]))
+    assert_equal({ run: "ops/x", dir: "ops/y" }, CLI.parse(%w[--run ops/x ops/y]), "with RUNBOOK given, the value stays the step")
+    assert_equal({ run: nil }, CLI.parse(%w[--run]))
+  end
+
+  def test_run_needs_the_engineer_and_why
+    run = run_cli("--run", "010", "--engineer", "me")
+    assert_equal 1, run.status
+    assert_includes run.err, "runsheets: --run needs --engineer and --why"
+  end
+
+  def test_run_refuses_a_library_and_new
+    run = run_cli("--run", "010", "-e", "me", "-w", "x", EXAMPLES)
+    assert_equal 1, run.status
+    assert_includes run.err, "--run needs a runbook, not a library of them"
+    assert_raises(OptionParser::ParseError) { CLI.parse(%w[--run 010 --new]) }
+  end
+
+  def test_run_starts_no_session_for_a_step_it_cannot_run
+    Dir.mktmpdir do |runs|
+      missing    = run_cli("--run", "nope", "-e", "me", "-w", "x", "--runs-dir", runs)
+      background = run_cli("--run", "035", "-e", "me", "-w", "x", "--runs-dir", runs)
+      assert_equal [1, 1], [missing.status, background.status]
+      assert_includes missing.err, 'no step "nope"'
+      assert_includes background.err, "has a background block"
+      assert_empty Dir.glob(File.join(runs, "sessions", "*"))
+    end
+  end
+
   def test_a_missing_config_file_exits_one_with_a_message
     run = run_cli(%w[--config /nope.yml --check])
     assert_equal 1, run.status

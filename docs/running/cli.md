@@ -9,6 +9,8 @@ tags:
 
 ```text
 Usage: runsheets [options] [RUNBOOK]
+       runsheets --new [DIR]
+       runsheets --run [STEP] --engineer NAME --why TEXT [RUNBOOK]
 ```
 
 `RUNBOOK` is one of three things: a runbook directory (it must contain
@@ -21,7 +23,13 @@ one; `runsheets examples` shows the five bundled example runbooks that way. It i
 the only positional argument. Leave it out and the bundled `examples/directory_based_runbooks/hello`
 is served, which is the quickest way to see the tool. `dir:` in the config
 file or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
+A relative `RUNBOOK` is looked for in the current directory first, then
+under that `dir:` or `RUNSHEETS_DIR`. With `RUNSHEETS_DIR=~/ops/runbooks`,
+`runsheets --check platform/deploy` finds `~/ops/runbooks/platform/deploy`
+from anywhere.
 `--new [DIR]` takes no `RUNBOOK`; see [New runbooks](#new-runbooks).
+`--run [STEP]` runs one step of `RUNBOOK` at the terminal; see
+[Running one step](#running-one-step).
 
 ## Options
 
@@ -34,6 +42,7 @@ file or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
 | `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. See [Checking runbooks](#checking-runbooks). `--no-check` turns it off. |
 | `--new [DIR]` | | Ask what kind of runbook to make, write it into `DIR` from a template, and exit. Without `DIR`, ask for it too. See [New runbooks](#new-runbooks). |
+| `--run [STEP]` | | Run one step of `RUNBOOK` at the terminal and exit. `STEP` is the step's number, its name or its slug, or `verify` or `rollback`; without it, the steps are listed to choose from. Needs `--engineer` and `--why`. See [Running one step](#running-one-step). |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-e`, `--engineer NAME` | ask | Who is starting the session. Without it the start page asks, pre-filled from `git config user.name`, else `$USER`. See [The session](#the-session). |
 | `-w`, `--why TEXT` | ask | Why the session is being started: its first note. With `--engineer` too, the session starts at once and the start page is skipped. |
@@ -76,6 +85,12 @@ Keep run records inside a project (but outside the runbook):
 
 ```bash
 runsheets --runs-dir ./tmp/runs ops/runbooks/staging-teardown
+```
+
+Run the checks in a runbook's `verify.md` from cron, failing if any does:
+
+```bash
+runsheets --run verify -e cron -w "nightly health check" ops/runbooks/db-maintenance.md </dev/null
 ```
 
 Validate every runbook in a repository (a directory of runbooks is checked
@@ -189,6 +204,76 @@ one of those. So a single file from such a template gets a folder of its
 own, `NAME/NAME.md` with the support files beside it, and `--check` is
 given `NAME/NAME.md`.
 
+## Running one step
+
+`runsheets --run STEP RUNBOOK` runs one step at the terminal and exits,
+without starting the web server. Name the step by its number (`020` or
+`20`), its name (`take-a-backup`), its whole slug (`020-take-a-backup`),
+or `verify`, `rollback` or `runbook` for those documents. In a single-file
+runbook the name is the heading as a slug: `## Take a backup` is
+`take-a-backup`. A name that matches nothing, or more than one step, is
+an error that lists the steps.
+
+```bash
+runsheets --run 020 -e "Pat Doe" -w "refresh staging" ops/runbooks/db-refresh
+```
+
+Leave `STEP` out and the steps are listed to choose from, by their number
+in the list or any name `STEP` takes:
+
+```text
+$ runsheets -e "Pat Doe" -w "refresh staging" --run ops/runbooks/db-refresh
+Steps in Refresh the staging database:
+   1) 010-preflight        Preflight
+   2) 020-take-a-backup    Take a backup
+   3) 030-tail-the-log     Tail the log  (page only)
+   4) verify               Verify
+Which step? (its number in the list, or its name): 2
+```
+
+A step marked `(page only)` has a background block and cannot run at a
+terminal. Since the step is optional, `--run ops/runbooks/db-refresh` would
+read the runbook as the step; a value with a `/` or ending in `.md` is taken
+as `RUNBOOK` instead, when no other `RUNBOOK` is given.
+
+It is recorded like a run from the page. `--engineer` and `--why` are
+required (or `engineer:` and `why:` from another
+[settings](#settings) layer), since there is no start page to ask. The
+step runs in a session of its own that ends when the step does, with a
+run record and a session log. Unless `--quiet` is given, the log is echoed
+as it is written, so each block's output appears as it comes.
+
+Each block does at the terminal what it does on the page:
+
+| Block | At the terminal |
+| --- | --- |
+| `run` | Runs. A block that does not exit `0` fails the step, and the blocks after it are not run. |
+| `text expect` | Is compared with the output of the block above it. A mismatch prints the lines that differ, marked `-` (expected) and `+` (output), and fails the step. |
+| `destructive` | Prints its confirmation code and runs only once the code is typed. There is no way to skip this. |
+| `terminal` | Is printed, and asks `Did you run it?`, then for an optional note. |
+| `background` | Is refused. A step with one is not run at all: nothing would be left to stop it. Start it from the page. |
+
+A step with nothing to run or confirm is printed, and asks `Done?`. A
+numbered step that succeeds is marked done in the run record.
+
+First it asks for each of the runbook's inputs in order, as the page's
+start form does. The value in brackets is the one it has now, from the
+environment or its default, and Enter keeps it. A secret is read without
+echo and shown only as `[set]`. An input the step uses that is still blank
+is an error.
+
+```text
+Who should be greeted? (NAME) [world]: Pat
+A word that must never appear in the run record (SECRET_WORD) [set]:
+Say hello [010-say-hello]
+```
+
+Questions are read from standard input. When it runs out (a cron job, or
+`</dev/null`), the inputs keep their values unasked, and a question that
+needs a person fails the step instead of waiting. So `--run verify` can
+run unattended as a health check, as long as its blocks only run and
+compare.
+
 ## Checking runbooks
 
 `--check` loads the runbook, prints its authoring warnings to stderr
@@ -261,9 +346,9 @@ given, the session log is echoed to the terminal as it is written. Press
 
 | Status | When |
 | --- | --- |
-| `0` | Normal exit, `--check` found no warnings, or `--new` wrote a runbook. |
-| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, `--check` found warnings or a runbook it could not read, or `--new` was answered `n` or could not write. |
-| `130` | Ctrl-C at a `--new` question. |
+| `0` | Normal exit, `--check` found no warnings, `--new` wrote a runbook, or the `--run` step succeeded. |
+| `1` | Bad arguments or settings, the runbook could not be loaded, the port is in use, `--check` found warnings or a runbook it could not read, `--new` was answered `n` or could not write, or the `--run` step failed, was refused, or was not confirmed. |
+| `130` | Ctrl-C at a `--new` question, or during `--run`. |
 
 ## Settings
 
@@ -278,7 +363,7 @@ comes from further down:
 1. **Command line.** Whatever is given wins outright.
 2. **Environment variables**, `RUNSHEETS_` plus the setting name in upper
    case: `RUNSHEETS_PORT`, `RUNSHEETS_BIND`, `RUNSHEETS_RUNS_DIR`,
-   `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`, `RUNSHEETS_INIT`, `RUNSHEETS_DUMP`, `RUNSHEETS_DIR`,
+   `RUNSHEETS_OPEN`, `RUNSHEETS_CHECK`, `RUNSHEETS_DUMP`, `RUNSHEETS_DIR`,
    `RUNSHEETS_ENGINEER`, `RUNSHEETS_WHY`, `RUNSHEETS_LOG_LEVEL`, `RUNSHEETS_QUIET`.
 3. **The project config**, `./config/runsheets.yml` in the current directory,
    or the file `--config FILE` or `RUNSHEETS_CONFIG` names in its place. The

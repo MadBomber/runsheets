@@ -15,6 +15,17 @@
   written once as a directory runbook and produces either shape; a single
   file from a template with support files gets a folder of its own.
 
+- `runsheets --run [STEP] RUNBOOK` runs one step at the terminal (listing the
+  steps to choose from when `STEP` is left out), recorded in a session like
+  a run from the page, and exits non-zero if the step fails.
+  `--engineer` and `--why` are required. It asks for the runbook's inputs
+  first, Enter keeping each one's value. A destructive block still needs
+  its confirmation code typed, a terminal block or manual step asks to be
+  confirmed, and a step with a background block is refused. Name a step by
+  number, name or slug, or `verify` for a health check.
+- A relative `RUNBOOK` not found from the current directory is looked for
+  under the `dir:` a config file sets, or `RUNSHEETS_DIR`.
+
 ### Removed
 
 - `--init`, `--no-init`, `RUNSHEETS_INIT` and the `init` setting. Use

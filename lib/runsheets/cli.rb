@@ -31,6 +31,7 @@ module Runsheets
 
           Usage: #{PROGRAM} [options] [RUNBOOK]
                  #{PROGRAM} --new [DIR]
+                 #{PROGRAM} --run [STEP] --engineer NAME --why TEXT [RUNBOOK]
 
           RUNBOOK is a directory holding runbook.md and a steps/ directory of
           markdown files, a single all-in-one markdown file whose ## headings
@@ -66,9 +67,23 @@ module Runsheets
       rest = parser.parse(argv)
       raise OptionParser::ParseError, "too many arguments: #{rest.join(' ')}" if rest.size > 1
       raise OptionParser::ParseError, "--new takes the directory to create the runbook in; give no RUNBOOK with it" if options.key?(:new) && rest.any?
+      raise OptionParser::ParseError, "--run and --new cannot be used together" if options.key?(:new) && options.key?(:run)
 
+      rest = runbook_taken_by_run(options, rest)
       options[:dir] = rest.first if rest.first
       options
+    end
+
+    # --run's step is optional, so in `--run ops/db-refresh` it takes the
+    # runbook as the step. A value with a / or ending in .md is no step
+    # name: when nothing else was given as RUNBOOK it is moved there, and
+    # the step is asked for. Returns the arguments left over.
+    def self.runbook_taken_by_run(options, rest)
+      value = options[:run]
+      return rest unless rest.empty? && value && (value.include?("/") || value.end_with?(".md"))
+
+      options[:run] = nil
+      [value]
     end
 
     # The options about serving: config file, port, bind, records, and the
@@ -81,6 +96,9 @@ module Runsheets
       opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
       opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
       opts.on("--new [DIR]", "Ask what kind of runbook to make, write it from a template into DIR (asked for when left out), and exit") { options[:new] = it }
+      opts.on("--run [STEP]", "Run one step of RUNBOOK (number, name or slug; asked when left out) at the terminal; needs -e and -w") do |step|
+        options[:run] = step
+      end
       opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
     end
 
@@ -119,6 +137,21 @@ module Runsheets
       0
     end
 
+    # The RUNBOOK argument as a path. A relative one is found from the
+    # current directory, else under +base+: the dir RUNSHEETS_DIR or a
+    # config file sets (or the directory of a single-file runbook it
+    # names). Raises RunbookError naming both places when neither has it.
+    def self.resolve_runbook(arg, base:, cwd: Dir.pwd)
+      here = File.expand_path(arg, cwd)
+      return here if File.exist?(here) || base.nil? || Pathname.new(arg).absolute? || arg.start_with?("~")
+
+      base  = File.dirname(base) if File.file?(base)
+      under = File.expand_path(arg, base)
+      return under if File.exist?(under)
+
+      raise RunbookError, "no such runbook: #{here}, nor #{under} under the runbook directory #{base}"
+    end
+
     # The runbook a configuration points at: its dir, else the bundled example.
     def self.runbook_path(config) = config.dir || DEFAULT_RUNBOOK
 
@@ -127,7 +160,9 @@ module Runsheets
     def self.run(argv, out: $stdout, err: $stderr, input: $stdin)
       options = parse(argv, out:)
       return 0 unless options
-      return new_runbook(options[:new], default: new_parent_default(new_config(options)), input:, out:) if options.key?(:new)
+      return new_runbook(options[:new], default: new_parent_default(offline_config(options)), input:, out:) if options.key?(:new)
+      options[:dir] = resolve_runbook(options[:dir], base: Config.new(path: options[:config]).dir) if options[:dir]
+      return run_step(options[:run], offline_config(options), input:, out:) if options.key?(:run)
 
       config  = configure(options)
       return dump(config, out:) if config.dump
@@ -141,7 +176,7 @@ module Runsheets
     rescue Errno::EADDRINUSE
       err.puts "#{PROGRAM}: port #{config.port} on #{config.bind} is already in use; pick another with --port"
       1
-    rescue OptionParser::ParseError, RunbookError, ConfigError,
+    rescue OptionParser::ParseError, RunbookError, RunError, ConfigError,
            Psych::Exception, SocketError, SystemCallError => e # also a bad config file, an unknown host, an unreadable directory
       err.puts "#{PROGRAM}: #{e.message}"
       1
@@ -262,9 +297,9 @@ module Runsheets
       nil
     end
 
-    # The settings --new reads its default directory from. Nothing is
-    # served, so a project config that binds to the network is no concern.
-    def self.new_config(options) = Runsheets.configure(options.except(:config, :new), path: options[:config])
+    # The settings for --new and --run. Nothing is served, so a project
+    # config that binds to the network is no concern.
+    def self.offline_config(options) = Runsheets.configure(options.except(:config, :new, :run), path: options[:config])
 
     # Where --new offers to write when it was given no directory: the dir a
     # config file sets, else $RUNSHEETS_DIR, else nil (no default). A dir
@@ -283,6 +318,35 @@ module Runsheets
     rescue Interrupt
       out.puts "", "Nothing created."
       130
+    end
+
+    # --run: run one step of the configured runbook at the terminal, in a
+    # session of its own that ends when the step does. The engineer and why
+    # are required, since nobody is at a start page to give them. Ctrl-C
+    # stops what is running. Returns the exit status.
+    def self.run_step(name, config, input: $stdin, out: $stdout)
+      raise ConfigError, "--run needs --engineer and --why: the run is recorded with who ran it and why" unless config.engineer && config.why
+
+      runbook = run_step_runbook(runbook_path(config))
+      step    = name ? StepRunner.find_step(runbook, name) : StepRunner.choose_step(runbook, input:, output: out)
+      refusal = StepRunner.refusal(step)
+      raise RunError, refusal if refusal
+
+      session = Session.new(engineer: config.engineer, why: config.why, runbook:, **session_options(config, out:))
+      StepRunner.new(session:, runbook:, step:, input:, output: out).run
+    rescue Interrupt
+      out.puts "", "Interrupted."
+      130
+    ensure
+      session&.end!("runsheets --run #{step.slug} finished")
+    end
+
+    # The runbook at +path+ for --run, which runs a step of one runbook and
+    # so cannot be given a library.
+    def self.run_step_runbook(path)
+      raise RunbookError, "--run needs a runbook, not a library of them: #{path}" if Library.library?(path)
+
+      Runbook.load(path)
     end
   end
 end
