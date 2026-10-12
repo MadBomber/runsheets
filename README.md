@@ -76,7 +76,7 @@ runsheets --open examples/single_md_file_runbooks/disk-space-triage.md # links t
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
 records go; default `~/.local/share/runsheets/runs`), `--open`, `--check`,
-`--new DIR`, `--config FILE`, `--dump` to print the settings in force as a
+`--new [DIR]`, `--config FILE`, `--dump` to print the settings in force as a
 config file (redirect it to save them), and for the session `--engineer`,
 `--why`, `--log-level`, `--verbose` and `--quiet`. Settings are layered: the command line beats
 `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`, `RUNSHEETS_DIR` for
