@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/images/logo.png" alt="runsheets logo: a smiling runsheet sprinting beside the runsheets wordmark" width="620">
+  <img src="https://raw.githubusercontent.com/MadBomber/runsheets/main/docs/assets/images/logo.png" alt="runsheets logo: a smiling runsheet sprinting beside the runsheets wordmark" width="620">
 </p>
 
 # runsheets
@@ -80,11 +80,11 @@ runsheets --open examples/single_md_file_runbooks/disk-space-triage.md # links t
 
 Options: `--port`, `--bind` (default loopback), `--runs-dir` (where run
 records go; default `~/.local/share/runsheets/runs`), `--open`, `--check`,
-`--new [DIR]`, `--run [STEP]` to run one step at the terminal, `--config FILE`, `--dump` to print the settings in force as a
+`--new [DIR]`, `--run [STEP]` to run one step at the terminal (by its name or slug), `--config FILE`, `--dump` to print the settings in force as a
 config file (redirect it to save them), and for the session `--engineer`,
 `--why`, `--log-level`, `--verbose` and `--quiet`. Settings are layered: the command line beats
 `RUNSHEETS_*` environment variables (`RUNSHEETS_PORT`, `RUNSHEETS_DIR` for
-the runbook, ...), which beat `./config/runsheets.yml` (or the file `--config` or
+the runbook, under which a relative `RUNBOOK` is also looked for, ...), which beat `./config/runsheets.yml` (or the file `--config` or
 `RUNSHEETS_CONFIG` names), which beats `~/.config/runsheets/runsheets.yml`,
 which beats the defaults bundled in `lib/runsheets/config/defaults.yml`. See
 [docs/running/cli.md](docs/running/cli.md#settings).

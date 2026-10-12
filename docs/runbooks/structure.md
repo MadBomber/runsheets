@@ -200,7 +200,7 @@ The rules:
   file is called `runbook.md`. The working directory for blocks is the
   file's directory.
 
-`runsheets --new DIR`, answering `single-file` to the first question, writes a starter file in this shape. The bundled
+`runsheets --new DIR` (answer `single-file`) writes a starter file in this shape. The bundled
 `examples/single_md_file_runbooks/db-maintenance.md` is a complete one.
 
 ## Several runbooks in one directory

@@ -18,7 +18,8 @@ lib/runsheets/
   block.rb                    a fenced block and the kind its flags ask for
   renderer.rb                 kramdown + rouge, wraps executable blocks
   step.rb                     one markdown file: front matter, body, html, blocks
-  single_file.rb              splits a one-file runbook into preamble and ## sections
+  slug.rb                     the slug and title rules shared by steps, sections and --new
+  single_file.rb              splits a one-file runbook into preamble and ## sections; joins them back for --new
   runbook.rb                  a directory or a single file: steps, verify, rollback
   library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
   search.rb                   full-text search over runbooks
@@ -38,7 +39,12 @@ lib/runsheets/
   pages/search.rb             the search results page
   assets.rb                   inline CSS and JavaScript
   cli.rb                      option parsing and the bin/runsheets entry point
+  prompt.rb                   questions at the terminal for --new and --run; secrets read without echo
+  template.rb                 a starter runbook under templates/, rendered with the --new answers
+  wizard.rb                   runsheets --new: asks, confirms, writes a runbook from a template
+  step_runner.rb              runsheets --run: one step at the terminal, recorded in a session
 bin/runsheets
+templates/                                            the --new templates, one directory runbook each
 examples/directory_based_runbooks/hello/               a safe runbook; also the test fixture
 ```
 

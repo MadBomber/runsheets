@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "io/console"
-
 module Runsheets
   # `runsheets --run STEP RUNBOOK`: run one step of a runbook at the
   # terminal. It is recorded like a run from the page: a session with an
@@ -24,18 +22,23 @@ module Runsheets
     attr_reader :session, :runbook, :step
 
     # The document of +runbook+ that +name+ names: its slug ("020-greet"),
-    # its number ("020" or "20"), its slug without the number ("greet"), or
-    # verify, rollback or runbook. Raises RunbookError saying what can be
-    # named when nothing, or more than one step, matches.
+    # else its slug without the number ("greet"), which covers verify,
+    # rollback and runbook too. A number names nothing here; numbers are
+    # only places in the list choose_step shows. Raises RunbookError saying
+    # what can be named when nothing, or more than one step, matches.
     def self.find_step(runbook, name)
-      name  = name.to_s.strip
+      name = name.to_s.strip
+      if name.match?(/\A\d+\z/)
+        raise RunbookError, "#{name.inspect} is a number; name the step by its slug or name, or leave STEP out to choose from a numbered list"
+      end
+
       found = runbook.step(name) and return found
 
-      matches = runbook.steps.select { same_step?(it, name) }
+      matches = runbook.steps.select { Slug.bare(it.slug) == name }
       return matches.first if matches.one?
 
       what = matches.empty? ? "no step #{name.inspect}" : "#{name.inspect} matches #{matches.map(&:slug).join(', ')}"
-      raise RunbookError, "#{what} in #{runbook.title}; steps: #{runbook.documents.keys.join(', ')}"
+      raise RunbookError, "#{what} in #{runbook.title} (#{runbook.main_path}); steps: #{runbook.documents.keys.join(', ')}"
     end
 
     # The documents --run offers to choose from: the numbered steps, then
@@ -53,15 +56,14 @@ module Runsheets
       choices = choices(runbook)
       raise RunbookError, "#{runbook.title} has no steps" if choices.empty?
 
+      prompt = Prompt.new(input:, output:)
       output.puts "Steps in #{runbook.title}:", *choice_lines(choices)
       loop do
         output.print "Which step? (its number in the list, or its name): "
-        answer = input.gets
-        output.puts if answer.nil?
-        raise RunError, "no step chosen" if answer.nil?
+        answer = prompt.line or raise RunError, "no step chosen"
 
-        pick = pick_step(runbook, choices, answer.strip) and return pick
-        output.puts "  #{answer.strip.inspect} is not one of the steps"
+        pick = pick_step(runbook, choices, answer) and return pick
+        output.puts "  #{answer.inspect} is not one of the steps"
       end
     end
 
@@ -74,22 +76,15 @@ module Runsheets
       end
     end
 
-    # The choice +answer+ names, or nil. A number without a leading zero is
-    # a place in the list; anything else is looked up as find_step does.
+    # The choice +answer+ names, or nil. A number is a place in the list,
+    # and only that; anything else is looked up as find_step does.
     def self.pick_step(runbook, choices, answer)
       return if answer.empty?
-      return choices[answer.to_i - 1] if answer.match?(/\A[1-9]\d*\z/) && answer.to_i <= choices.size
+      return choices[answer.to_i - 1] if answer.match?(/\A\d+\z/) && answer.to_i.between?(1, choices.size)
 
       find_step(runbook, answer)
     rescue RunbookError
       nil
-    end
-
-    # Whether +name+ is +step+'s number or its slug without the number.
-    def self.same_step?(step, name)
-      return step.number&.to_i == name.to_i if name.match?(/\A\d+\z/)
-
-      step.slug.sub(/\A\d+[-_]?/, "") == name
     end
 
     # Why +step+ cannot be run at a terminal, or nil.
@@ -123,23 +118,34 @@ module Runsheets
       end
     end
 
-    def initialize(session:, runbook:, step:, input: $stdin, output: $stdout)
-      @session = session
-      @runbook = runbook
-      @step    = step
-      @input   = input
-      @output  = output
+    # "A has no value; the step needs it", or for several names
+    # "A, B have no value; the step needs them".
+    def self.blank_message(names)
+      many = names.size > 1
+      "#{names.join(', ')} #{many ? 'have' : 'has'} no value; the step needs #{many ? 'them' : 'it'}"
     end
 
-    # Run the step. Returns the exit status: 0 when every block ran, matched
-    # and was confirmed, 1 otherwise. A numbered step that succeeds is
-    # marked done.
-    def run
+    # Raises RunError when +step+ cannot be run at a terminal, so a step
+    # that would be refused is refused before any session starts.
+    def initialize(runbook:, step:, input: $stdin, output: $stdout)
       refusal = self.class.refusal(step)
       raise RunError, refusal if refusal
 
-      inputs = ask_inputs
-      @run   = session.open(runbook, inputs:)
+      @runbook = runbook
+      @step    = step
+      @output  = output
+      @prompt  = Prompt.new(input:, output:)
+      @session = nil
+      @run     = nil
+    end
+
+    # Run the step in +session+. Returns the exit status: 0 when every
+    # block ran, matched and was confirmed, 1 otherwise. A numbered step
+    # that succeeds is marked done.
+    def run(session)
+      @session = session
+      inputs   = ask_inputs
+      @run     = session.open(runbook, inputs:)
       @output.puts "#{step.title} [#{step.slug}]"
       return 1 unless performed?
 
@@ -164,7 +170,7 @@ module Runsheets
       values = Run.resolve_inputs(runbook, {})
       values = runbook.inputs.to_h { [it.name, ask_input(it, values[it.name])] }
       blank  = self.class.blank_inputs(runbook, step, values).map(&:name)
-      raise RunError, "#{blank.join(', ')} #{blank.size > 1 ? 'have' : 'has'} no value; the step needs #{blank.size > 1 ? 'them' : 'it'}" if blank.any?
+      raise RunError, self.class.blank_message(blank) if blank.any?
 
       values
     end
@@ -172,10 +178,10 @@ module Runsheets
     # One input's value: what was typed, else +current+. A secret is read
     # without echo, and its value is never shown.
     def ask_input(input, current)
-      return current if @exhausted
+      return current if @prompt.exhausted?
 
       @output.print "#{input.prompt || input.name} (#{input.name})#{self.class.shown(input, current)}: "
-      answer = input.secret? ? read_secret : read_line
+      answer = input.secret? ? @prompt.secret : @prompt.line
       answer.to_s.empty? ? current : answer
     end
 
@@ -192,7 +198,7 @@ module Runsheets
     def execute(block)
       execution = start(block) or return false
       execution.wait
-      return failed(block, Run.ending(execution).last) unless execution.success?
+      return failed(block.id, Run.ending(execution).last) unless execution.success?
 
       expected = step.expected_output(block.id)
       expected.nil? || matches?(block, expected, execution.output)
@@ -201,15 +207,21 @@ module Runsheets
     # Start a block, asking for its confirmation code when it is
     # destructive. Returns the Execution, or nil when it was not confirmed.
     def start(block)
-      @run.execute(block.id)
-    rescue Run::ConfirmationRequired => e
-      @output.print "#{block.id} is destructive. Type #{e.challenge} to run it: "
+      id = block.id
       begin
-        @run.execute(block.id, confirm: read_line.to_s)
-      rescue Run::ConfirmationRequired
-        failed(block, "not confirmed")
-        nil
+        @run.execute(id)
+      rescue Run::ConfirmationRequired => e
+        @output.print "#{id} is destructive. Type #{e.challenge} to run it: "
+        start_confirmed(id)
       end
+    end
+
+    # Run block +id+ with the code that is typed; nil when it is not the code.
+    def start_confirmed(id)
+      @run.execute(id, confirm: @prompt.line.to_s)
+    rescue Run::ConfirmationRequired
+      failed(id, "not confirmed")
+      nil
     end
 
     # Whether +output+ is what the expect block says; prints the lines that
@@ -219,53 +231,31 @@ module Runsheets
       return true if result.match?
 
       @output.puts "#{block.id}: the output is not what the expect block says:", *self.class.mismatch_lines(result).map { "  #{it}" }
-      failed(block, "output did not match")
+      failed(block.id, "output did not match")
     end
 
     # Show a terminal block and ask whether the operator ran it.
     def confirm_terminal(block)
       @output.puts "Run this yourself:", *block.code.lines(chomp: true).map { "  #{it}" }
-      return failed(block, "not confirmed") unless yes?("Did you run it?")
+      return failed(block.id, "not confirmed") unless @prompt.yes?("Did you run it?")
 
       @output.print "Note (optional): "
-      @run.acknowledge(block.id, note: read_line)
+      @run.acknowledge(block.id, note: @prompt.line)
       true
     end
 
     # Show a step with nothing to run and ask whether it is done.
     def done?
       @output.puts "", step.body.strip, ""
-      yes?("Done?") || failed(step, "not done")
+      @prompt.yes?("Done?") || failed(step.slug, "not done")
     end
 
     private
 
-    # A yes/no question; no unless the answer starts with y.
-    def yes?(question)
-      @output.print "#{question} [y/N]: "
-      read_line.to_s.downcase.start_with?("y")
-    end
-
-    def failed(thing, why)
-      @output.puts "#{thing.is_a?(Step) ? thing.slug : thing.id}: #{why}"
+    # Say why +label+ (a block id or step slug) failed; false, for the step.
+    def failed(label, why)
+      @output.puts "#{label}: #{why}"
       false
-    end
-
-    # A line of input, stripped, or nil when input has run out.
-    def read_line
-      line = @input.gets
-      @exhausted = true if line.nil?
-      @output.puts if line.nil? # end the prompt's line
-      line&.strip
-    end
-
-    def read_secret
-      return read_line unless @input.respond_to?(:tty?) && @input.tty?
-
-      line = @input.noecho(&:gets)
-      @exhausted = true if line.nil?
-      @output.puts
-      line&.strip
     end
   end
 end

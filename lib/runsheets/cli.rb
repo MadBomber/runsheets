@@ -22,7 +22,7 @@ module Runsheets
     # names for the options, :config for the config file. Raises
     # OptionParser::ParseError on bad input; returns nil after printing help
     # or the version.
-    def self.parse(argv, out: $stdout)
+    def self.parse(argv, out: $stdout, cwd: Dir.pwd)
       options  = {}
       defaults = Config.bundled_defaults
       parser   = OptionParser.new do |opts|
@@ -69,18 +69,20 @@ module Runsheets
       raise OptionParser::ParseError, "--new takes the directory to create the runbook in; give no RUNBOOK with it" if options.key?(:new) && rest.any?
       raise OptionParser::ParseError, "--run and --new cannot be used together" if options.key?(:new) && options.key?(:run)
 
-      rest = runbook_taken_by_run(options, rest)
+      rest = runbook_taken_by_run(options, rest, cwd:)
       options[:dir] = rest.first if rest.first
       options
     end
 
-    # --run's step is optional, so in `--run ops/db-refresh` it takes the
-    # runbook as the step. A value with a / or ending in .md is no step
-    # name: when nothing else was given as RUNBOOK it is moved there, and
-    # the step is asked for. Returns the arguments left over.
-    def self.runbook_taken_by_run(options, rest)
+    # --run's step is optional, so in `--run db-refresh` it takes the
+    # runbook as the step. A value with a / or ending in .md, or that names
+    # something in +cwd+, is no step name: when nothing else was given as
+    # RUNBOOK it is moved there, and the step is asked for. Returns the
+    # arguments left over.
+    def self.runbook_taken_by_run(options, rest, cwd: Dir.pwd)
       value = options[:run]
-      return rest unless rest.empty? && value && (value.include?("/") || value.end_with?(".md"))
+      return rest unless rest.empty? && value
+      return rest unless value.include?("/") || value.end_with?(".md") || File.exist?(File.join(cwd, value))
 
       options[:run] = nil
       [value]
@@ -96,9 +98,8 @@ module Runsheets
       opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
       opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
       opts.on("--new [DIR]", "Ask what kind of runbook to make, write it from a template into DIR (asked for when left out), and exit") { options[:new] = it }
-      opts.on("--run [STEP]", "Run one step of RUNBOOK (number, name or slug; asked when left out) at the terminal; needs -e and -w") do |step|
-        options[:run] = step
-      end
+      opts.on("--run [STEP]", "Run one step of RUNBOOK at the terminal, named by its slug or name (or verify, rollback, runbook); " \
+                              "left out, choose it by number from a list. Needs -e and -w") { options[:run] = it }
       opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
     end
 
@@ -142,11 +143,11 @@ module Runsheets
     # config file sets (or the directory of a single-file runbook it
     # names). Raises RunbookError naming both places when neither has it.
     def self.resolve_runbook(arg, base:, cwd: Dir.pwd)
-      here = File.expand_path(arg, cwd)
+      here = Config.expand_path(arg, cwd)
       return here if File.exist?(here) || base.nil? || Pathname.new(arg).absolute? || arg.start_with?("~")
 
       base  = File.dirname(base) if File.file?(base)
-      under = File.expand_path(arg, base)
+      under = Config.expand_path(arg, base)
       return under if File.exist?(under)
 
       raise RunbookError, "no such runbook: #{here}, nor #{under} under the runbook directory #{base}"
@@ -156,15 +157,15 @@ module Runsheets
     def self.runbook_path(config) = config.dir || DEFAULT_RUNBOOK
 
     # Entry point for the executable. Returns the process exit status.
-    # --new reads its answers from +input+.
+    # --new and --run read their answers from +input+.
     def self.run(argv, out: $stdout, err: $stderr, input: $stdin)
       options = parse(argv, out:)
       return 0 unless options
-      return new_runbook(options[:new], default: new_parent_default(offline_config(options)), input:, out:) if options.key?(:new)
-      options[:dir] = resolve_runbook(options[:dir], base: Config.new(path: options[:config]).dir) if options[:dir]
-      return run_step(options[:run], offline_config(options), input:, out:) if options.key?(:run)
+      return new_runbook(options[:new], default: configured_runbook_dir(offline_config(options)), input:, out:) if options.key?(:new)
 
-      config  = configure(options)
+      config = options.key?(:run) ? offline_config(options) : configure(options)
+      config.dir = resolve_runbook(options[:dir], base: configured_runbook_dir(config)) if options[:dir]
+      return run_step(options[:run], config, input:, out:) if options.key?(:run)
       return dump(config, out:) if config.dump
 
       path   = runbook_path(config)
@@ -255,7 +256,9 @@ module Runsheets
 
     # Who the start page suggests: the configured engineer, else git's
     # user.name, else the login name.
-    def self.default_engineer(config) = [config.engineer, git_user_name, ENV["USER"]].find { !it.to_s.strip.empty? }
+    def self.default_engineer(config, env: ENV, git_name: git_user_name)
+      [config.engineer, git_name, env["USER"]].find { !it.to_s.strip.empty? }
+    end
 
     def self.git_user_name
       IO.popen(%w[git config user.name], err: File::NULL, &:read).strip
@@ -301,12 +304,14 @@ module Runsheets
     # config that binds to the network is no concern.
     def self.offline_config(options) = Runsheets.configure(options.except(:config, :new, :run), path: options[:config])
 
-    # Where --new offers to write when it was given no directory: the dir a
-    # config file sets, else $RUNSHEETS_DIR, else nil (no default). A dir
-    # naming a single-file runbook offers the directory it is in.
-    def self.new_parent_default(config, env: ENV)
+    # The runbook directory the settings name, apart from the command line:
+    # the dir a config file sets, else $RUNSHEETS_DIR, else nil. A dir
+    # naming a single-file runbook gives the directory it is in. --new
+    # offers it when given no directory, and a relative RUNBOOK not found
+    # from the current directory is looked for under it.
+    def self.configured_runbook_dir(config, env: ENV)
       dir = config.file_dir
-      dir ||= File.expand_path(env["RUNSHEETS_DIR"].strip) unless Config.blank?(env["RUNSHEETS_DIR"])
+      dir ||= Config.expand_path(env["RUNSHEETS_DIR"].strip) unless Config.blank?(env["RUNSHEETS_DIR"])
       dir && File.file?(dir) ? File.dirname(dir) : dir
     end
 
@@ -316,7 +321,7 @@ module Runsheets
     def self.new_runbook(dir, default: nil, input: $stdin, out: $stdout)
       Wizard.new(dir, input:, output: out, default_parent: default).run
     rescue Interrupt
-      out.puts "", "Nothing created."
+      out.puts "", Wizard::CANCELLED
       130
     end
 
@@ -329,16 +334,17 @@ module Runsheets
 
       runbook = run_step_runbook(runbook_path(config))
       step    = name ? StepRunner.find_step(runbook, name) : StepRunner.choose_step(runbook, input:, output: out)
-      refusal = StepRunner.refusal(step)
-      raise RunError, refusal if refusal
-
+      runner  = StepRunner.new(runbook:, step:, input:, output: out)
       session = Session.new(engineer: config.engineer, why: config.why, runbook:, **session_options(config, out:))
-      StepRunner.new(session:, runbook:, step:, input:, output: out).run
+      status  = runner.run(session)
+      ending  = status.zero? ? "succeeded" : "failed"
+      status
     rescue Interrupt
+      ending = "was interrupted"
       out.puts "", "Interrupted."
       130
     ensure
-      session&.end!("runsheets --run #{step.slug} finished")
+      session&.end!("runsheets --run #{step.slug} #{ending || 'stopped on an error'}")
     end
 
     # The runbook at +path+ for --run, which runs a step of one runbook and

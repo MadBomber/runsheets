@@ -82,3 +82,6 @@ A `runsheets` process holds one session, from the start page to Ctrl-C or
 **End session**. To keep two separate notebooks, start two processes on
 different ports. See
 [One session per process](../running/index.md#one-session-per-process).
+A session can also be started at the terminal, without the start page:
+`runsheets --run STEP` records one step in a session of its own, with the
+same run record and log. See [Running one step](../running/cli.md#running-one-step).

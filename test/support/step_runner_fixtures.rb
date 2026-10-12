@@ -6,12 +6,11 @@ module RunsheetsTest
   # Fixtures for the StepRunner tests: running one step of a single-file
   # runbook and reading back what it printed and recorded.
   module StepRunnerFixtures
-    # What one StepRunner#run returned and printed, the session it ran in,
-    # and each execution's output (read before the run directory goes).
-    Outcome = Data.define(:status, :out, :session, :outputs) do
-      def step_status(slug) = session.run_for(session.runbook.slug).step_status(slug)
-      def acks              = session.run_for(session.runbook.slug).record.acks
-      def executions        = session.executions
+    # What one StepRunner#run returned and printed, and what it recorded:
+    # each document's step status, the acknowledgements, the executions
+    # and their output, all read before the run directory goes.
+    Outcome = Data.define(:status, :out, :statuses, :acks, :executions, :outputs) do
+      def step_status(slug) = statuses[slug]
     end
 
     # Answers the destructive block's confirmation by reading the code the
@@ -19,6 +18,19 @@ module RunsheetsTest
     class CodeTyper
       def initialize(out) = @out = out
       def gets = "#{@out.string[/Type (\h+) to run it/, 1]}\n"
+    end
+
+    # Input that says it is a terminal, as a person's is, and notes
+    # whether it was read with echo off.
+    class FakeTty < StringIO
+      attr_reader :noecho_used
+
+      def tty? = true
+
+      def noecho
+        @noecho_used = true
+        yield self
+      end
     end
 
     # A single-file runbook titled "Fixture" with +steps+ ("Title" => body),
@@ -34,14 +46,25 @@ module RunsheetsTest
       with_runs_dir do |root|
         with_single_file(text) do |runbook, _path|
           out     = StringIO.new
-          session = start_session(root, runbook:)
           step    = Runsheets::StepRunner.find_step(runbook, name)
           io      = input.respond_to?(:call) ? input.call(out) : StringIO.new(input)
-          status  = Runsheets::StepRunner.new(session:, runbook:, step:, input: io, output: out).run
-          session.end!("test")
-          return Outcome.new(status:, out: out.string, session:, outputs: session.executions.map(&:output))
+          runner  = Runsheets::StepRunner.new(runbook:, step:, input: io, output: out)
+          session = start_session(root, runbook:)
+          begin
+            status = runner.run(session)
+            return outcome(status, out, session)
+          ensure
+            session.end!("test")
+          end
         end
       end
+    end
+
+    # The Outcome of a run in +session+, read while its records exist.
+    def outcome(status, out, session)
+      run = session.run_for(session.runbook.slug)
+      Outcome.new(status:, out: out.string, statuses: session.runbook.documents.keys.to_h { [it, run&.step_status(it)] },
+                  acks: run ? run.record.acks : {}, executions: session.executions, outputs: session.executions.map(&:output))
     end
   end
 end

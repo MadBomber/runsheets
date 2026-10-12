@@ -24,10 +24,14 @@ the only positional argument. Leave it out and the bundled `examples/directory_b
 is served, which is the quickest way to see the tool. `dir:` in the config
 file or `RUNSHEETS_DIR` can supply it instead; see [Settings](#settings).
 A relative `RUNBOOK` is looked for in the current directory first, then
-under that `dir:` or `RUNSHEETS_DIR`. With `RUNSHEETS_DIR=~/ops/runbooks`,
-`runsheets --check platform/deploy` finds `~/ops/runbooks/platform/deploy`
-from anywhere.
-`--new [DIR]` takes no `RUNBOOK`; see [New runbooks](#new-runbooks).
+under the `dir:` a config file sets, else `RUNSHEETS_DIR` (a `dir:` naming
+a single-file runbook is searched from the folder it is in). With
+`RUNSHEETS_DIR=~/ops/runbooks`, `runsheets --check platform/deploy` finds
+`~/ops/runbooks/platform/deploy` from anywhere. An absolute path, or one
+starting with `~`, is only ever looked for where it says. When neither
+place has it, the error names both.
+`--new [DIR]` takes no `RUNBOOK` and cannot be combined with `--run`; see
+[New runbooks](#new-runbooks).
 `--run [STEP]` runs one step of `RUNBOOK` at the terminal; see
 [Running one step](#running-one-step).
 
@@ -42,7 +46,7 @@ from anywhere.
 | `-o`, `--open` | off | Open the default browser once the server is listening. `--no-open` turns it off. |
 | `--check` | off | Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. See [Checking runbooks](#checking-runbooks). `--no-check` turns it off. |
 | `--new [DIR]` | | Ask what kind of runbook to make, write it into `DIR` from a template, and exit. Without `DIR`, ask for it too. See [New runbooks](#new-runbooks). |
-| `--run [STEP]` | | Run one step of `RUNBOOK` at the terminal and exit. `STEP` is the step's number, its name or its slug, or `verify` or `rollback`; without it, the steps are listed to choose from. Needs `--engineer` and `--why`. See [Running one step](#running-one-step). |
+| `--run [STEP]` | | Run one step of `RUNBOOK` at the terminal and exit. `STEP` is the step's name or slug, or `verify`, `rollback` or `runbook`, never a number; without it, the steps are listed to choose from by number. Needs `--engineer` and `--why`. See [Running one step](#running-one-step). |
 | `--dump` | off | Print the settings in force as a config file to stdout and exit. `--no-dump` turns it off. See [Saving settings](#saving-settings). |
 | `-e`, `--engineer NAME` | ask | Who is starting the session. Without it the start page asks, pre-filled from `git config user.name`, else `$USER`. See [The session](#the-session). |
 | `-w`, `--why TEXT` | ask | Why the session is being started: its first note. With `--engineer` too, the session starts at once and the start page is skipped. |
@@ -102,18 +106,19 @@ runsheets --check ops/runbooks
 
 ## New runbooks
 
-`runsheets --new DIR` asks six questions, then writes a starter runbook into
-`DIR`, creating `DIR` if it does not exist. Enter accepts the default in
-brackets.
+`runsheets --new DIR` asks six questions, shows what it will create and
+asks to go ahead, then writes a starter runbook into `DIR`, creating `DIR`
+if it does not exist. Enter accepts the default in brackets.
 
-Leave `DIR` out and the first question is where to put it. The default
+Leave `DIR` out and there is a seventh question first: where to put it. The default
 offered is the `dir:` a config file sets (the file `--config` names or
 `./config/runsheets.yml`, then the user config), else `RUNSHEETS_DIR`. Here
 a config file setting beats the environment, the reverse of the usual
 [layering](#settings), because the config file is where a standing choice
 of runbook directory belongs. With neither there is no default and an
 answer is needed. A `dir:` naming a single-file runbook offers the directory
-it is in, and `~` is expanded.
+it is in, and `~` is expanded. An answer that names a file, or a `~user`
+that does not exist, is asked for again.
 
 ```text
 $ RUNSHEETS_DIR=~/ops/runbooks runsheets --new
@@ -145,7 +150,7 @@ Title [Db refresh]: Refresh staging from production
 When to use, in a sentence [edit later]: Before a release that needs production data
 Who to call when a step fails [edit later]: #data-platform
 
-Create directory runbook ops/runbooks/db-refresh from the rollback template? [Y/n]
+Create directory runbook ops/runbooks/db-refresh from the rollback template? [Y/n]:
 created ops/runbooks/db-refresh/runbook.md
 ...
 ```
@@ -164,12 +169,16 @@ created ops/runbooks/db-refresh/runbook.md
   a placeholder to fill in later.
 
 Answering `n` at the end creates nothing, as does Ctrl-C at any question.
-The answers can be piped in, one per line, and any missing at the end take
-their defaults:
+The answers can be piped in, one per line. Any missing at the end take
+their defaults, and the final question is answered yes, so a pipe that
+runs out writes the runbook:
 
 ```bash
 printf '2\ninputs\nnightly-report\n' | runsheets --new ops/runbooks
 ```
+
+An answer that is refused (a name that is taken, a choice not on the list)
+with no more input after it is an error, not a default.
 
 ### The bundled templates
 
@@ -207,40 +216,56 @@ given `NAME/NAME.md`.
 ## Running one step
 
 `runsheets --run STEP RUNBOOK` runs one step at the terminal and exits,
-without starting the web server. Name the step by its number (`020` or
-`20`), its name (`take-a-backup`), its whole slug (`020-take-a-backup`),
-or `verify`, `rollback` or `runbook` for those documents. In a single-file
-runbook the name is the heading as a slug: `## Take a backup` is
-`take-a-backup`. A name that matches nothing, or more than one step, is
-an error that lists the steps.
+without starting the web server. Name the step by its name
+(`take-a-backup`), its whole slug (`020-take-a-backup`), or `verify`,
+`rollback` or `runbook` for those documents. In a single-file runbook the
+name is the heading as a slug: `## Take a backup` is `take-a-backup`.
+`STEP` is never a number: `--run 020` is an error, so a number typed by
+habit cannot run a step other than the one meant. A name that matches
+nothing, or more than one step, is an error that names the runbook and
+lists its steps.
 
 ```bash
-runsheets --run 020 -e "Pat Doe" -w "refresh staging" ops/runbooks/db-refresh
+runsheets --run take-a-backup -e "Pat Doe" -w "refresh staging" ops/runbooks/db-refresh
 ```
 
-Leave `STEP` out and the steps are listed to choose from, by their number
-in the list or any name `STEP` takes:
+A whole slug always means its own document. A numbered step named like
+`verify.md`, `rollback.md` or the landing page (`030-verify`, say) is
+reached by its whole slug, since `--run verify` runs `verify.md`; `--check`
+warns about such a step.
+
+Leave `STEP` out and the steps are listed to choose from. Numbers belong
+here: they are places in this list, not step numbers. A name or slug works
+too:
 
 ```text
 $ runsheets -e "Pat Doe" -w "refresh staging" --run ops/runbooks/db-refresh
 Steps in Refresh the staging database:
-   1) 010-preflight        Preflight
-   2) 020-take-a-backup    Take a backup
-   3) 030-tail-the-log     Tail the log  (page only)
-   4) verify               Verify
+   1) 010-preflight      Preflight
+   2) 020-take-a-backup  Take a backup
+   3) 030-tail-the-log   Tail the log  (page only)
+   4) verify             Verify
 Which step? (its number in the list, or its name): 2
 ```
 
-A step marked `(page only)` has a background block and cannot run at a
-terminal. Since the step is optional, `--run ops/runbooks/db-refresh` would
-read the runbook as the step; a value with a `/` or ending in `.md` is taken
-as `RUNBOOK` instead, when no other `RUNBOOK` is given.
+The list starts with `runbook`, the landing page, when that page has
+blocks to run or confirm. A step marked `(page only)` has a background
+block and cannot run at a terminal.
+
+Since the step is optional, `--run ops/runbooks/db-refresh` would read the
+runbook as the step. When no other `RUNBOOK` is given, a value with a `/`,
+ending in `.md`, or naming something in the current directory is taken as
+`RUNBOOK` instead. With no `RUNBOOK` at all, `--run` uses the `dir:` or
+`RUNSHEETS_DIR` setting, else the bundled hello example. `RUNBOOK` must be
+one runbook: `--run` refuses a directory of them.
 
 It is recorded like a run from the page. `--engineer` and `--why` are
 required (or `engineer:` and `why:` from another
 [settings](#settings) layer), since there is no start page to ask. The
 step runs in a session of its own that ends when the step does, with a
-run record and a session log. Unless `--quiet` is given, the log is echoed
+run record and a session log whose last line says whether the step
+succeeded, failed or was interrupted. A step that would be refused, or a
+name that finds no step, starts no session. Unless `--quiet` is given, the log is echoed
 as it is written, so each block's output appears as it comes.
 
 Each block does at the terminal what it does on the page:
@@ -259,8 +284,9 @@ numbered step that succeeds is marked done in the run record.
 First it asks for each of the runbook's inputs in order, as the page's
 start form does. The value in brackets is the one it has now, from the
 environment or its default, and Enter keeps it. A secret is read without
-echo and shown only as `[set]`. An input the step uses that is still blank
-is an error.
+echo and shown only as `[set]`; only its newline is removed, so spaces
+typed around a password are kept, as on the page. An input the step uses
+that is still blank is an error.
 
 ```text
 Who should be greeted? (NAME) [world]: Pat

@@ -196,10 +196,45 @@ class TestConfig < Minitest::Test
       by_env  = write_yaml(File.join(dir, "env.yml"), development: { "dir" => "/dev" }, production: { "dir" => "/prod" })
       broken  = File.join(dir, "broken.yml").tap { File.write(it, "dir: [") }
       assert_equal({ "dir" => "/flat" }, Config.file_settings(flat))
-      assert_equal({ "dir" => "/dev" }, Config.file_settings(by_env))
+      assert_equal({ "dir" => "/dev" }, Config.file_settings(by_env, environment: "development"))
       assert_empty Config.file_settings(broken)
       assert_empty Config.file_settings(File.join(dir, "absent.yml"))
+      assert_equal({ "dir" => "/prod" }, Config.file_settings(by_env, environment: "production"))
+      whole = { "development" => { "dir" => "/dev" }, "production" => { "dir" => "/prod" } }
+      assert_equal whole, Config.file_settings(by_env, environment: "staging"), "a file with no section for the environment is read whole"
+      assert_equal whole, Config.file_settings(by_env, environment: nil), "with no environment set the file is read whole"
     end
+  end
+
+  def test_file_settings_of_a_file_that_is_not_a_mapping_is_empty
+    Dir.mktmpdir do |dir|
+      ["just-a-string\n", "- a\n"].each_with_index do |text, i|
+        path = File.join(dir, "#{i}.yml").tap { File.write(it, text) }
+        assert_empty Config.file_settings(path), text
+      end
+    end
+  end
+
+  def test_explicit_path_is_the_option_else_the_variable
+    Dir.mktmpdir do |dir|
+      given = write_yaml(File.join(dir, "given.yml"), port: 1)
+      env   = write_yaml(File.join(dir, "env.yml"), port: 2)
+      assert_equal given, Config.explicit_path(given, env: { "RUNSHEETS_CONFIG" => env })
+      assert_equal env, Config.explicit_path(" ", env: { "RUNSHEETS_CONFIG" => env })
+      assert_nil Config.explicit_path(nil, env: { "RUNSHEETS_CONFIG" => "" })
+    end
+  end
+
+  def test_explicit_path_must_name_a_file
+    error = assert_raises(Runsheets::ConfigError) { Config.explicit_path("/no/such.yml", env: {}) }
+    assert_equal "config file not found: /no/such.yml", error.message
+  end
+
+  def test_expand_path_reports_a_home_that_does_not_exist
+    assert_equal "/base/x", Config.expand_path("x", "/base")
+    error = assert_raises(Runsheets::ConfigError) { Config.expand_path("~no-such-user-here/x") }
+    assert_match(%r{cannot expand ~no-such-user-here/x}, error.message)
+    assert_raises(Runsheets::ConfigError) { Config.new({ dir: "~no-such-user-here/x" }) }
   end
 
   def test_file_dir_comes_from_the_files_whatever_the_environment_says

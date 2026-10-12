@@ -36,7 +36,7 @@ module Runsheets
     end
 
     def title
-      data["title"] || Renderer.title_of(body) || slug.sub(/\A\d+[-_]?/, "").tr("-_", " ").capitalize
+      data["title"] || Renderer.title_of(body) || Slug.title(Slug.bare(slug))
     end
 
     def kind = (data["kind"] || (blocks.any?(&:executable?) ? "automated" : "manual")).to_s

@@ -5,5 +5,5 @@
 import "*.loki"
 
 class Tasks
-  header "<%= name %>: tasks for the <%= title %> runbook"
+  header <%= ruby_string("#{name}: tasks for the #{title} runbook") %>
 end

@@ -9,25 +9,41 @@ module Runsheets
   # Every question has a default, so Enter accepts it. Answers are read
   # from +input+ and prompts written to +output+, so a test (or a script
   # piping answers in) drives it like a person would. When input runs out
-  # each remaining question takes its default.
+  # each remaining question takes its default, and the final "Create?" is
+  # answered yes.
   class Wizard
     SHAPES = {
       "directory" => "runbook.md, steps/, verify.md and rollback.md",
       "single-file" => "one .md file; each ## heading is a step"
     }.freeze
 
-    DEFAULT_NAME        = "new-runbook"
-    DEFAULT_WHEN_TO_USE = "One or two sentences on the situation this runbook is for."
-    DEFAULT_ESCALATION  = "Who to call when a step fails"
+    # What Enter gives for the free-text questions.
+    DEFAULTS = {
+      name: "new-runbook",
+      when_to_use: "One or two sentences on the situation this runbook is for.",
+      escalation: "Who to call when a step fails"
+    }.freeze
 
-    # +folder+ is true when a single-file runbook gets a folder of its own
-    # because its template brings support files (see Template#support_files?).
-    Answers = Data.define(:shape, :template, :name, :title, :when_to_use, :escalation, :folder) do
-      def single_file? = shape == "single-file"
+    # How a runbook sits in its parent directory: a directory runbook, a
+    # single .md file, or a single file in a folder of its own because its
+    # template brings support files (see Template#support_files?). Keyed by
+    # [shape, whether the template has support files].
+    LAYOUTS = {
+      ["directory", false] => :directory, ["directory", true] => :directory,
+      ["single-file", false] => :file, ["single-file", true] => :folder
+    }.freeze
+
+    # Where each layout's runbook itself is, relative to the parent. Its
+    # first part is what the layout creates there.
+    MAINS = { directory: "%<name>s", file: "%<name>s.md", folder: "%<name>s/%<name>s.md" }.freeze
+
+    Answers = Data.define(:template, :name, :title, :when_to_use, :escalation, :layout) do
+      def single_file? = layout != :directory
+      def shape        = single_file? ? "single-file" : "directory"
       # What is created in the parent directory: a file or a directory.
-      def location = Wizard.location(name, single_file: single_file?, folder:)
+      def location     = Wizard.location(name, layout)
       # The runbook itself, relative to the parent: what --check is given.
-      def main     = single_file? && folder ? File.join(name, "#{name}.md") : location
+      def main         = format(MAINS.fetch(layout), name:)
 
       def context
         Template::Context.new(name:, title:, when_to_use:, escalation:, single_file: single_file?)
@@ -36,15 +52,18 @@ module Runsheets
 
     # "DB Refresh!" => "db-refresh": the basename a name becomes. A name
     # with nothing usable in it gives "".
-    def self.slug(text) = text.to_s.strip.delete_suffix(".md").downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-+|-+\z/, "")
+    def self.slug(text) = Slug.of(text.to_s.strip.downcase.delete_suffix(".md"))
+
+    # The layout for a runbook of +shape+ from a template that has, or has
+    # not, +support_files+.
+    def self.layout(shape, support_files) = LAYOUTS.fetch([shape, support_files])
 
     # What a runbook called +name+ creates in its parent directory: a
-    # directory, a .md file, or for a single file with support files a
-    # directory holding both.
-    def self.location(name, single_file:, folder: false) = single_file && !folder ? "#{name}.md" : name
+    # directory or a .md file.
+    def self.location(name, layout) = format(MAINS.fetch(layout), name:).split("/").first
 
     # "db-refresh" => "Db refresh": the title a name suggests.
-    def self.title_for(name) = name.tr("-_", " ").capitalize
+    def self.title_for(name) = Slug.title(name)
 
     # Why +path+ cannot be created, or nil when it can: an existing file, or
     # a directory with something in it.
@@ -54,17 +73,45 @@ module Runsheets
       "#{path} exists and is not empty" if File.directory?(path) && !Dir.empty?(path)
     end
 
+    # Why +name+ cannot be a new runbook of +layout+ in +parent+, or nil
+    # when it can.
+    def self.name_problem(parent, name, layout)
+      return "a name needs a letter or digit" if name.empty?
+
+      conflict(File.join(parent, location(name, layout)))
+    end
+
+    # Why +dir+ cannot be the directory to write into, or nil when it can.
+    def self.parent_problem(dir)
+      return "a directory is needed" if dir.nil?
+
+      "#{dir} is a file, not a directory" if File.file?(Config.expand_path(dir))
+    rescue ConfigError => e
+      e.message
+    end
+
+    # The one of +names+ that +answer+ picks, by its number in the list or
+    # by name, or nil.
+    def self.pick(names, answer)
+      return names.find { it == answer } unless answer.match?(/\A\d+\z/)
+
+      names[answer.to_i - 1] if answer.to_i.between?(1, names.size)
+    end
+
+    CANCELLED = "Nothing created."
+
     attr_reader :parent
 
     # +parent+ is the directory to write into; nil asks for it, offering
     # +default_parent+ (nil for no default).
     def initialize(parent, input: $stdin, output: $stdout, templates: Template.all, default_parent: nil)
+      raise RunbookError, "no runbook templates to offer" if templates.empty?
+
       @parent         = parent
       @default_parent = default_parent
-      @input          = input
       @output         = output
+      @prompt         = Prompt.new(input:, output:)
       @templates      = templates
-      raise RunbookError, "no runbook templates found in #{Template::DIR}" if templates.empty?
     end
 
     # Ask, confirm, write. Returns the exit status.
@@ -81,24 +128,24 @@ module Runsheets
     def ask_all
       shape    = choose("Shape", SHAPES)
       template = choose("Template", @templates.to_h { [it.name, it.description] }, default: Template::DEFAULT)
-      folder   = shape == "single-file" && template_named(template).support_files?
-      name     = ask_name(shape, folder:)
+      layout   = self.class.layout(shape, template_named(template).support_files?)
+      name     = ask_name(layout)
       title    = ask("Title", default: self.class.title_for(name))
-      Answers.new(shape:, template:, name:, title:, folder:,
-                  when_to_use: ask("When to use, in a sentence", default: DEFAULT_WHEN_TO_USE, shown: "edit later"),
-                  escalation: ask("Who to call when a step fails", default: DEFAULT_ESCALATION, shown: "edit later"))
+      Answers.new(template:, name:, title:, layout:,
+                  when_to_use: ask("When to use, in a sentence", default: DEFAULTS[:when_to_use], shown: "edit later"),
+                  escalation: ask("Who to call when a step fails", default: DEFAULTS[:escalation], shown: "edit later"))
     end
 
     # One free-text answer: what was typed, else +default+. +shown+ is what
-    # the prompt displays in the brackets in place of a long default. When
-    # input runs out while a rejected answer is being asked again, the
-    # default would quietly replace it, so that is an error instead.
-    def ask(question, default:, shown: default)
+    # the prompt displays in the brackets in place of a long default.
+    # +rejected+ says why the last answer was refused: when input runs out
+    # while it is being asked again, the default would quietly replace it,
+    # so that is an error instead.
+    def ask(question, default:, shown: default, rejected: nil)
       @output.print shown ? "#{question} [#{shown}]: " : "#{question}: "
-      line = read_line
-      raise RunbookError, @rejected if line.nil? && @rejected
+      line = @prompt.line
+      raise RunbookError, rejected if line.nil? && rejected
 
-      @rejected = nil
       line.nil? || line.empty? ? default : line
     end
 
@@ -110,41 +157,42 @@ module Runsheets
       @output.puts "#{question}:"
       width = names.map(&:size).max
       names.each.with_index(1) { |name, i| @output.puts "  #{i}) #{name.ljust(width)}  #{options[name]}" }
-      loop do
-        answer = ask("Choose", default: ((names.index(default) || 0) + 1).to_s)
-        pick   = answer.match?(/\A\d+\z/) ? names[answer.to_i - 1] : names.find { it == answer }
-        return pick if pick && answer != "0"
-
-        retry_or_give_up("#{answer.inspect} is not one of 1-#{names.size}")
+      ask_until do |rejected|
+        answer = ask("Choose", default: ((names.index(default) || 0) + 1).to_s, rejected:)
+        pick   = self.class.pick(names, answer)
+        [pick, ("#{answer.inspect} is not one of 1-#{names.size}" unless pick)]
       end
     end
 
     # The runbook's name, slugged, asked again while it is blank or taken.
-    # +folder+ says a single file will be put in a folder of its own.
-    def ask_name(shape, folder: false)
-      single = shape == "single-file"
-      loop do
-        name = self.class.slug(ask("Name (the #{single && !folder ? 'file' : 'directory'} name)", default: DEFAULT_NAME))
-        problem = name.empty? ? "a name needs a letter or digit" : self.class.conflict(File.join(parent,
-                                                                                                 self.class.location(name, single_file: single, folder:)))
-        return name unless problem
-
-        retry_or_give_up(problem)
+    def ask_name(layout)
+      ask_until do |rejected|
+        name = self.class.slug(ask("Name (the #{layout == :file ? 'file' : 'directory'} name)", default: DEFAULTS[:name], rejected:))
+        [name, self.class.name_problem(parent, name, layout)]
       end
     end
 
     # The directory to write into, expanded so ~ works: what was typed,
-    # else +default+. Asked again while it is blank with no default, or
-    # names a file.
+    # else +default+. Asked again while it is blank with no default, names
+    # a file, or cannot be expanded (~nobody).
     def ask_parent(default)
-      loop do
-        dir     = ask("Directory to create the runbook in", default:)
-        problem = if dir.nil? then "a directory is needed"
-                  elsif File.file?(File.expand_path(dir)) then "#{dir} is a file, not a directory"
-                  end
-        return File.expand_path(dir) unless problem
+      dir = ask_until do |rejected|
+        answer = ask("Directory to create the runbook in", default:, rejected:)
+        [answer, self.class.parent_problem(answer)]
+      end
+      Config.expand_path(dir)
+    end
 
-        retry_or_give_up(problem)
+    # Ask until an answer has no problem. The block is given why the last
+    # answer was refused (nil at first) and returns [answer, problem or
+    # nil]. Returns the answer.
+    def ask_until
+      rejected = nil
+      loop do
+        answer, problem = yield(rejected)
+        return answer unless problem
+
+        rejected = retry_or_give_up(problem)
       end
     end
 
@@ -152,10 +200,10 @@ module Runsheets
       "Create #{answers.shape} runbook #{File.join(parent, answers.main)} from the #{answers.template} template?"
     end
 
-    # A yes/no question; yes unless the answer starts with n.
+    # A yes/no question; Enter, or input that has run out, is yes.
     def confirm?(question)
-      @output.print "\n#{question} [Y/n]: "
-      !read_line.to_s.downcase.start_with?("n")
+      @output.puts
+      @prompt.yes_unless_no?(question)
     end
 
     # The template called +name+ among those offered.
@@ -168,7 +216,7 @@ module Runsheets
       return rendered.transform_keys { File.join(answers.location, it) } unless answers.single_file?
 
       support = Template.support_files(rendered).transform_keys { File.join(answers.location, it) }
-      { answers.main => Template.single_file(rendered), **support }
+      { answers.main => SingleFile.from_directory(rendered), **support }
     end
 
     # Write the runbook and say what to do next. Returns the exit status.
@@ -194,25 +242,18 @@ module Runsheets
 
     private
 
-    # A line of input without its newline, or nil when input has run out.
-    def read_line
-      line = @input.gets
-      @exhausted = true if line.nil?
-      @output.puts if line.nil? # keep the terminal tidy after Ctrl-D
-      line&.strip
-    end
-
-    # Say what was wrong before the question is asked again; when input has
-    # already run out, asking again would loop forever, so stop instead.
+    # Say what was wrong before the question is asked again, and return it
+    # for that ask. When input has already run out, asking again would loop
+    # forever, so stop instead.
     def retry_or_give_up(problem)
-      raise RunbookError, problem if @exhausted
+      raise RunbookError, problem if @prompt.exhausted?
 
       @output.puts "  #{problem}"
-      @rejected = problem
+      problem
     end
 
     def cancelled
-      @output.puts "Nothing created."
+      @output.puts CANCELLED
       1
     end
   end

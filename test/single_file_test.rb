@@ -236,4 +236,27 @@ class TestSingleFile < Minitest::Test
     assert_empty %i[run destructive terminal background expect] - kinds
     assert teardown.destructive?
   end
+
+  def test_from_directory_joins_the_steps_under_headings_with_their_attributes
+    files = { "runbook.md" => "---\ntitle: T\n---\n\n# T\n\nPreamble.\n",
+              "steps/020-b.md" => "---\ntitle: Second\nkind: manual\n---\n\nDo B.\n",
+              "steps/010-a.md" => "Do A.\n",
+              "rollback.md" => "---\ntitle: Rollback\n---\n\nUndo.\n" }
+    text = SingleFile.from_directory(files)
+    assert_equal "---\ntitle: T\n---\n\n# T\n\nPreamble.\n\n## A\n\nDo A.\n\n## Second\n<!-- kind: manual -->\n\nDo B.\n\n## Rollback\n\nUndo.\n", text
+  end
+
+  def test_attributes_quote_only_what_yaml_would_misread
+    assert_equal "kind: automated, timeout: 300, destructive: true", SingleFile.format_attributes("kind" => "automated", "timeout" => 300, "destructive" => true)
+    assert_equal %(cwd: "yes", note: "a: b", id: "010"), SingleFile.format_attributes("cwd" => "yes", "note" => "a: b", "id" => "010")
+  end
+
+  def test_format_attributes_reads_back_as_written
+    data = { "kind" => "automated", "timeout" => 300, "cwd" => "yes", "note" => "a: b", "id" => "010", "path" => "./x" }
+    assert_equal [data, nil], SingleFile.parse_attributes(SingleFile.format_attributes(data))
+  end
+
+  def test_section_titles_a_step_without_one_from_its_file_name
+    assert_equal "## Take a backup\n\nDo it.", SingleFile.section("Do it.\n", fallback: "020-take-a-backup")
+  end
 end

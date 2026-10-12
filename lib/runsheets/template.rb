@@ -16,7 +16,7 @@ module Runsheets
   #     .loki                  support files: anything else, copied beside
   #
   # Each template is written once, in the directory shape. A single-file
-  # runbook is made from the rendered files (see .single_file), so the two
+  # runbook is made from the rendered files (SingleFile.from_directory), so the two
   # shapes cannot drift apart. Step bodies must therefore use ### and
   # deeper headings: a ## heading would start a new step in a single file.
   class Template
@@ -25,9 +25,12 @@ module Runsheets
     META    = "template.yml"
 
     # What the ERB sees. +yaml+ quotes a value for front matter, so a title
-    # such as "null" or "yes: no" stays a string.
+    # such as "null" or "yes: no" stays a string. +ruby_string+ makes a
+    # value a Ruby string literal for a support file such as asgard's .loki,
+    # so a quote or #{} in a title is text, not code.
     Context = Data.define(:name, :title, :when_to_use, :escalation, :single_file) do
       def yaml(value) = value.to_s.to_json
+      def ruby_string(value) = value.to_s.dump
       def binding_for = binding
     end
 
@@ -37,9 +40,12 @@ module Runsheets
     attr_reader :name, :dir, :description, :order
 
     # Every template under +root+, by the order in its template.yml, then
-    # by name.
+    # by name. Raises RunbookError when there are none.
     def self.all(root: DIR)
-      Dir.glob("*/", base: root).map { new(File.join(root, it.chomp("/"))) }.sort_by { [it.order, it.name] }
+      templates = Dir.glob("*/", base: root).map { new(File.join(root, it.chomp("/"))) }.sort_by { [it.order, it.name] }
+      raise RunbookError, "no runbook templates found in #{root}" if templates.empty?
+
+      templates
     end
 
     # Whether +rel+, a rendered path, is part of the runbook itself rather
@@ -80,36 +86,6 @@ module Runsheets
     # Whether the template brings files besides the runbook's markdown, such
     # as asgard's .loki files. A single-file runbook from it gets a folder.
     def support_files? = sources.any? { !self.class.runbook_file?(it.delete_suffix(".erb")) }
-
-    # One single-file runbook made from rendered directory files: runbook.md
-    # as the front matter and preamble, then a ## section per step in
-    # order, then Verify and Rollback. Each file's front matter, less its
-    # title, becomes the attribute comment under its heading.
-    def self.single_file(files)
-      steps    = files.keys.select { runbook_file?(it) && it.start_with?("#{Runbook::STEPS_DIR}/") }.sort_by { [File.basename(it)[/\A\d+/].to_i, it] }
-      extras   = Runbook::EXTRAS.map { "#{it}.md" }.select { files.key?(it) }
-      sections = (steps + extras).map { section(files[it], fallback: File.basename(it, ".md")) }
-      [files.fetch("runbook.md").rstrip, *sections].join("\n\n") << "\n"
-    end
-
-    # A ## section from one step file's text.
-    def self.section(text, fallback:)
-      parsed  = FrontMatter.parse(text)
-      title   = parsed.data["title"] || fallback.sub(/\A\d+[-_]?/, "").tr("-_", " ").capitalize
-      attrs   = parsed.data.except("title")
-      heading = "## #{title}"
-      heading += "\n<!-- #{attributes(attrs)} -->" unless attrs.empty?
-      "#{heading}\n\n#{parsed.body.strip}"
-    end
-
-    # { "kind" => "automated", "timeout" => 300 } => "kind: automated, timeout: 300".
-    # A string YAML would read as something else (yes, 010, a: b) is quoted.
-    def self.attributes(data)
-      data.map do |key, value|
-        plain = value.is_a?(String) && value.match?(%r{\A[A-Za-z][\w./-]*\z}) && YAML.safe_load(value) == value
-        "#{key}: #{plain || !value.is_a?(String) ? value : value.to_json}"
-      end.join(", ")
-    end
 
     private
 

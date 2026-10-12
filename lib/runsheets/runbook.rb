@@ -291,11 +291,23 @@ module Runsheets
       dupes = steps.map(&:slug).tally.select { |_, n| n > 1 }.keys
       warnings << "duplicate step slugs: #{dupes.join(', ')}" if dupes.any?
       steps.map(&:slug).intersection(%w[runbook verify rollback]).each { warnings << "step #{it} has the name of a special document; give it a number" }
+      warnings.concat(shadow_warnings)
       warnings.concat(@section_warnings)
       documents.each_value do |step|
         step.warnings.each { warnings << "#{step.slug}: #{it}" }
       end
       warnings
+    end
+
+    # A warning for each numbered step whose name without the number is the
+    # slug of another document (030-verify beside verify.md), which that
+    # name finds first.
+    def shadow_warnings
+      steps.filter_map do |step|
+        slug = step.slug
+        name = Slug.bare(slug)
+        "step #{slug} is named like #{name}.md, so `--run #{name}` runs that; use `--run #{slug}`" if name != slug && documents.key?(name)
+      end
     end
   end
 end
