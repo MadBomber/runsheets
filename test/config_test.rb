@@ -17,7 +17,6 @@ class TestConfig < Minitest::Test
       assert_equal File.join(home, ".local/share/runsheets/runs"), config.runs_dir
       refute config.open
       refute config.check
-      refute config.init
       refute config.dump
     end
   end
@@ -33,7 +32,7 @@ class TestConfig < Minitest::Test
 
   def test_every_bundled_default_is_an_attribute_with_a_coercion
     schema = YAML.safe_load_file(Config.defaults_path, symbolize_names: true)
-    assert_equal %i[dir port bind runs_dir open check init dump engineer why log_level quiet], schema[:defaults].keys
+    assert_equal %i[dir port bind runs_dir open check dump engineer why log_level quiet], schema[:defaults].keys
     assert_equal schema[:defaults].keys.sort, Config.config_attributes.sort
     assert_equal schema[:defaults].keys.sort, Config.coercion_mapping.keys.sort
   end
@@ -177,7 +176,7 @@ class TestConfig < Minitest::Test
       text   = Config.new({ port: 4590, open: "yes" }).to_config_yaml
       loaded = YAML.safe_load(text)
       assert_match(/\A# runsheets settings, written by `runsheets --dump`/, text)
-      assert_equal (Config.config_attributes - %i[dump check init why]).map(&:to_s).sort, loaded.keys.sort
+      assert_equal (Config.config_attributes - %i[dump check why]).map(&:to_s).sort, loaded.keys.sort
       assert_equal 4590, loaded["port"]
       assert loaded["open"]
     end
@@ -188,6 +187,71 @@ class TestConfig < Minitest::Test
       assert_raises(Runsheets::ConfigError) { Config.new({ port: "0" }) }
       assert_raises(Runsheets::ConfigError) { Config.new({ port: "70000" }) }
       assert_equal 65_535, Config.new({ port: "65535" }).port
+    end
+  end
+
+  def test_file_settings_reads_a_flat_file_or_the_environment_section
+    Dir.mktmpdir do |dir|
+      flat    = write_yaml(File.join(dir, "flat.yml"), dir: "/flat")
+      by_env  = write_yaml(File.join(dir, "env.yml"), development: { "dir" => "/dev" }, production: { "dir" => "/prod" })
+      broken  = File.join(dir, "broken.yml").tap { File.write(it, "dir: [") }
+      assert_equal({ "dir" => "/flat" }, Config.file_settings(flat))
+      assert_equal({ "dir" => "/dev" }, Config.file_settings(by_env, environment: "development"))
+      assert_empty Config.file_settings(broken)
+      assert_empty Config.file_settings(File.join(dir, "absent.yml"))
+      assert_equal({ "dir" => "/prod" }, Config.file_settings(by_env, environment: "production"))
+      whole = { "development" => { "dir" => "/dev" }, "production" => { "dir" => "/prod" } }
+      assert_equal whole, Config.file_settings(by_env, environment: "staging"), "a file with no section for the environment is read whole"
+      assert_equal whole, Config.file_settings(by_env, environment: nil), "with no environment set the file is read whole"
+    end
+  end
+
+  def test_file_settings_of_a_file_that_is_not_a_mapping_is_empty
+    Dir.mktmpdir do |dir|
+      ["just-a-string\n", "- a\n"].each_with_index do |text, i|
+        path = File.join(dir, "#{i}.yml").tap { File.write(it, text) }
+        assert_empty Config.file_settings(path), text
+      end
+    end
+  end
+
+  def test_explicit_path_is_the_option_else_the_variable
+    Dir.mktmpdir do |dir|
+      given = write_yaml(File.join(dir, "given.yml"), port: 1)
+      env   = write_yaml(File.join(dir, "env.yml"), port: 2)
+      assert_equal given, Config.explicit_path(given, env: { "RUNSHEETS_CONFIG" => env })
+      assert_equal env, Config.explicit_path(" ", env: { "RUNSHEETS_CONFIG" => env })
+      assert_nil Config.explicit_path(nil, env: { "RUNSHEETS_CONFIG" => "" })
+    end
+  end
+
+  def test_explicit_path_must_name_a_file
+    error = assert_raises(Runsheets::ConfigError) { Config.explicit_path("/no/such.yml", env: {}) }
+    assert_equal "config file not found: /no/such.yml", error.message
+  end
+
+  def test_expand_path_reports_a_home_that_does_not_exist
+    assert_equal "/base/x", Config.expand_path("x", "/base")
+    error = assert_raises(Runsheets::ConfigError) { Config.expand_path("~no-such-user-here/x") }
+    assert_match(%r{cannot expand ~no-such-user-here/x}, error.message)
+    assert_raises(Runsheets::ConfigError) { Config.new({ dir: "~no-such-user-here/x" }) }
+  end
+
+  def test_file_dir_comes_from_the_files_whatever_the_environment_says
+    with_clean_home do |home|
+      write_yaml(Config.xdg_path, dir: "~/user-runbooks")
+      project = write_yaml(File.join(home, "project.yml"), port: 4000)
+      with_env("RUNSHEETS_DIR" => "/from/env") do
+        assert_equal File.join(home, "user-runbooks"), Config.new(nil, path: project).file_dir
+        write_yaml(project, dir: "/project-runbooks")
+        assert_equal "/project-runbooks", Config.new(nil, path: project).file_dir, "the higher file wins"
+      end
+    end
+  end
+
+  def test_file_dir_is_nil_without_a_file_that_sets_it
+    with_clean_home do
+      with_env("RUNSHEETS_DIR" => "/from/env") { assert_nil Config.new.file_dir }
     end
   end
 end

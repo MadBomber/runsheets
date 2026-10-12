@@ -33,7 +33,7 @@ class TestCLI < Minitest::Test
   end
 
   def test_parse_negated_flags
-    assert_equal({ open: false, check: false, init: false, dump: false }, CLI.parse(%w[--no-open --no-check --no-init --no-dump]))
+    assert_equal({ open: false, check: false, dump: false }, CLI.parse(%w[--no-open --no-check --no-dump]))
     assert_equal({ dump: true }, CLI.parse(%w[--dump]))
   end
 
@@ -75,14 +75,264 @@ class TestCLI < Minitest::Test
   def test_runsheets_dir_stands_in_for_the_runbook_argument
     ENV["RUNSHEETS_DIR"] = RunsheetsTest::EXAMPLE_DIR
     assert_equal RunsheetsTest::EXAMPLE_DIR, CLI.runbook_path(cli_config)
-    assert_equal RunsheetsTest::EXAMPLE_DIR, CLI.runbook_path(cli_config("--init"))
     assert_equal "/tmp/argv", CLI.runbook_path(cli_config("/tmp/argv"))
   end
 
-  def test_init_without_any_runbook_path_is_an_error
-    run = run_cli("--init")
+  def test_new_takes_no_runbook_beside_its_directory
+    run = run_cli("--new", "/tmp/x", "also-this")
     assert_equal 1, run.status
-    assert_match(/--init needs the path/, run.err)
+    assert_match(/give no RUNBOOK with it/, run.err)
+  end
+
+  def test_new_without_a_directory_asks_for_one
+    with_scratch_dir do |dir|
+      run = run_cli("--new", input: "#{dir}\n\n\nasked\n")
+      assert_equal 0, run.status, run.err
+      assert_includes run.out, "Directory to create the runbook in: "
+      assert File.file?(File.join(dir, "asked", "runbook.md"))
+    end
+  end
+
+  def test_new_without_a_directory_or_an_answer_is_an_error
+    run = run_cli("--new")
+    assert_equal 1, run.status
+    assert_match(/a directory is needed/, run.err)
+  end
+
+  def test_new_offers_runsheets_dir_as_the_directory
+    with_scratch_dir do |dir|
+      ENV["RUNSHEETS_DIR"] = dir
+      run = run_cli("--new", input: "\n\n\nfrom-env\n")
+      assert_equal 0, run.status, run.err
+      assert_includes run.out, "Directory to create the runbook in [#{dir}]: "
+      assert File.file?(File.join(dir, "from-env", "runbook.md"))
+    end
+  end
+
+  def test_new_offers_the_config_file_dir_over_runsheets_dir
+    with_scratch_dir do |dir|
+      from_file = File.join(dir, "from-file")
+      config    = write_yaml(File.join(dir, "runsheets.yml"), dir: from_file)
+      ENV["RUNSHEETS_DIR"] = File.join(dir, "from-env")
+      run = run_cli("--new", "--config", config, input: "\n\n\nchosen\n")
+      assert_equal 0, run.status, run.err
+      assert File.file?(File.join(from_file, "chosen", "runbook.md"))
+    end
+  end
+
+  def test_configured_runbook_dir_follows_the_config_file_then_the_environment
+    with_scratch_dir("lib/one.md" => "x") do |dir|
+      config = Struct.new(:file_dir)
+      assert_equal "/from/file", CLI.configured_runbook_dir(config.new("/from/file"), env: { "RUNSHEETS_DIR" => "/from/env" })
+      assert_equal "/from/env", CLI.configured_runbook_dir(config.new(nil), env: { "RUNSHEETS_DIR" => " /from/env " })
+      assert_nil CLI.configured_runbook_dir(config.new(nil), env: { "RUNSHEETS_DIR" => "" })
+      assert_equal File.join(dir, "lib"), CLI.configured_runbook_dir(config.new(File.join(dir, "lib", "one.md")), env: {}),
+                   "a single-file runbook gives its directory"
+    end
+  end
+
+  def test_new_ignores_a_project_config_that_binds_to_the_network
+    with_scratch_dir("config/runsheets.yml" => "bind: 0.0.0.0\n") do |dir|
+      Dir.chdir(dir) do
+        run = run_cli("--new", dir, input: "\n\nok\n")
+        assert_equal 0, run.status, run.err
+        assert File.file?(File.join(dir, "ok", "runbook.md"))
+        refute_match(/bind|loopback/, run.out + run.err)
+      end
+    end
+  end
+
+  def test_ctrl_c_in_new_creates_nothing
+    with_scratch_dir do |dir|
+      run = run_cli("--new", dir, input: CtrlC.new)
+      assert_equal 130, run.status
+      assert_includes run.out, "Nothing created."
+      assert_empty Dir.children(dir)
+    end
+  end
+
+  def test_init_is_gone
+    run = run_cli("--init", "/tmp/x")
+    assert_equal 1, run.status
+    assert_match(/invalid option: --init/, run.err)
+  end
+
+  def test_resolve_runbook_looks_here_then_under_the_runbook_directory
+    with_scratch_dir("here/a.md" => "x", "base/b.md" => "x", "base/a.md" => "x") do |dir|
+      here = File.join(dir, "here")
+      base = File.join(dir, "base")
+      assert_equal File.join(here, "a.md"), CLI.resolve_runbook("a.md", base:, cwd: here), "the current directory wins"
+      assert_equal File.join(base, "b.md"), CLI.resolve_runbook("b.md", base:, cwd: here)
+      assert_equal File.join(base, "b.md"), CLI.resolve_runbook("b.md", base: File.join(base, "a.md"), cwd: here), "a single-file dir gives its directory"
+      assert_equal File.join(here, "b.md"), CLI.resolve_runbook("b.md", base: nil, cwd: here), "with no base the missing path is left to the loader"
+      assert_equal "/nope/c.md", CLI.resolve_runbook("/nope/c.md", base:, cwd: here), "an absolute path is never looked for elsewhere"
+      error = assert_raises(Runsheets::RunbookError) { CLI.resolve_runbook("c.md", base:, cwd: here) }
+      assert_equal "no such runbook: #{File.join(here, 'c.md')}, nor #{File.join(base, 'c.md')} under the runbook directory #{base}", error.message
+    end
+  end
+
+  def test_resolve_runbook_leaves_a_home_path_alone
+    with_scratch_dir do |home|
+      with_env("HOME" => home) { assert_equal File.join(home, "x"), CLI.resolve_runbook("~/x", base: "/elsewhere") }
+    end
+  end
+
+  def test_resolve_runbook_reports_a_home_that_does_not_exist
+    assert_raises(Runsheets::ConfigError) { CLI.resolve_runbook("~no-such-user-here/x", base: nil) }
+  end
+
+  def test_a_runbook_in_a_home_that_does_not_exist_exits_one_with_a_message
+    run = run_cli("--check", "~no-such-user-here/x")
+    assert_equal 1, run.status
+    assert_match(/runsheets: cannot expand ~no-such-user-here/, run.err)
+  end
+
+  def test_a_relative_runbook_is_found_under_runsheets_dir
+    ENV["RUNSHEETS_DIR"] = EXAMPLES
+    run = run_cli("--check", "directory_based_runbooks/hello")
+    assert_equal 0, run.status
+    assert_includes run.out, HELLO_CLEAN
+  end
+
+  def test_a_relative_runbook_is_found_under_the_config_file_dir
+    with_scratch_dir("cfg.yml" => "dir: #{EXAMPLES}/directory_based_runbooks\n") do |dir|
+      run = run_cli("--check", "hello", "--config", File.join(dir, "cfg.yml"))
+      assert_equal 0, run.status, run.err
+      assert_includes run.out, HELLO_CLEAN
+    end
+  end
+
+  def test_a_relative_runbook_in_the_current_directory_wins
+    with_scratch_dir("hello/runbook.md" => "---\ntitle: Other hello\n---\n", "hello/steps/010-a.md" => "Do it.\n") do |dir|
+      ENV["RUNSHEETS_DIR"] = dir
+      assert_includes run_cli("--check", "hello").out, "Other hello: 1 steps", "not in the current directory, so under $RUNSHEETS_DIR"
+      Dir.chdir(File.join(EXAMPLES, "directory_based_runbooks")) do
+        assert_includes run_cli("--check", "hello").out, HELLO_CLEAN, "./hello beats $RUNSHEETS_DIR/hello"
+      end
+    end
+  end
+
+  def test_a_relative_runbook_found_nowhere_names_both_places
+    ENV["RUNSHEETS_DIR"] = EXAMPLES
+    run = run_cli("--check", "no-such-runbook")
+    assert_equal 1, run.status
+    assert_match(%r{runsheets: no such runbook: .*/no-such-runbook, nor #{EXAMPLES}/no-such-runbook under the runbook directory #{EXAMPLES}}, run.err)
+  end
+
+  def test_run_runs_one_step_in_a_session_of_its_own
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "say-hello", "--engineer", "me", "--why", "trying", "--runs-dir", runs)
+      assert_equal 0, run.status
+      assert_includes run.out, "Say hello [010-say-hello]"
+      assert_includes run.out, "> Hello, world!"
+      assert_equal([%w[me ended]], sessions_in(runs).map { [it["engineer"], it["status"]] })
+      assert_includes session_logs_in(runs), "runsheets --run 010-say-hello succeeded"
+    end
+  end
+
+  def test_run_takes_a_runbook_named_relative_to_runsheets_dir
+    ENV["RUNSHEETS_DIR"] = File.join(EXAMPLES, "directory_based_runbooks")
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "say-hello", "-e", "me", "-w", "x", "--runs-dir", runs, "hello")
+      assert_equal 0, run.status, run.err
+      assert_includes run.out, "Say hello [010-say-hello]"
+    end
+  end
+
+  def test_run_refuses_a_step_number
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "010", "-e", "me", "-w", "x", "--runs-dir", runs)
+      assert_equal 1, run.status
+      assert_includes run.err, %(runsheets: "010" is a number; name the step by its slug or name, or leave STEP out)
+      assert_empty sessions_in(runs)
+    end
+  end
+
+  def test_a_failed_step_exits_one_and_ends_its_session
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "exercise-failure", "-e", "me", "-w", "x", "--runs-dir", runs)
+      assert_equal 1, run.status
+      assert_equal(%w[ended], sessions_in(runs).map { it["status"] })
+      assert_includes session_logs_in(runs), "runsheets --run 040-exercise-failure failed"
+    end
+  end
+
+  def test_ctrl_c_in_run_exits_130_and_ends_the_session
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "say-hello", "-e", "me", "-w", "x", "--runs-dir", runs, input: CtrlC.new)
+      assert_equal 130, run.status
+      assert_includes run.out, "Interrupted."
+      assert_equal(%w[ended], sessions_in(runs).map { it["status"] })
+      assert_includes session_logs_in(runs), "runsheets --run 010-say-hello was interrupted"
+    end
+  end
+
+  def test_ctrl_c_while_choosing_a_step_starts_no_session
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "-e", "me", "-w", "x", "--runs-dir", runs, input: CtrlC.new)
+      assert_equal 130, run.status
+      assert_empty sessions_in(runs)
+    end
+  end
+
+  def test_run_without_a_step_asks_which_one
+    Dir.mktmpdir do |runs|
+      run = run_cli("-e", "me", "-w", "trying", "--runs-dir", runs, "--run", input: "1\n")
+      assert_equal 0, run.status
+      assert_includes run.out, "Steps in Hello, runsheets:"
+      assert_includes run.out, "Say hello [010-say-hello]"
+    end
+  end
+
+  def test_run_takes_a_path_as_the_runbook_not_the_step
+    assert_equal({ run: nil, dir: "ops/db-refresh" }, CLI.parse(%w[--run ops/db-refresh]))
+    assert_equal({ run: nil, dir: "db.md" }, CLI.parse(%w[--run db.md]))
+    assert_equal({ run: "backup", dir: "ops/db-refresh" }, CLI.parse(%w[--run backup ops/db-refresh]))
+    assert_equal({ run: "ops/x", dir: "ops/y" }, CLI.parse(%w[--run ops/x ops/y]), "with RUNBOOK given, the value stays the step")
+    assert_equal({ run: nil }, CLI.parse(%w[--run]))
+  end
+
+  def test_run_takes_something_in_the_current_directory_as_the_runbook
+    with_scratch_dir("db-refresh/runbook.md" => "x") do |dir|
+      assert_equal({ run: nil, dir: "db-refresh" }, CLI.parse(%w[--run db-refresh], cwd: dir))
+      assert_equal({ run: "backup" }, CLI.parse(%w[--run backup], cwd: dir))
+    end
+  end
+
+  def test_run_needs_the_engineer_and_why
+    [%w[--engineer me], %w[--why because]].each do |given|
+      run = run_cli("--run", "say-hello", *given)
+      assert_equal 1, run.status
+      assert_includes run.err, "runsheets: --run needs --engineer and --why"
+    end
+  end
+
+  def test_run_takes_the_engineer_and_why_from_the_environment
+    ENV["RUNSHEETS_ENGINEER"] = "me"
+    ENV["RUNSHEETS_WHY"]      = "because"
+    Dir.mktmpdir do |runs|
+      run = run_cli("--run", "say-hello", "--runs-dir", runs)
+      assert_equal 0, run.status, run.err
+      assert_equal([%w[me ended]], sessions_in(runs).map { [it["engineer"], it["status"]] })
+    end
+  end
+
+  def test_run_refuses_a_library_and_new
+    run = run_cli("--run", "say-hello", "-e", "me", "-w", "x", EXAMPLES)
+    assert_equal 1, run.status
+    assert_includes run.err, "--run needs a runbook, not a library of them"
+    assert_raises(OptionParser::ParseError) { CLI.parse(%w[--run say-hello --new]) }
+  end
+
+  def test_run_starts_no_session_for_a_step_it_cannot_run
+    Dir.mktmpdir do |runs|
+      missing    = run_cli("--run", "nope", "-e", "me", "-w", "x", "--runs-dir", runs)
+      background = run_cli("--run", "keep-a-clock-running", "-e", "me", "-w", "x", "--runs-dir", runs)
+      assert_equal [1, 1], [missing.status, background.status]
+      assert_includes missing.err, 'no step "nope"'
+      assert_includes background.err, "has a background block"
+      assert_empty Dir.glob(File.join(runs, "sessions", "*"))
+    end
   end
 
   def test_a_missing_config_file_exits_one_with_a_message
@@ -130,55 +380,70 @@ class TestCLI < Minitest::Test
     assert_includes text, Runsheets::VERSION
   end
 
-  def test_init_scaffolds_a_directory_runbook
+  def test_new_writes_a_directory_runbook_from_the_answers
     with_scratch_dir do |dir|
-      target = File.join(dir, "new-runbook")
-      run = run_cli("--init", target)
-      assert_equal 0, run.status
+      run    = run_cli("--new", dir, input: "1\ntasks\nDB Refresh\n\n\n\ny\n")
+      target = File.join(dir, "db-refresh")
+      check  = run_cli("--check", target)
+      assert_equal 0, run.status, run.err
       assert_includes run.out, "created #{File.join(target, 'runbook.md')}"
-      assert File.file?(File.join(target, "steps", "010-first-step.md"))
-      assert File.file?(File.join(target, "verify.md"))
-      assert File.file?(File.join(target, "rollback.md"))
-    end
-  end
-
-  def test_a_scaffolded_directory_runbook_checks_clean_and_is_not_overwritten
-    with_scratch_dir do |dir|
-      target = File.join(dir, "new-runbook")
-      run_cli("--init", target)
-      check = run_cli("--check", target)
-      again = run_cli("--init", target)
+      assert_includes run.out, "#{CLI::PROGRAM} --check #{target}"
+      assert File.file?(File.join(target, "steps", "010-preflight.md"))
+      assert_equal "Db refresh", Runsheets::Runbook.load(target).title
       assert_equal 0, check.status, check.err
-      assert_equal "New runbook", Runsheets::Runbook.load(target).title
-      assert_equal 1, again.status
-      assert_match(/not empty/, again.err)
     end
   end
 
-  def test_init_scaffolds_a_single_file_runbook
+  def test_new_writes_a_single_file_runbook_from_the_answers
     with_scratch_dir do |dir|
-      target = File.join(dir, "db-refresh.md")
-      run = run_cli("--init", target)
-      rb  = Runsheets::Runbook.load(target)
-      assert_equal 0, run.status
-      assert File.file?(target)
+      run    = run_cli("--new", dir, input: "2\n3\nflaky-api\nFlaky API\nWhen the API times out\n#oncall\n\n")
+      target = File.join(dir, "flaky-api.md")
+      rb     = Runsheets::Runbook.load(target)
+      assert_equal 0, run.status, run.err
       assert rb.single_file?
-      assert_equal "Db refresh", rb.title
-      assert_equal 2, rb.steps.size
-      assert rb.verify
+      assert_equal "Flaky API", rb.title
+      assert_equal "When the API times out", rb.data["when_to_use"]
+      assert_equal "#oncall", rb.data["escalation"]
+      assert_equal 4, rb.steps.size, "the rollback template"
       assert rb.rollback
     end
   end
 
-  def test_a_scaffolded_single_file_runbook_checks_clean_and_is_not_overwritten
+  def test_new_puts_a_single_file_with_support_files_in_a_folder_of_its_own
     with_scratch_dir do |dir|
-      target = File.join(dir, "db-refresh.md")
-      run_cli("--init", target)
-      check = run_cli("--check", target)
-      again = run_cli("--init", target)
-      assert_equal 0, check.status, check.err
-      assert_equal 1, again.status
-      assert_match(/already exists/, again.err)
+      run    = run_cli("--new", dir, input: "2\nasgard\nnightly\n")
+      folder = File.join(dir, "nightly")
+      main   = File.join(folder, "nightly.md")
+      assert_equal 0, run.status, run.err
+      assert_equal %w[.loki nightly.md tasks.loki], Dir.children(folder).sort
+      assert_includes run.out, "#{CLI::PROGRAM} --check #{main}"
+      assert Runsheets::Runbook.load(main).single_file?
+    end
+  end
+
+  def test_new_with_no_answers_takes_every_default
+    with_scratch_dir do |dir|
+      run = run_cli("--new", dir)
+      assert_equal 0, run.status, run.err
+      assert File.file?(File.join(dir, Runsheets::Wizard::DEFAULTS[:name], "runbook.md"))
+    end
+  end
+
+  def test_new_refuses_a_name_that_is_taken_when_there_is_no_other_answer
+    with_scratch_dir("taken/runbook.md" => "x") do |dir|
+      run = run_cli("--new", dir, input: "1\n1\ntaken\n")
+      assert_equal 1, run.status
+      assert_match(/taken exists and is not empty/, run.err)
+      assert_equal "x", File.read(File.join(dir, "taken", "runbook.md"))
+    end
+  end
+
+  def test_answering_no_creates_nothing
+    with_scratch_dir do |dir|
+      run = run_cli("--new", dir, input: "\n\nnope\n\n\n\nn\n")
+      assert_equal 1, run.status
+      assert_includes run.out, "Nothing created."
+      assert_empty Dir.children(dir)
     end
   end
 
@@ -249,22 +514,19 @@ class TestCLI < Minitest::Test
 
   def test_dump_never_saves_a_one_shot_action
     with_clean_home do
-      run   = run_cli(%w[--dump --check --init x])
+      run   = run_cli(%w[--dump --check x])
       saved = YAML.safe_load(run.out)
       assert_equal 0, run.status
       refute saved.key?("check")
-      refute saved.key?("init")
     end
   end
 
-  def test_init_quotes_titles_that_yaml_would_misread
+  def test_new_quotes_titles_that_yaml_would_misread
     with_scratch_dir do |dir|
-      null = File.join(dir, "null.md")
-      yes  = File.join(dir, "yes.md")
-      statuses = [run_cli("--init", null).status, run_cli("--init", yes).status]
+      statuses = %w[null yes].map { run_cli("--new", dir, input: "2\n1\n#{it}\n").status }
       assert_equal [0, 0], statuses
-      assert_equal "Null", Runsheets::Runbook.load(null).title
-      assert_equal "Yes", Runsheets::Runbook.load(yes).title
+      assert_equal "Null", Runsheets::Runbook.load(File.join(dir, "null.md")).title
+      assert_equal "Yes", Runsheets::Runbook.load(File.join(dir, "yes.md")).title
     end
   end
 
@@ -362,6 +624,14 @@ class TestCLI < Minitest::Test
         assert_equal "0.0.0.0", with_env("RUNSHEETS_BIND" => "0.0.0.0") { cli_config.bind }, "so can the environment"
       end
     end
+  end
+
+  def test_default_engineer_is_the_configured_one_else_git_else_the_login
+    config = Struct.new(:engineer)
+    assert_equal "me", CLI.default_engineer(config.new("me"), env: { "USER" => "login" }, git_name: "git")
+    assert_equal "git", CLI.default_engineer(config.new(nil), env: { "USER" => "login" }, git_name: "git")
+    assert_equal "login", CLI.default_engineer(config.new(" "), env: { "USER" => "login" }, git_name: nil)
+    assert_nil CLI.default_engineer(config.new(nil), env: {}, git_name: "")
   end
 
   def test_a_project_config_may_bind_a_loopback_address

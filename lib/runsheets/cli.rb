@@ -6,7 +6,7 @@ require "socket"
 
 module Runsheets
   # The `runsheets` command: load a runbook (a directory or a single markdown
-  # file) and serve it, check it, or scaffold a new one.
+  # file) and serve it or check it; or ask some questions and write a new one.
   #
   # Settings come from Config: bundled defaults, then the config file, then
   # RUNSHEETS_* variables, then whatever is given on the command line.
@@ -22,7 +22,7 @@ module Runsheets
     # names for the options, :config for the config file. Raises
     # OptionParser::ParseError on bad input; returns nil after printing help
     # or the version.
-    def self.parse(argv, out: $stdout)
+    def self.parse(argv, out: $stdout, cwd: Dir.pwd)
       options  = {}
       defaults = Config.bundled_defaults
       parser   = OptionParser.new do |opts|
@@ -30,6 +30,8 @@ module Runsheets
           #{PROGRAM} #{VERSION} - executable runbooks in your browser
 
           Usage: #{PROGRAM} [options] [RUNBOOK]
+                 #{PROGRAM} --new [DIR]
+                 #{PROGRAM} --run [STEP] --engineer NAME --why TEXT [RUNBOOK]
 
           RUNBOOK is a directory holding runbook.md and a steps/ directory of
           markdown files, a single all-in-one markdown file whose ## headings
@@ -44,8 +46,8 @@ module Runsheets
           then ./config/runsheets.yml (or the file --config names), then the
           environment variable named beside each option, then the command line,
           which wins. RUNBOOK itself can be set as `dir:` in a config file or
-          with RUNSHEETS_DIR. Flags take 1, true, yes or on; --no-open,
-          --no-check and --no-init switch a flag off that a lower layer turned on.
+          with RUNSHEETS_DIR. Flags take 1, true, yes or on; --no-open and
+          --no-check switch a flag off that a lower layer turned on.
 
           Options:
         BANNER
@@ -64,9 +66,26 @@ module Runsheets
 
       rest = parser.parse(argv)
       raise OptionParser::ParseError, "too many arguments: #{rest.join(' ')}" if rest.size > 1
+      raise OptionParser::ParseError, "--new takes the directory to create the runbook in; give no RUNBOOK with it" if options.key?(:new) && rest.any?
+      raise OptionParser::ParseError, "--run and --new cannot be used together" if options.key?(:new) && options.key?(:run)
 
+      rest = runbook_taken_by_run(options, rest, cwd:)
       options[:dir] = rest.first if rest.first
       options
+    end
+
+    # --run's step is optional, so in `--run db-refresh` it takes the
+    # runbook as the step. A value with a / or ending in .md, or that names
+    # something in +cwd+, is no step name: when nothing else was given as
+    # RUNBOOK it is moved there, and the step is asked for. Returns the
+    # arguments left over.
+    def self.runbook_taken_by_run(options, rest, cwd: Dir.pwd)
+      value = options[:run]
+      return rest unless rest.empty? && value
+      return rest unless value.include?("/") || value.end_with?(".md") || File.exist?(File.join(cwd, value))
+
+      options[:run] = nil
+      [value]
     end
 
     # The options about serving: config file, port, bind, records, and the
@@ -78,7 +97,9 @@ module Runsheets
       opts.on("--runs-dir DIR", "Where run records are written (default: #{defaults[:runs_dir]}) [RUNSHEETS_RUNS_DIR]") { options[:runs_dir] = it }
       opts.on("-o", "--[no-]open", "Open the browser once the server is up [RUNSHEETS_OPEN]") { options[:open] = it }
       opts.on("--[no-]check", "Load the runbook, report authoring warnings, and exit [RUNSHEETS_CHECK]") { options[:check] = it }
-      opts.on("--[no-]init", "Create a new runbook skeleton at RUNBOOK (a directory, or a .md file) and exit [RUNSHEETS_INIT]") { options[:init] = it }
+      opts.on("--new [DIR]", "Ask what kind of runbook to make, write it from a template into DIR (asked for when left out), and exit") { options[:new] = it }
+      opts.on("--run [STEP]", "Run one step of RUNBOOK at the terminal, named by its slug or name (or verify, rollback, runbook); " \
+                              "left out, choose it by number from a list. Needs -e and -w") { options[:run] = it }
       opts.on("--[no-]dump", "Print the settings in force as a config file to stdout and exit [RUNSHEETS_DUMP]") { options[:dump] = it }
     end
 
@@ -117,27 +138,37 @@ module Runsheets
       0
     end
 
-    # The runbook a configuration points at: its dir, else the bundled example.
-    # --init insists on an explicit one.
-    def self.runbook_path(config)
-      if config.init && config.dir.nil?
-        raise OptionParser::ParseError, "--init needs the path of the runbook to create (RUNBOOK, dir: in the config file, or RUNSHEETS_DIR)"
-      end
+    # The RUNBOOK argument as a path. A relative one is found from the
+    # current directory, else under +base+: the dir RUNSHEETS_DIR or a
+    # config file sets (or the directory of a single-file runbook it
+    # names). Raises RunbookError naming both places when neither has it.
+    def self.resolve_runbook(arg, base:, cwd: Dir.pwd)
+      here = Config.expand_path(arg, cwd)
+      return here if File.exist?(here) || base.nil? || Pathname.new(arg).absolute? || arg.start_with?("~")
 
-      config.dir || DEFAULT_RUNBOOK
+      base  = File.dirname(base) if File.file?(base)
+      under = Config.expand_path(arg, base)
+      return under if File.exist?(under)
+
+      raise RunbookError, "no such runbook: #{here}, nor #{under} under the runbook directory #{base}"
     end
 
+    # The runbook a configuration points at: its dir, else the bundled example.
+    def self.runbook_path(config) = config.dir || DEFAULT_RUNBOOK
+
     # Entry point for the executable. Returns the process exit status.
-    def self.run(argv, out: $stdout, err: $stderr)
+    # --new and --run read their answers from +input+.
+    def self.run(argv, out: $stdout, err: $stderr, input: $stdin)
       options = parse(argv, out:)
       return 0 unless options
+      return new_runbook(options[:new], default: configured_runbook_dir(offline_config(options)), input:, out:) if options.key?(:new)
 
-      config  = configure(options)
+      config = options.key?(:run) ? offline_config(options) : configure(options)
+      config.dir = resolve_runbook(options[:dir], base: configured_runbook_dir(config)) if options[:dir]
+      return run_step(options[:run], config, input:, out:) if options.key?(:run)
       return dump(config, out:) if config.dump
 
-      path    = runbook_path(config)
-      return init(path, out:) if config.init
-
+      path   = runbook_path(config)
       target = Library.library?(path) ? Library.load(path) : Runbook.load(path)
       return check(target, out:, err:) if config.check
 
@@ -146,7 +177,7 @@ module Runsheets
     rescue Errno::EADDRINUSE
       err.puts "#{PROGRAM}: port #{config.port} on #{config.bind} is already in use; pick another with --port"
       1
-    rescue OptionParser::ParseError, RunbookError, ConfigError,
+    rescue OptionParser::ParseError, RunbookError, RunError, ConfigError,
            Psych::Exception, SocketError, SystemCallError => e # also a bad config file, an unknown host, an unreadable directory
       err.puts "#{PROGRAM}: #{e.message}"
       1
@@ -225,7 +256,9 @@ module Runsheets
 
     # Who the start page suggests: the configured engineer, else git's
     # user.name, else the login name.
-    def self.default_engineer(config) = [config.engineer, git_user_name, ENV["USER"]].find { !it.to_s.strip.empty? }
+    def self.default_engineer(config, env: ENV, git_name: git_user_name)
+      [config.engineer, git_name, env["USER"]].find { !it.to_s.strip.empty? }
+    end
 
     def self.git_user_name
       IO.popen(%w[git config user.name], err: File::NULL, &:read).strip
@@ -267,158 +300,59 @@ module Runsheets
       nil
     end
 
-    # --- scaffolding -------------------------------------------------------
+    # The settings for --new and --run. Nothing is served, so a project
+    # config that binds to the network is no concern.
+    def self.offline_config(options) = Runsheets.configure(options.except(:config, :new, :run), path: options[:config])
 
-    # Write a starter runbook. A path ending in .md gets the single-file
-    # shape; anything else becomes a directory. Refuses to touch an existing
-    # file or a non-empty directory. Returns the exit status.
-    def self.init(path, out: $stdout)
-      files = scaffold(path)
-      raise RunbookError, "#{path} already exists" if File.file?(path)
-      raise RunbookError, "#{path} exists and is not empty" if File.directory?(path) && !Dir.empty?(path)
-
-      files.each do |rel, text|
-        full = rel.start_with?("/") ? rel : File.join(path, rel)
-        FileUtils.mkdir_p(File.dirname(full))
-        File.write(full, text)
-        out.puts "created #{full}"
-      end
-      out.puts "Next: #{PROGRAM} --check #{path}"
-      0
+    # The runbook directory the settings name, apart from the command line:
+    # the dir a config file sets, else $RUNSHEETS_DIR, else nil. A dir
+    # naming a single-file runbook gives the directory it is in. --new
+    # offers it when given no directory, and a relative RUNBOOK not found
+    # from the current directory is looked for under it.
+    def self.configured_runbook_dir(config, env: ENV)
+      dir = config.file_dir
+      dir ||= Config.expand_path(env["RUNSHEETS_DIR"].strip) unless Config.blank?(env["RUNSHEETS_DIR"])
+      dir && File.file?(dir) ? File.dirname(dir) : dir
     end
 
-    # The files a new runbook starts with, keyed by path. For a single-file
-    # runbook the one key is the absolute path itself.
-    def self.scaffold(path)
-      name  = File.basename(path, ".*")
-      title = name.tr("-_", " ").capitalize
-      if path.end_with?(".md")
-        { path => single_file_template(title) }
-      else
-        {
-          "runbook.md" => runbook_template(title),
-          "steps/010-first-step.md" => <<~MD,
-            ---
-            title: First step
-            kind: automated
-            timeout: 300
-            ---
-
-            Say what this step does and why it is here. Then the command:
-
-            ```bash run
-            echo "hello from #{name}"
-            ```
-
-            How to tell it worked:
-
-            ```text expect
-            hello from #{name}
-            ```
-          MD
-          "steps/020-a-manual-step.md" => <<~MD,
-            ---
-            title: A manual step
-            kind: manual
-            ---
-
-            An instruction the operator carries out and then acknowledges.
-          MD
-          "verify.md" => <<~MD,
-            ---
-            title: Verify
-            kind: verify
-            ---
-
-            Whole-procedure checks. These should pass after every run.
-
-            ```bash run
-            test -n "$EXAMPLE_INPUT" && echo "EXAMPLE_INPUT is set"
-            ```
-          MD
-          "rollback.md" => <<~MD
-            ---
-            title: Rollback
-            ---
-
-            What to do when it fails partway. This panel sits in the sidebar of
-            every step.
-          MD
-        }
-      end
+    # --new: ask what kind of runbook to make and write it into +dir+; with
+    # no dir, ask for that too, offering +default+. Ctrl-C at a question
+    # creates nothing. Returns the exit status.
+    def self.new_runbook(dir, default: nil, input: $stdin, out: $stdout)
+      Wizard.new(dir, input:, output: out, default_parent: default).run
+    rescue Interrupt
+      out.puts "", Wizard::CANCELLED
+      130
     end
 
-    def self.runbook_template(title)
-      <<~MD
-        ---
-        title: #{title.to_json}
-        when_to_use: >
-          One or two sentences on the situation this runbook is for.
-        prerequisites:
-          - What must be true or installed before starting
-        escalation: Who to call when a step fails
-        tags: []
-        inputs:
-          - name: EXAMPLE_INPUT
-            prompt: An example input, exported as $EXAMPLE_INPUT
-            default: example
-        ---
+    # --run: run one step of the configured runbook at the terminal, in a
+    # session of its own that ends when the step does. The engineer and why
+    # are required, since nobody is at a start page to give them. Ctrl-C
+    # stops what is running. Returns the exit status.
+    def self.run_step(name, config, input: $stdin, out: $stdout)
+      raise ConfigError, "--run needs --engineer and --why: the run is recorded with who ran it and why" unless config.engineer && config.why
 
-        # #{title}
-
-        Everything above the first step is the preamble: what this procedure does,
-        what it touches, and what the operator should know before starting.
-      MD
+      runbook = run_step_runbook(runbook_path(config))
+      step    = name ? StepRunner.find_step(runbook, name) : StepRunner.choose_step(runbook, input:, output: out)
+      runner  = StepRunner.new(runbook:, step:, input:, output: out)
+      session = Session.new(engineer: config.engineer, why: config.why, runbook:, **session_options(config, out:))
+      status  = runner.run(session)
+      ending  = status.zero? ? "succeeded" : "failed"
+      status
+    rescue Interrupt
+      ending = "was interrupted"
+      out.puts "", "Interrupted."
+      130
+    ensure
+      session&.end!("runsheets --run #{step.slug} #{ending || 'stopped on an error'}")
     end
 
-    def self.single_file_template(title)
-      <<~MD
-        ---
-        title: #{title.to_json}
-        when_to_use: >
-          One or two sentences on the situation this runbook is for.
-        prerequisites:
-          - What must be true or installed before starting
-        escalation: Who to call when a step fails
-        inputs:
-          - name: EXAMPLE_INPUT
-            prompt: An example input, exported as $EXAMPLE_INPUT
-            default: example
-        ---
+    # The runbook at +path+ for --run, which runs a step of one runbook and
+    # so cannot be given a library.
+    def self.run_step_runbook(path)
+      raise RunbookError, "--run needs a runbook, not a library of them: #{path}" if Library.library?(path)
 
-        # #{title}
-
-        Everything above the first `##` heading is the preamble. Each `##` heading
-        below is a step. Step attributes go in an HTML comment right after the
-        heading.
-
-        ## First step
-        <!-- kind: automated, timeout: 300 -->
-
-        Say what this step does and why it is here. Then the command:
-
-        ```bash run
-        echo "hello from $EXAMPLE_INPUT"
-        ```
-
-        ## A manual step
-        <!-- kind: manual -->
-
-        An instruction the operator carries out and then acknowledges.
-
-        ## Verify
-
-        Whole-procedure checks. A section headed Verify plays the part of verify.md.
-
-        ```bash run
-        test -n "$EXAMPLE_INPUT" && echo "EXAMPLE_INPUT is set"
-        ```
-
-        ## Rollback
-
-        What to do when it fails partway. A section headed Rollback sits in the
-        sidebar of every step.
-      MD
+      Runbook.load(path)
     end
   end
 end

@@ -1,0 +1,14 @@
+---
+title: There is disk space
+kind: verify
+timeout: 30
+---
+
+A check fails when its block exits non-zero. This one fails when the file
+system holding the runbook is 90% full or more.
+
+```bash run
+used=$(df -P . | awk 'NR == 2 { sub("%", "", $5); print $5 }')
+echo "disk use: ${used}%"
+test "$used" -lt 90
+```

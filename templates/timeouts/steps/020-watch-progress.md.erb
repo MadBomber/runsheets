@@ -1,0 +1,13 @@
+---
+title: Watch the progress
+kind: automated
+---
+
+Start this before the long step. It keeps running, listed in the Running
+panel on every page, until you stop it or the session ends.
+
+```bash background
+mkdir -p "$WORK_DIR"
+touch "$WORK_DIR/progress.log"
+tail -n 0 -F "$WORK_DIR/progress.log"
+```

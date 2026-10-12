@@ -27,13 +27,25 @@ module RunsheetsTest
       FileUtils.rm_rf(@home)
     end
 
-    # Run the CLI on +argv+ with captured output.
-    def run_cli(*argv)
+    # Run the CLI on +argv+ with captured output; +input+ is what is typed,
+    # or an IO to read it from.
+    def run_cli(*argv, input: "")
       out = StringIO.new
       err = StringIO.new
-      status = Runsheets::CLI.run(argv.flatten, out:, err:)
+      status = Runsheets::CLI.run(argv.flatten, out:, err:, input: input.is_a?(String) ? StringIO.new(input) : input)
       CliRun.new(status:, out: out.string, err: err.string)
     end
+
+    # Input whose every read is a Ctrl-C.
+    class CtrlC
+      def gets = raise(Interrupt)
+    end
+
+    # The session.json of every session recorded under +runs+.
+    def sessions_in(runs) = Dir.glob(File.join(runs, "sessions", "*", "session.json")).map { JSON.parse(File.read(it)) }
+
+    # The text of every session log recorded under +runs+, joined.
+    def session_logs_in(runs) = Dir.glob(File.join(runs, "sessions", "*", "session.log")).map { File.read(it) }.join
 
     # CLI.parse with captured output; returns the options and the text.
     def parse_cli(*argv)

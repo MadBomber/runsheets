@@ -144,6 +144,16 @@ execution therefore belongs to a record, and the record and the session
 log are written as it happens, not afterwards. Once the session has ended,
 every request but the session page is refused with 410.
 
+### Runs at the terminal
+
+`runsheets --run` starts no web server, so it has no session key and no
+token to check: it is the operator running a step of a runbook as
+themselves, as they could run its commands in a shell. The rest holds:
+only opted-in blocks execute, a `destructive` block still needs its code
+typed, secrets are read without echo and redacted from the output, the
+log and the record, and a step with a `background` block is refused,
+since nothing would be left to stop it.
+
 ### Destructive confirmation
 
 Destructive blocks sit under a banner with the runbook's blast radius and

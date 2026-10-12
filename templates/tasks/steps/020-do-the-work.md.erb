@@ -1,0 +1,18 @@
+---
+title: Do the work
+kind: automated
+timeout: 300
+---
+
+The change this runbook exists for. Replace the block with the real
+command; keep the expected output so the operator can see it worked.
+
+```bash run
+mkdir -p "$WORK_DIR"
+date -u > "$WORK_DIR/last-run"
+echo "wrote $WORK_DIR/last-run"
+```
+
+```text expect
+wrote {{any}}/last-run
+```

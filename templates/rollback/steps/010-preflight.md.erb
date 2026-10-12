@@ -1,0 +1,16 @@
+---
+title: Preflight
+kind: verify
+timeout: 30
+---
+
+Check what the later steps rely on before anything changes. A `verify`
+step also runs on its own from the Checks page.
+
+```bash run
+test -n "$WORK_DIR" && echo "WORK_DIR is $WORK_DIR"
+```
+
+```text expect
+WORK_DIR is {{any}}
+```

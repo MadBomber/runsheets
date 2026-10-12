@@ -1,6 +1,40 @@
 # Changelog
 
-## [Unreleased]
+## [0.0.2] - Unreleased
+
+### Added
+
+- `runsheets --new [DIR]` asks what kind of runbook to make (a directory or a
+  single file, a template, a name, a title, when to use it and who to call)
+  and writes it into `DIR`. Enter accepts each default, and answers can be
+  piped in. Without `DIR` it asks for one, offering the `dir:` a config file
+  sets, else `RUNSHEETS_DIR`.
+- Runbook templates in `templates/`, a ladder of structure: `checks` (checks
+  only), `tasks` (checks and tasks, the default), `rollback`, `timeouts`,
+  `inputs` and `asgard` (tasks in `.loki` files beside the runbook). Each is
+  written once as a directory runbook and produces either shape; a single
+  file from a template with support files gets a folder of its own.
+- `runsheets --run [STEP] RUNBOOK` runs one step at the terminal (listing the
+  steps to choose from when `STEP` is left out), recorded in a session like
+  a run from the page, and exits non-zero if the step fails.
+  `--engineer` and `--why` are required. It asks for the runbook's inputs
+  first, Enter keeping each one's value. A destructive block still needs
+  its confirmation code typed, a terminal block or manual step asks to be
+  confirmed, and a step with a background block is refused. Name a step by
+  its name or slug, or `verify`, `rollback` or `runbook`; `--run verify` is
+  a health check. `STEP` is never a number: numbers are only places in the
+  list shown when `STEP` is left out. Exits 0 on success, 1 on failure and
+  130 on Ctrl-C.
+- A relative `RUNBOOK` not found from the current directory is looked for
+  under the `dir:` a config file sets, else `RUNSHEETS_DIR`.
+- `--check` warns about a numbered step named like `verify.md`,
+  `rollback.md` or the landing page (`030-verify`), since `--run verify`
+  runs `verify.md`.
+
+### Removed (breaking)
+
+- `--init`, `--no-init`, `RUNSHEETS_INIT` and the `init` setting. Use
+  `--new`; the `tasks` template is the nearest to what `--init` wrote.
 
 ## [0.0.1] - 2026-10-11
 

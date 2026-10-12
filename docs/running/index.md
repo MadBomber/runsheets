@@ -54,6 +54,10 @@ keeps running, until the session ends with **End session** or Ctrl-C. Then
 each run is closed with a status worked out from what was done. To keep two
 separate sessions, start two processes on different ports.
 
+`runsheets --run STEP` starts a session too, without the web server: it
+runs one step at the terminal and ends the session when the step ends.
+See [Running one step](cli.md#running-one-step).
+
 ## Where the shell comes from
 
 Executed blocks inherit the environment of the shell that started

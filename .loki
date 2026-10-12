@@ -9,6 +9,8 @@
 #   doc_tasks.loki  doc_builder, doc_server (mkdocs.yml is present)
 # Run `asgard help` for the full list.
 
+require "shellwords"
+
 import_up "dev/gem_tasks.loki"
 import_up "dev/quality.loki"
 import_up "dev/git.loki"
@@ -29,8 +31,8 @@ class Tasks
     sh "bundle exec bin/runsheets --check examples"
   end
 
-  desc "Scaffold a new runbook (a path ending in .md makes a single file)"
-  def init(path)
-    sh "bundle exec bin/runsheets --init #{path}"
+  desc "Ask what kind of runbook to make and write it into DIR (asked for when left out)"
+  def new_runbook(dir = nil)
+    sh "bundle exec bin/runsheets --new #{dir&.shellescape}".rstrip
   end
 end

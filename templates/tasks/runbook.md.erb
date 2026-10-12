@@ -1,0 +1,29 @@
+---
+title: <%= yaml title %>
+when_to_use: <%= yaml when_to_use %>
+prerequisites:
+  - What must be true or installed before starting
+tags: []
+inputs:
+  - name: WORK_DIR
+    prompt: Where this runbook writes its files
+    default: /tmp/<%= name %>
+escalation: <%= yaml escalation %>
+---
+
+# <%= title %>
+
+Checks, then the work, then proof that it worked. The preflight and
+verify checks read; the steps between them change things. `WORK_DIR` is
+an input: the start-run form asks for it and every block gets it as an
+environment variable.
+
+<% if single_file -%>
+Everything above the first `##` heading is the preamble. Each `##` heading
+below is a step, and its attributes (`kind`, `timeout`, ...) go in the HTML
+comment right after the heading.
+<% else -%>
+Everything above the first step is the preamble. The steps are the files in
+`steps/`, run in the order of their numbers, and each one's attributes
+(`kind`, `timeout`, ...) are in its front matter.
+<% end -%>

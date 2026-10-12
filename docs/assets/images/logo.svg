@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="420" viewBox="0 0 1240 420">
+  <!-- runsheets logo: a runsheet that is literally running. Dark theme, transparent background. -->
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#99f6e4"/>
+      <stop offset="1" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+    <!-- one sneaker, ankle at the origin, toe pointing +x -->
+    <g id="sneaker" stroke="#0f172a" stroke-width="6" stroke-linejoin="round">
+      <path d="M-18 -14 h26 a16 16 0 0 1 16 10 l18 6 a10 10 0 0 1 8 10 H-10 a8 8 0 0 1 -8 -8 Z" fill="#f43f5e"/>
+      <path d="M-14 4 h60" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <!-- ===== Speed lines trailing behind the runner ===== -->
+  <g stroke="#2dd4bf" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M30 150 H120" stroke-width="7"/>
+    <path d="M12 196 H110" stroke-width="9" opacity="0.7"/>
+    <path d="M40 242 H125" stroke-width="7"/>
+    <path d="M70 288 H135" stroke-width="5" opacity="0.6"/>
+  </g>
+
+  <!-- ===== Dust puffs kicked up by the back foot ===== -->
+  <g fill="#94a3b8" opacity="0.55" filter="url(#soft)">
+    <circle cx="200" cy="392" r="11"/>
+    <circle cx="228" cy="400" r="8"/>
+    <circle cx="176" cy="402" r="6"/>
+  </g>
+
+  <!-- ===== Legs, drawn behind the page so the hips tuck under it ===== -->
+  <g fill="none" stroke="#0f172a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <!-- back leg: hip on the page's bottom edge, knee back, foot kicked up behind -->
+    <path d="M292 350 L238 372 L204 344"/>
+    <!-- front leg: hip on the page's bottom edge, knee forward, foot landing -->
+    <path d="M388 326 L442 344 L452 384"/>
+  </g>
+  <!-- sneakers -->
+  <use href="#sneaker" transform="translate(204 344) rotate(-55)"/>
+  <use href="#sneaker" transform="translate(452 384) rotate(6)"/>
+
+  <!-- ===== The running sheet (leaning into the sprint) ===== -->
+  <g transform="translate(300 200) rotate(-14)">
+    <!-- glow behind the page -->
+    <rect x="-108" y="-158" width="216" height="296" rx="20" fill="#0f766e" opacity="0.55" filter="url(#glow)"/>
+
+    <!-- page body with folded corner -->
+    <path d="M-100 -150 H46 L100 -96 V130 a16 16 0 0 1 -16 16 H-84 a16 16 0 0 1 -16 -16 Z"
+          fill="url(#paper)" stroke="#0f172a" stroke-width="7" stroke-linejoin="round"/>
+    <!-- the fold -->
+    <path d="M46 -150 V-96 H100" fill="#94a3b8" stroke="#0f172a" stroke-width="7" stroke-linejoin="round"/>
+
+    <!-- runbook lines on the page -->
+    <g stroke="#94a3b8" stroke-width="9" stroke-linecap="round">
+      <path d="M-66 -52 H18"/>
+      <path d="M-66 -16 H46"/>
+      <path d="M-66 20 H0"/>
+    </g>
+
+    <!-- checked step and a Run button, the heart of a runsheet -->
+    <g>
+      <path d="M-66 62 l14 14 l26 -30" fill="none" stroke="#14b8a6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="26" cy="68" r="28" fill="url(#teal)" stroke="#0f172a" stroke-width="6"/>
+      <path d="M16 52 L48 68 L16 84 Z" fill="#0f172a"/>
+    </g>
+
+    <!-- face: a determined little grin -->
+    <g>
+      <circle cx="-44" cy="-104" r="9" fill="#0f172a"/>
+      <circle cx="4" cy="-104" r="9" fill="#0f172a"/>
+      <circle cx="-41" cy="-107" r="3" fill="#ffffff"/>
+      <circle cx="7" cy="-107" r="3" fill="#ffffff"/>
+      <path d="M-40 -82 q20 18 40 0" fill="none" stroke="#0f172a" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="-62" cy="-86" r="7" fill="#f472b6" opacity="0.6"/>
+      <circle cx="22" cy="-86" r="7" fill="#f472b6" opacity="0.6"/>
+    </g>
+
+    <!-- arms pumping -->
+    <g fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-100 -20 l-44 26 l-10 -40"/>
+      <path d="M100 -20 l46 -26 l34 18"/>
+    </g>
+    <circle cx="-154" cy="-36" r="11" fill="#fbbf24" stroke="#0f172a" stroke-width="6"/>
+    <circle cx="182" cy="-30" r="11" fill="#fbbf24" stroke="#0f172a" stroke-width="6"/>
+  </g>
+
+  <!-- ===== Wordmark: letters bouncing along as if they ran in too ===== -->
+  <g font-family="'Arial Rounded MT Bold', 'Chalkboard SE', 'Nunito', sans-serif" font-size="130" font-weight="700"
+     fill="url(#word)" stroke="#0f172a" stroke-width="5" stroke-linejoin="round" paint-order="stroke fill">
+    <text x="520"  y="266" transform="rotate(-6 548 220)">r</text>
+    <text x="570"  y="256" transform="rotate(4 610 220)">u</text>
+    <text x="654"  y="268" transform="rotate(-3 694 220)">n</text>
+    <text x="738"  y="254" transform="rotate(6 771 220)">s</text>
+    <text x="807"  y="266" transform="rotate(-5 847 220)">h</text>
+    <text x="891"  y="258" transform="rotate(3 929 220)">e</text>
+    <text x="970"  y="268" transform="rotate(-4 1008 220)">e</text>
+    <text x="1049" y="256" transform="rotate(5 1074 220)">t</text>
+    <text x="1103" y="266" transform="rotate(-6 1136 220)">s</text>
+  </g>
+
+  <!-- tagline -->
+  <text x="524" y="326" font-family="'Arial Rounded MT Bold', sans-serif" font-size="30" fill="#94a3b8" letter-spacing="5">RUNBOOKS THAT ACTUALLY RUN</text>
+
+  <!-- a dotted track under the word, like a finish-line stripe -->
+  <path d="M522 358 H1186" fill="none" stroke="#2dd4bf" stroke-width="6" stroke-linecap="round" stroke-dasharray="2 18" opacity="0.8"/>
+</svg>

@@ -96,7 +96,7 @@ it. Messages are quoted exactly as `runsheets` prints them.
     comes from a config file you forgot about, or from a `RUNSHEETS_*`
     variable left set in the shell.
 
-    `--dump` leaves out `dump`, `check`, `init` and `why`, so its output can
+    `--dump` leaves out `dump`, `check` and `why`, so its output can
     be saved as a config file. See [Settings](running/cli.md#settings) and
     [Saving settings](running/cli.md#saving-settings).
 

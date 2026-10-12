@@ -1,0 +1,13 @@
+---
+title: Another language
+kind: automated
+timeout: 60
+---
+
+`python` blocks run because the front matter maps `python` to `python3`
+under `interpreters`. `bash`, `sh`, `zsh` and `ruby` need no mapping.
+
+```python run
+import os
+print(os.environ["GREETING"], "from python")
+```

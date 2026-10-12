@@ -16,7 +16,7 @@ module Runsheets
   #   5. the overrides hash, which the CLI fills from the command line
   #
   # Every key in defaults.yml is an attribute here (dir, port, bind, runs_dir,
-  # open, check, init, dump, engineer, why, log_level, quiet). Paths are
+  # open, check, dump, engineer, why, log_level, quiet). Paths are
   # expanded; flags accept 1/true/yes/on.
   class Config < MywayConfig::Base
     config_name :runsheets
@@ -27,6 +27,14 @@ module Runsheets
 
     class << self
       def blank?(value) = value.nil? || value.to_s.strip.empty?
+
+      # File.expand_path, but a ~user that names nobody is a ConfigError
+      # rather than an ArgumentError, so the CLI reports it in one line.
+      def expand_path(path, base = nil)
+        File.expand_path(path, base)
+      rescue ArgumentError => e
+        raise ConfigError, "cannot expand #{path}: #{e.message}"
+      end
 
       # A coercion that hands the stripped text to the block, or gives nil for
       # a blank so the bundled default fills it (see fill_blanks_from_defaults).
@@ -47,8 +55,37 @@ module Runsheets
           File.join(Dir.home, ".config", config_name.to_s, "#{config_name}.yml")
       end
 
+      # The config file named in place of the project config: +given+ (the
+      # --config option), else RUNSHEETS_CONFIG, expanded; nil when neither
+      # names one. Raises ConfigError when the file named does not exist.
+      def explicit_path(given, env: ENV)
+        name = [given, env["RUNSHEETS_CONFIG"]].find { !blank?(it) } or return nil
+        path = expand_path(name)
+        raise ConfigError, "config file not found: #{path}" unless File.file?(path)
+
+        path
+      end
+
       # The project config read when neither --config nor RUNSHEETS_CONFIG names a file.
       def project_path = File.expand_path(Anyway::Settings.default_config_path.call(config_name))
+
+      # The settings one config file holds, as a string-keyed Hash, read as
+      # myway_config reads it: the section for +environment+ when one is
+      # set and the file has it, else the whole file. {} when it is
+      # missing, unreadable or not a mapping.
+      def file_settings(path, environment: current_environment)
+        data = YAML.safe_load_file(path, aliases: false)
+        return {} unless data.is_a?(Hash)
+
+        section = data[environment] if environment
+        section.is_a?(Hash) ? section : data
+      rescue Psych::Exception, SystemCallError
+        {}
+      end
+
+      # The environment whose section a config file is read from, or nil
+      # (the usual case for a command) to read the whole file.
+      def current_environment = Anyway::Settings.current_environment&.to_s
 
       # The bundled defaults, coerced, keyed by attribute. What the help text shows.
       def bundled_defaults = schema.to_h { |key, value| [key, type_caster.coerce(key, value)] }
@@ -59,12 +96,12 @@ module Runsheets
 
     # Coercions: the raw YAML/env/CLI value becomes the type the attribute needs.
     TEXT = unless_blank(&:itself)
-    PATH = unless_blank { File.expand_path(it) }
+    PATH = unless_blank { expand_path(it) }
     PORT = unless_blank { whole_number(it) }
     FLAG = ->(v) { v == true || TRUE_WORDS.include?(v.to_s.strip.downcase) }
 
-    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :init, :dump, :engineer, :why, :log_level, :quiet
-    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, init: FLAG, dump: FLAG,
+    attr_config :dir, :port, :bind, :runs_dir, :open, :check, :dump, :engineer, :why, :log_level, :quiet
+    coerce_types dir: PATH, runs_dir: PATH, bind: TEXT, port: PORT, open: FLAG, check: FLAG, dump: FLAG,
                  engineer: TEXT, why: TEXT, log_level: unless_blank { SessionLog.level_name(it) }, quiet: FLAG
 
     on_load :fill_blanks_from_defaults
@@ -83,6 +120,16 @@ module Runsheets
     # The config files that exist and were read, lowest layer first.
     def files = [self.class.xdg_path, path].select { File.file?(it) }
 
+    # The dir a config file sets, whatever RUNSHEETS_DIR or the command line
+    # say: from the highest file that has one, expanded, else nil.
+    def file_dir
+      files.reverse_each do |file|
+        value = self.class.file_settings(file)["dir"]
+        return self.class.expand_path(value.to_s) unless self.class.blank?(value)
+      end
+      nil
+    end
+
     # The bind address in force when it came from the project config found
     # in the current directory, else nil. That file arrives with whatever
     # repository was cloned, so the CLI will not let it alone open the
@@ -92,18 +139,15 @@ module Runsheets
       return nil if @override_keys.include?("bind") || !self.class.blank?(ENV["RUNSHEETS_BIND"])
       return nil unless File.file?(path.to_s)
 
-      data = YAML.safe_load_file(path, aliases: false)
-      data.is_a?(Hash) && data.key?("bind") ? bind : nil
-    rescue Psych::Exception
-      nil
+      self.class.file_settings(path).key?("bind") ? bind : nil
     end
 
     # The settings in force as the flat hash a config file holds. dump is
     # left out: it is an action for this run, and a saved `dump: true` would
-    # make every later run print and exit; check and init likewise. why is
+    # make every later run print and exit; check likewise. why is
     # left out too: it belongs to one session, and a saved one would start
     # every later session with it.
-    def settings = (self.class.config_attributes - %i[dump check init why]).to_h { [it.to_s, public_send(it)] }
+    def settings = (self.class.config_attributes - %i[dump check why]).to_h { [it.to_s, public_send(it)] }
 
     # The settings in force as the text of a config file: a comment header,
     # then one key per setting. `runsheets --dump` prints this.
@@ -120,12 +164,7 @@ module Runsheets
     # Where anyway_config's yml loader reads from. A file named explicitly
     # (option or variable) must exist; the project config may be absent.
     def resolve_config_path(_name, _env_prefix)
-      explicit = @explicit_path
-      explicit = ENV["RUNSHEETS_CONFIG"] if self.class.blank?(explicit)
-      explicit = nil if self.class.blank?(explicit)
-      raise ConfigError, "config file not found: #{explicit}" if explicit && !File.file?(File.expand_path(explicit))
-
-      @path = explicit ? File.expand_path(explicit) : self.class.project_path
+      @path = self.class.explicit_path(@explicit_path) || self.class.project_path
     end
 
     # A blank in any layer (RUNSHEETS_PORT="" say) coerces to nil; put the

@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+# asgard's entry point for the <%= title %> runbook beside it. Blocks in the
+# runbook run in this directory, so `asgard` finds this file first.
+
+import "*.loki"
+
+class Tasks
+  header <%= ruby_string("#{name}: tasks for the #{title} runbook") %>
+end

@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+require "fileutils"
+
+# The runbook's work. WORK_DIR is a runbook input; env(:work_dir) reads it.
+class Tasks
+  desc "preflight", "Fail unless WORK_DIR is set"
+  def preflight
+    dir = env(:work_dir, "")
+    abort "preflight: WORK_DIR is empty" if dir.empty?
+    puts "preflight: WORK_DIR is #{dir}"
+  end
+
+  desc "work", "Write the time to WORK_DIR/last-run"
+  def work
+    dir = env(:work_dir, "")
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "last-run"), "#{Time.now.utc}\n")
+    puts "work: wrote #{dir}/last-run"
+  end
+
+  desc "check", "Fail unless WORK_DIR/last-run has something in it"
+  def check
+    path = File.join(env(:work_dir, ""), "last-run")
+    abort "check: #{path} is missing or empty" unless File.size?(path)
+    puts "check: last run #{File.read(path).strip}"
+  end
+end

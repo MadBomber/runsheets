@@ -1,0 +1,30 @@
+---
+title: <%= yaml title %>
+when_to_use: <%= yaml when_to_use %>
+prerequisites:
+  - What must be true or installed before starting
+tags: []
+inputs:
+  - name: WORK_DIR
+    prompt: Where this runbook writes its files
+    default: /tmp/<%= name %>
+escalation: <%= yaml escalation %>
+---
+
+# <%= title %>
+
+Checks and tasks that take time. Each step's `timeout` is how many
+seconds its blocks may run before they are stopped (600 when it is not
+set). A `background` block has no timeout: it runs until it is stopped,
+while later steps run. A `terminal` block is one the operator runs in
+their own shell.
+
+<% if single_file -%>
+Everything above the first `##` heading is the preamble. Each `##` heading
+below is a step, and its attributes (`kind`, `timeout`, ...) go in the HTML
+comment right after the heading.
+<% else -%>
+Everything above the first step is the preamble. The steps are the files in
+`steps/`, run in the order of their numbers, and each one's attributes
+(`kind`, `timeout`, ...) are in its front matter.
+<% end -%>

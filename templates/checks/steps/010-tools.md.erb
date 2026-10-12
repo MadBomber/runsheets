@@ -1,0 +1,17 @@
+---
+title: The tools are installed
+kind: verify
+timeout: 30
+---
+
+Each `bash run` block gets a Run button. The `text expect` block under it
+is compared with its output; `{{any}}` matches whatever changes from
+machine to machine.
+
+```bash run
+git --version
+```
+
+```text expect
+git version {{any}}
+```

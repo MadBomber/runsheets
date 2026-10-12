@@ -1,0 +1,13 @@
+---
+title: The directory is writable
+kind: verify
+timeout: 30
+---
+
+```bash run
+test -w . && echo "can write here"
+```
+
+```text expect
+can write here
+```

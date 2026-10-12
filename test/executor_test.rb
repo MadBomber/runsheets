@@ -51,8 +51,9 @@ class TestExecutor < Minitest::Test
   def test_a_finished_block_leaves_no_child_behind
     Dir.mktmpdir do |dir|
       code = "sleep 30 > /dev/null 2>&1 &\necho $!\n(trap '' TERM; sleep 30) > /dev/null 2>&1 &\necho $!\n"
-      pids = Runsheets::Executor.new.run(execution(dir), code:).output.split.map(&:to_i)
-      assert_equal [false, false], pids.map { Process.kill(0, it) rescue false }, "a child outlived its block"
+      plain, deaf = Runsheets::Executor.new.run(execution(dir), code:).output.split
+      refute system("kill", "-0", plain, err: File::NULL), "a background child outlived its block"
+      refute system("kill", "-0", deaf, err: File::NULL), "a child ignoring TERM outlived its block"
     end
   end
 

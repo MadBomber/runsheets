@@ -1,0 +1,18 @@
+---
+title: Keep a copy
+kind: automated
+timeout: 120
+---
+
+Save what the next step replaces, so Rollback has something to restore.
+
+```bash run
+mkdir -p "$WORK_DIR"
+touch "$WORK_DIR/last-run"
+cp "$WORK_DIR/last-run" "$WORK_DIR/last-run.bak"
+echo "saved $WORK_DIR/last-run.bak"
+```
+
+```text expect
+saved {{any}}/last-run.bak
+```
