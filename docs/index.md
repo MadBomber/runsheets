@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/logo.png" alt="runsheets logo: a smiling runsheet sprinting beside the runsheets wordmark" width="620">
+</p>
+
 # runsheets
 
 <p class="hero-tagline">Runbooks you can run. Runs you can prove.</p>

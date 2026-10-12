@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/images/logo.png" alt="runsheets logo: a smiling runsheet sprinting beside the runsheets wordmark" width="620">
+</p>
+
 # runsheets
 
 > **Note:** This is a proof-of-concept and a work in progress. Features,
