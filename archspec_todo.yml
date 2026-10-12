@@ -1,0 +1,32 @@
+---
+violations:
+- id: bd6f748ea23f791211b2342d
+  rule: dependencies.no_cycles
+  path: lib/runsheets/cli.rb
+  line: 322
+  message: 'component dependency cycle: cli -> console -> cli'
+- id: 4af0bc5913dc3dfbdd2512bc
+  rule: dependencies.allow
+  path: lib/runsheets/pages.rb
+  line: 648
+  message: pages may not depend on routes
+- id: 542009c67c4ebffeb4d329f7
+  rule: dependencies.no_cycles
+  path: lib/runsheets/pages.rb
+  line: 648
+  message: 'component dependency cycle: pages -> routes -> pages'
+- id: 4af0bc5913dc3dfbdd2512bc
+  rule: dependencies.allow
+  path: lib/runsheets/pages.rb
+  line: 651
+  message: pages may not depend on routes
+- id: 5521b0d9be73ab02461a4abe
+  rule: dependencies.allow
+  path: lib/runsheets/wizard.rb
+  line: 237
+  message: console may not depend on cli
+- id: 5521b0d9be73ab02461a4abe
+  rule: dependencies.allow
+  path: lib/runsheets/wizard.rb
+  line: 238
+  message: console may not depend on cli

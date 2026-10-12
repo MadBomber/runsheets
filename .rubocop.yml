@@ -171,3 +171,8 @@ Metrics/BlockLength:
     - '*.gemspec'
     - 'test/**/*'
     - '.loki'
+
+# archspec reads its spec from a file it names Archspec.rb.
+Naming/FileName:
+  Exclude:
+    - 'Archspec.rb'
