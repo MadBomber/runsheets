@@ -294,8 +294,8 @@ A word that must never appear in the run record (SECRET_WORD) [set]:
 Say hello [010-say-hello]
 ```
 
-Questions are read from standard input. When it runs out (a cron job, or
-`</dev/null`), the inputs keep their values unasked, and a question that
+Questions are read from standard input. When it runs out (a cron job, or a
+redirect from `/dev/null`), the inputs keep their values unasked, and a question that
 needs a person fails the step instead of waiting. So `--run verify` can
 run unattended as a health check, as long as its blocks only run and
 compare.
