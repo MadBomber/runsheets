@@ -1866,7 +1866,10 @@ closes every run in it, with a status worked out from what was done:</p>
 <p>A <code>runsheets</code> process holds one session, from the start page to Ctrl-C or
 <strong>End session</strong>. To keep two separate notebooks, start two processes on
 different ports. See
-<a href="../../running/#one-session-per-process">One session per process</a>.</p>
+<a href="../../running/#one-session-per-process">One session per process</a>.
+A session can also be started at the terminal, without the start page:
+<code>runsheets --run STEP</code> records one step in a session of its own, with the
+same run record and log. See <a href="../../running/cli/#running-one-step">Running one step</a>.</p>
 
 
 

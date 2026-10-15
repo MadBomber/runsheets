@@ -1187,6 +1187,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#new-runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New runbooks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New runbooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-bundled-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The bundled templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-one-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running one step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checking-runbooks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1734,6 +1773,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#new-runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New runbooks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New runbooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-bundled-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The bundled templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-one-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running one step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checking-runbooks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1940,6 +2018,8 @@
 
 <h1 id="command-line">Command Line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h1>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: runsheets [options] [RUNBOOK]
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>       runsheets --new [DIR]
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>       runsheets --run [STEP] --engineer NAME --why TEXT [RUNBOOK]
 </span></code></pre></div>
 <p><code>RUNBOOK</code> is one of three things: a runbook directory (it must contain
 <code>runbook.md</code>), a single all-in-one markdown file whose <code>##</code> headings are the
@@ -1949,9 +2029,19 @@ or a directory holding several of either, in folders nested to any depth
 directory of runbooks, the page opens on a folder tree and the operator picks
 one; <code>runsheets examples</code> shows the five bundled example runbooks that way. It is
 the only positional argument. Leave it out and the bundled <code>examples/directory_based_runbooks/hello</code>
-is served, which is the quickest way to see the tool;
-<code>--init</code> is the one mode that always needs a path. <code>dir:</code> in the config file
-or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Settings</a>.</p>
+is served, which is the quickest way to see the tool. <code>dir:</code> in the config
+file or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Settings</a>.
+A relative <code>RUNBOOK</code> is looked for in the current directory first, then
+under the <code>dir:</code> a config file sets, else <code>RUNSHEETS_DIR</code> (a <code>dir:</code> naming
+a single-file runbook is searched from the folder it is in). With
+<code>RUNSHEETS_DIR=~/ops/runbooks</code>, <code>runsheets --check platform/deploy</code> finds
+<code>~/ops/runbooks/platform/deploy</code> from anywhere. An absolute path, or one
+starting with <code>~</code>, is only ever looked for where it says. When neither
+place has it, the error names both.
+<code>--new [DIR]</code> takes no <code>RUNBOOK</code> and cannot be combined with <code>--run</code>; see
+<a href="#new-runbooks">New runbooks</a>.
+<code>--run [STEP]</code> runs one step of <code>RUNBOOK</code> at the terminal; see
+<a href="#running-one-step">Running one step</a>.</p>
 <h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1993,9 +2083,14 @@ or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Set
 <td>Load the runbook, print authoring warnings, and exit without serving. On a directory of runbooks, every runbook is checked, one line each. See <a href="#checking-runbooks">Checking runbooks</a>. <code>--no-check</code> turns it off.</td>
 </tr>
 <tr>
-<td><code>--init</code></td>
-<td>off</td>
-<td>Create a starter runbook at <code>RUNBOOK</code> and exit: a directory with <code>runbook.md</code>, two steps, <code>verify.md</code> and <code>rollback.md</code>, or a single file when the path ends in <code>.md</code>. Refuses to touch an existing file or a non-empty directory. <code>--no-init</code> turns it off.</td>
+<td><code>--new [DIR]</code></td>
+<td></td>
+<td>Ask what kind of runbook to make, write it into <code>DIR</code> from a template, and exit. Without <code>DIR</code>, ask for it too. See <a href="#new-runbooks">New runbooks</a>.</td>
+</tr>
+<tr>
+<td><code>--run [STEP]</code></td>
+<td></td>
+<td>Run one step of <code>RUNBOOK</code> at the terminal and exit. <code>STEP</code> is the step's name or slug, or <code>verify</code>, <code>rollback</code> or <code>runbook</code>, never a number; without it, the steps are listed to choose from by number. Needs <code>--engineer</code> and <code>--why</code>. See <a href="#running-one-step">Running one step</a>.</td>
 </tr>
 <tr>
 <td><code>--dump</code></td>
@@ -2041,9 +2136,8 @@ or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Set
 </table>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Start a new runbook, then serve it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># a directory</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/db-refresh.md<span class="w">     </span><span class="c1"># or a single file</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-refresh
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runsheets<span class="w"> </span>--new<span class="w"> </span>ops/runbooks<span class="w">                    </span><span class="c1"># answer the questions; say db-refresh for the name</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/db-refresh
 </span></code></pre></div>
 <p>Serve a runbook and open it, as a directory or as one all-in-one file:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>runsheets<span class="w"> </span>--open<span class="w"> </span>ops/runbooks/staging-teardown<span class="w">       </span><span class="c1"># a directory</span>
@@ -2059,36 +2153,263 @@ or <code>RUNSHEETS_DIR</code> can supply it instead; see <a href="#settings">Set
 <p>Keep run records inside a project (but outside the runbook):</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>runsheets<span class="w"> </span>--runs-dir<span class="w"> </span>./tmp/runs<span class="w"> </span>ops/runbooks/staging-teardown
 </span></code></pre></div>
+<p>Run the checks in a runbook's <code>verify.md</code> from cron, failing if any does:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheets<span class="w"> </span>--run<span class="w"> </span>verify<span class="w"> </span>-e<span class="w"> </span>cron<span class="w"> </span>-w<span class="w"> </span><span class="s2">"nightly health check"</span><span class="w"> </span>ops/runbooks/db-maintenance.md<span class="w"> </span>&lt;/dev/null
+</span></code></pre></div>
 <p>Validate every runbook in a repository (a directory of runbooks is checked
 as a whole):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks
 </span></code></pre></div>
+<h2 id="new-runbooks">New runbooks<a class="headerlink" href="#new-runbooks" title="Permanent link">&para;</a></h2>
+<p><code>runsheets --new DIR</code> asks six questions, shows what it will create and
+asks to go ahead, then writes a starter runbook into <code>DIR</code>, creating <code>DIR</code>
+if it does not exist. Enter accepts the default in brackets.</p>
+<p>Leave <code>DIR</code> out and there is a seventh question first: where to put it. The default
+offered is the <code>dir:</code> a config file sets (the file <code>--config</code> names or
+<code>./config/runsheets.yml</code>, then the user config), else <code>RUNSHEETS_DIR</code>. Here
+a config file setting beats the environment, the reverse of the usual
+<a href="#settings">layering</a>, because the config file is where a standing choice
+of runbook directory belongs. With neither there is no default and an
+answer is needed. A <code>dir:</code> naming a single-file runbook offers the directory
+it is in, and <code>~</code> is expanded. An answer that names a file, or a <code>~user</code>
+that does not exist, is asked for again.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ RUNSHEETS_DIR=~/ops/runbooks runsheets --new
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Directory to create the runbook in [/Users/you/ops/runbooks]:
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>New runbook in /Users/you/ops/runbooks
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>...
+</span></code></pre></div>
+<p>With <code>DIR</code> given:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>$ runsheets --new ops/runbooks
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>New runbook in ops/runbooks
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>Shape:
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  1) directory    runbook.md, steps/, verify.md and rollback.md
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  2) single-file  one .md file; each ## heading is a step
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>Choose [1]:
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>Template:
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>  1) checks    Checks only: verify steps that read and compare, never change
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>  2) tasks     Checks and tasks: preflight, automated and manual steps, verify
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>  3) rollback  Checks, tasks and rollback: a destructive step and the way back
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>  4) timeouts  Checks, tasks and time: per-step timeouts, a background process, a terminal step
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>  5) inputs    Checks, tasks and inputs: defaults, a secret, another language
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>  6) asgard    Checks and tasks as asgard tasks in .loki files beside the runbook
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>Choose [2]: 3
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>Name (the directory name) [new-runbook]: DB Refresh
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>Title [Db refresh]: Refresh staging from production
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>When to use, in a sentence [edit later]: Before a release that needs production data
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>Who to call when a step fails [edit later]: #data-platform
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>Create directory runbook ops/runbooks/db-refresh from the rollback template? [Y/n]:
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>created ops/runbooks/db-refresh/runbook.md
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>...
+</span></code></pre></div>
+<ul>
+<li><strong>Shape</strong> is the <a href="../../runbooks/structure/">runbook structure</a>: a
+  directory, or one markdown file whose <code>##</code> headings are the steps.</li>
+<li><strong>Template</strong> is the starting content, from the simplest structure to
+  richer ones; <code>tasks</code> is the default. Every template produces either
+  shape, and every one passes <code>--check</code> with no warnings as written.</li>
+<li><strong>Name</strong> becomes the directory or file name: lower case, with anything
+  but letters and digits turned into <code>-</code>, and <code>.md</code> added for a single
+  file. A name that is already taken (a file, or a directory with anything
+  in it) is asked for again.</li>
+<li><strong>Title</strong>, <strong>When to use</strong> and <strong>Who to call</strong> go into the front matter
+  as <code>title</code>, <code>when_to_use</code> and <code>escalation</code>. Left blank, the last two keep
+  a placeholder to fill in later.</li>
+</ul>
+<p>Answering <code>n</code> at the end creates nothing, as does Ctrl-C at any question.
+The answers can be piped in, one per line. Any missing at the end take
+their defaults, and the final question is answered yes, so a pipe that
+runs out writes the runbook:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'2\ninputs\nnightly-report\n'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>runsheets<span class="w"> </span>--new<span class="w"> </span>ops/runbooks
+</span></code></pre></div>
+<p>An answer that is refused (a name that is taken, a choice not on the list)
+with no more input after it is an error, not a default.</p>
+<h3 id="the-bundled-templates">The bundled templates<a class="headerlink" href="#the-bundled-templates" title="Permanent link">&para;</a></h3>
+<p>The templates are a ladder of structure, not of subject: each adds one
+thing to the one before, so pick the simplest that has what your procedure
+needs and replace the placeholder commands.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Template</th>
+<th>Adds</th>
+<th>What is in it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>checks</code></td>
+<td>checks only</td>
+<td>Steps that are all <code>kind: verify</code>: commands that read, never change, each compared with a <code>text expect</code> block. Runnable all at once from the Checks page.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>tasks</code></td>
+<td>doing work</td>
+<td>A preflight check, an automated step, a manual step, and <code>verify.md</code>, with one input, <code>WORK_DIR</code>. The default.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>rollback</code></td>
+<td>undoing work</td>
+<td><code>tasks</code>, plus a step that keeps a copy, a <code>destructive</code> step behind a typed confirmation, and <code>rollback.md</code> to put the copy back.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>timeouts</code></td>
+<td>time</td>
+<td><code>tasks</code>, plus a <code>timeout</code> per step, a <code>background</code> block that runs while later steps do, and a <code>terminal</code> block for the operator's own shell.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>inputs</code></td>
+<td>inputs</td>
+<td><code>tasks</code>, driven by inputs: one with a default, one without, a <code>secret</code> that is redacted from the output, and a <code>python</code> block run through <code>interpreters</code>.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>asgard</code></td>
+<td>code beside the runbook</td>
+<td><code>tasks</code>, with every block a one-line <a href="../../asgard/">asgard</a> call and the code in <code>.loki</code> files beside the runbook.</td>
+</tr>
+</tbody>
+</table>
+<p>Rungs 4 to 6 each build on <code>tasks</code>, not on each other, so each shows only
+its own addition.</p>
+<p>The templates live in <code>templates/</code> in the gem, one directory each, written
+as a directory runbook (<code>runbook.md.erb</code>, <code>steps/*.md.erb</code>, <code>verify.md.erb</code>,
+<code>rollback.md.erb</code>) with a <code>template.yml</code> holding the menu <code>order</code> and
+<code>description</code>. Files ending in <code>.erb</code> have the answers filled in; any other
+file is copied as it is. The single-file shape is made from the same files:
+each step becomes a <code>##</code> section, and its front matter, less the title,
+becomes the attribute comment under the heading.</p>
+<p>A template that brings files besides the runbook, as <code>asgard</code> brings its
+<code>.loki</code> files, cannot drop them loose beside a single file: they would
+land in a folder other runbooks share, and asgard would use them for every
+one of those. So a single file from such a template gets a folder of its
+own, <code>NAME/NAME.md</code> with the support files beside it, and <code>--check</code> is
+given <code>NAME/NAME.md</code>.</p>
+<h2 id="running-one-step">Running one step<a class="headerlink" href="#running-one-step" title="Permanent link">&para;</a></h2>
+<p><code>runsheets --run STEP RUNBOOK</code> runs one step at the terminal and exits,
+without starting the web server. Name the step by its name
+(<code>take-a-backup</code>), its whole slug (<code>020-take-a-backup</code>), or <code>verify</code>,
+<code>rollback</code> or <code>runbook</code> for those documents. In a single-file runbook the
+name is the heading as a slug: <code>## Take a backup</code> is <code>take-a-backup</code>.
+<code>STEP</code> is never a number: <code>--run 020</code> is an error, so a number typed by
+habit cannot run a step other than the one meant. A name that matches
+nothing, or more than one step, is an error that names the runbook and
+lists its steps.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>runsheets<span class="w"> </span>--run<span class="w"> </span>take-a-backup<span class="w"> </span>-e<span class="w"> </span><span class="s2">"Pat Doe"</span><span class="w"> </span>-w<span class="w"> </span><span class="s2">"refresh staging"</span><span class="w"> </span>ops/runbooks/db-refresh
+</span></code></pre></div>
+<p>A whole slug always means its own document. A numbered step named like
+<code>verify.md</code>, <code>rollback.md</code> or the landing page (<code>030-verify</code>, say) is
+reached by its whole slug, since <code>--run verify</code> runs <code>verify.md</code>; <code>--check</code>
+warns about such a step.</p>
+<p>Leave <code>STEP</code> out and the steps are listed to choose from. Numbers belong
+here: they are places in this list, not step numbers. A name or slug works
+too:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>$ runsheets -e "Pat Doe" -w "refresh staging" --run ops/runbooks/db-refresh
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>Steps in Refresh the staging database:
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>   1) 010-preflight      Preflight
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>   2) 020-take-a-backup  Take a backup
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>   3) 030-tail-the-log   Tail the log  (page only)
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>   4) verify             Verify
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>Which step? (its number in the list, or its name): 2
+</span></code></pre></div>
+<p>The list starts with <code>runbook</code>, the landing page, when that page has
+blocks to run or confirm. A step marked <code>(page only)</code> has a background
+block and cannot run at a terminal.</p>
+<p>Since the step is optional, <code>--run ops/runbooks/db-refresh</code> would read the
+runbook as the step. When no other <code>RUNBOOK</code> is given, a value with a <code>/</code>,
+ending in <code>.md</code>, or naming something in the current directory is taken as
+<code>RUNBOOK</code> instead. With no <code>RUNBOOK</code> at all, <code>--run</code> uses the <code>dir:</code> or
+<code>RUNSHEETS_DIR</code> setting, else the bundled hello example. <code>RUNBOOK</code> must be
+one runbook: <code>--run</code> refuses a directory of them.</p>
+<p>It is recorded like a run from the page. <code>--engineer</code> and <code>--why</code> are
+required (or <code>engineer:</code> and <code>why:</code> from another
+<a href="#settings">settings</a> layer), since there is no start page to ask. The
+step runs in a session of its own that ends when the step does, with a
+run record and a session log whose last line says whether the step
+succeeded, failed or was interrupted. A step that would be refused, or a
+name that finds no step, starts no session. Unless <code>--quiet</code> is given, the log is echoed
+as it is written, so each block's output appears as it comes.</p>
+<p>Each block does at the terminal what it does on the page:</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>At the terminal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run</code></td>
+<td>Runs. A block that does not exit <code>0</code> fails the step, and the blocks after it are not run.</td>
+</tr>
+<tr>
+<td><code>text expect</code></td>
+<td>Is compared with the output of the block above it. A mismatch prints the lines that differ, marked <code>-</code> (expected) and <code>+</code> (output), and fails the step.</td>
+</tr>
+<tr>
+<td><code>destructive</code></td>
+<td>Prints its confirmation code and runs only once the code is typed. There is no way to skip this.</td>
+</tr>
+<tr>
+<td><code>terminal</code></td>
+<td>Is printed, and asks <code>Did you run it?</code>, then for an optional note.</td>
+</tr>
+<tr>
+<td><code>background</code></td>
+<td>Is refused. A step with one is not run at all: nothing would be left to stop it. Start it from the page.</td>
+</tr>
+</tbody>
+</table>
+<p>A step with nothing to run or confirm is printed, and asks <code>Done?</code>. A
+numbered step that succeeds is marked done in the run record.</p>
+<p>First it asks for each of the runbook's inputs in order, as the page's
+start form does. The value in brackets is the one it has now, from the
+environment or its default, and Enter keeps it. A secret is read without
+echo and shown only as <code>[set]</code>; only its newline is removed, so spaces
+typed around a password are kept, as on the page. An input the step uses
+that is still blank is an error.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Who should be greeted? (NAME) [world]: Pat
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>A word that must never appear in the run record (SECRET_WORD) [set]:
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>Say hello [010-say-hello]
+</span></code></pre></div>
+<p>Questions are read from standard input. When it runs out (a cron job, or a
+redirect from <code>/dev/null</code>), the inputs keep their values unasked, and a question that
+needs a person fails the step instead of waiting. So <code>--run verify</code> can
+run unattended as a health check, as long as its blocks only run and
+compare.</p>
 <h2 id="checking-runbooks">Checking runbooks<a class="headerlink" href="#checking-runbooks" title="Permanent link">&para;</a></h2>
 <p><code>--check</code> loads the runbook, prints its authoring warnings to stderr
 prefixed <code>runsheets: warning:</code>, and prints one line to stdout:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Hello, runsheets: 6 steps, 0 warnings
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Hello, runsheets: 6 steps, 0 warnings
 </span></code></pre></div>
 <p>On a directory of runbooks every runbook gets that line with its slug in
 brackets, and each warning is prefixed with the slug:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>runsheets: warning: platform/deploy: 020-roll-out: automated step has no executable block
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Deploy [platform/deploy]: 4 steps, 1 warnings
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>Backup [platform/database/backup]: 3 steps, 0 warnings
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>runsheets: warning: platform/deploy: 020-roll-out: automated step has no executable block
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>Deploy [platform/deploy]: 4 steps, 1 warnings
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>Backup [platform/database/backup]: 3 steps, 0 warnings
 </span></code></pre></div>
 <p>A runbook in the directory that cannot be read (an unreadable file, front
 matter that is not valid YAML, a clash of names) is never dropped from
 the check. It is reported as an error with its slug and no summary line:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>runsheets: error: platform/restore: front matter may not use YAML aliases (&amp; and *)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>runsheets: error: platform/restore: front matter may not use YAML aliases (&amp; and *)
 </span></code></pre></div>
 <p>The exit status is <code>1</code> if any runbook warned or could not be read, else
 <code>0</code>.</p>
 <h2 id="what-it-prints">What it prints<a class="headerlink" href="#what-it-prints" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>runsheets 0.0.1
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>Config:  /Users/you/.config/runsheets/runsheets.yml
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Session: starts in the browser (who and why)
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>Press Ctrl-C to end the session and stop
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>runsheets 0.0.1
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Runbook: Staging Infrastructure Teardown and Rebuild (/Users/you/ops/runbooks/staging-teardown)
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>Runs:    /Users/you/.local/share/runsheets/runs
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>Config:  /Users/you/.config/runsheets/runsheets.yml
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>Session: starts in the browser (who and why)
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>Open http://127.0.0.1:4567/?token=3f9c0d6e8a1b4c2f9e7d5a3b1c0f8e6d in your browser
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>Press Ctrl-C to end the session and stop
 </span></code></pre></div>
 <p>The link carries this start's session key. Opening it gives the browser
 the key as a cookie and drops it from the address bar; every request
@@ -2101,7 +2422,7 @@ is bracketed, <code>http://[::1]:4567/?token=…</code>.</p>
 number of runbooks and folders. When <code>--engineer</code> and <code>--why</code> are both set
 the session has already started, and the <code>Session:</code> line gives its id and
 the path of its log:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Session: 20261010T141502, log /Users/you/.local/share/runsheets/runs/sessions/20261010T141502/session.log
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Session: 20261010T141502, log /Users/you/.local/share/runsheets/runs/sessions/20261010T141502/session.log
 </span></code></pre></div>
 <p>Served on one runbook, its authoring warnings are printed to stderr
 before the banner, prefixed <code>runsheets: warning:</code>. The server still
@@ -2122,17 +2443,21 @@ given, the session log is echoed to the terminal as it is written. Press
 <tbody>
 <tr>
 <td><code>0</code></td>
-<td>Normal exit, or <code>--check</code> found no warnings.</td>
+<td>Normal exit, <code>--check</code> found no warnings, <code>--new</code> wrote a runbook, or the <code>--run</code> step succeeded.</td>
 </tr>
 <tr>
 <td><code>1</code></td>
-<td>Bad arguments or settings, the runbook could not be loaded, the port is in use, or <code>--check</code> found warnings or a runbook it could not read.</td>
+<td>Bad arguments or settings, the runbook could not be loaded, the port is in use, <code>--check</code> found warnings or a runbook it could not read, <code>--new</code> was answered <code>n</code> or could not write, or the <code>--run</code> step failed, was refused, or was not confirmed.</td>
+</tr>
+<tr>
+<td><code>130</code></td>
+<td>Ctrl-C at a <code>--new</code> question, or during <code>--run</code>.</td>
 </tr>
 </tbody>
 </table>
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
 <p>Every option is a setting with the same name (<code>port</code>, <code>bind</code>, <code>runs_dir</code>,
-<code>open</code>, <code>check</code>, <code>init</code>, <code>dump</code>, <code>engineer</code>, <code>why</code>, <code>log_level</code>, <code>quiet</code>),
+<code>open</code>, <code>check</code>, <code>dump</code>, <code>engineer</code>, <code>why</code>, <code>log_level</code>, <code>quiet</code>),
 and the <code>RUNBOOK</code> argument is the setting <code>dir</code>. <code>--verbose</code> sets
 <code>log_level</code> to <code>debug</code>.
 Settings are layered with <a href="https://github.com/madbomber/myway_config">myway_config</a>;
@@ -2142,7 +2467,7 @@ comes from further down:</p>
 <li><strong>Command line.</strong> Whatever is given wins outright.</li>
 <li><strong>Environment variables</strong>, <code>RUNSHEETS_</code> plus the setting name in upper
    case: <code>RUNSHEETS_PORT</code>, <code>RUNSHEETS_BIND</code>, <code>RUNSHEETS_RUNS_DIR</code>,
-   <code>RUNSHEETS_OPEN</code>, <code>RUNSHEETS_CHECK</code>, <code>RUNSHEETS_INIT</code>, <code>RUNSHEETS_DUMP</code>, <code>RUNSHEETS_DIR</code>,
+   <code>RUNSHEETS_OPEN</code>, <code>RUNSHEETS_CHECK</code>, <code>RUNSHEETS_DUMP</code>, <code>RUNSHEETS_DIR</code>,
    <code>RUNSHEETS_ENGINEER</code>, <code>RUNSHEETS_WHY</code>, <code>RUNSHEETS_LOG_LEVEL</code>, <code>RUNSHEETS_QUIET</code>.</li>
 <li><strong>The project config</strong>, <code>./config/runsheets.yml</code> in the current directory,
    or the file <code>--config FILE</code> or <code>RUNSHEETS_CONFIG</code> names in its place. The
@@ -2163,13 +2488,13 @@ that is not one of the five (in any case: <code>WARN</code> is <code>warn</code>
 config file that does not exist, a config file that is not valid YAML, a
 <code>--bind</code> host that does not resolve, or a runbook directory that cannot
 be read is reported in one line and the command exits <code>1</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>runsheets: port must be between 1 and 65535, got 70000
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>runsheets: port must be between 1 and 65535, got 70000
 </span></code></pre></div>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># ~/.config/runsheets/runsheets.yml</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runbooks/db-refresh</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4580</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="nt">runs_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runs</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="nt">open</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># ~/.config/runsheets/runsheets.yml</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runbooks/db-refresh</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4580</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="nt">runs_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/ops/runs</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="nt">open</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </span></code></pre></div>
 <p>With that file, plain <code>runsheets</code> serves the db-refresh runbook on port 4580
 and opens the browser; <code>runsheets --check</code> checks it instead; and
@@ -2215,14 +2540,14 @@ Pass <code>--bind</code> or set <code>RUNSHEETS_BIND</code> if that is really wa
 in the shape of a config file, and exits. Redirect it to save them. Run it
 with the options you want to keep and they become the defaults for later
 runs:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># look first</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w"> </span>&gt;<span class="w"> </span>~/.config/runsheets/runsheets.yml
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>runsheets<span class="w">                                                  </span><span class="c1"># now serves db-refresh on 4580</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w">        </span><span class="c1"># look first</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>runsheets<span class="w"> </span>--dump<span class="w"> </span>-p<span class="w"> </span><span class="m">4580</span><span class="w"> </span>~/ops/runbooks/db-refresh<span class="w"> </span>&gt;<span class="w"> </span>~/.config/runsheets/runsheets.yml
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>runsheets<span class="w">                                                  </span><span class="c1"># now serves db-refresh on 4580</span>
 </span></code></pre></div>
 <p>Redirect to <code>config/runsheets.yml</code> instead for a project config to commit
 with a repository. <code>dump</code> itself is never in the output, so a saved file
-cannot make every later run print and exit, and neither are <code>check</code> and
-<code>init</code>, for the same reason. Nor is <code>why</code>: the reason for a session
+cannot make every later run print and exit, and neither is <code>check</code>, for
+the same reason. Nor is <code>why</code>: the reason for a session
 belongs to that session, not to every later one. <code>engineer</code> is saved.</p>
 <h2 id="about-bind">About <code>--bind</code><a class="headerlink" href="#about-bind" title="Permanent link">&para;</a></h2>
 <p>The default binds to loopback and the server only accepts requests whose

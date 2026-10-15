@@ -1926,28 +1926,34 @@ on Sinatra and is tested in isolation.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  block.rb                    a fenced block and the kind its flags ask for
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  renderer.rb                 kramdown + rouge, wraps executable blocks
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  step.rb                     one markdown file: front matter, body, html, blocks
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  single_file.rb              splits a one-file runbook into preamble and ## sections
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  runbook.rb                  a directory or a single file: steps, verify, rollback
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  search.rb                   full-text search over runbooks
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  diff.rb                     line diff for drift between a record and the runbook
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  expectation.rb              compares a block's output with its expect block, {{any}} wildcards
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  redactor.rb                 replaces secret values in captured output
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  execution.rb                one execution: state, pid, files, timing
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  executor.rb                 spawns, pumps output through the redactor to the file and the log, reaps, times out, stops
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  run_record.rb               run.json, run.md, blocks/; list, load, drift, closing status
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  run.rb                      one runbook's run: inputs, executions, confirmation codes
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>  session_log.rb              session.log: tagged, levelled lines, echoed to the terminal
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  session.rb                  the session: engineer, notes, the runs, session.json, ending
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>  web.rb                      Sinatra routes and the security checks
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>  pages.rb                    pure functions that build the HTML
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  pages/chooser.rb            the library page: header, folder pane, runbook pane
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  pages/tree.rb               the folder tree in the library page's left pane
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>  pages/search.rb             the search results page
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  assets.rb                   inline CSS and JavaScript
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>  cli.rb                      option parsing and the bin/runsheets entry point
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>bin/runsheets
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>examples/directory_based_runbooks/hello/               a safe runbook; also the test fixture
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  slug.rb                     the slug and title rules shared by steps, sections and --new
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  single_file.rb              splits a one-file runbook into preamble and ## sections; joins them back for --new
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  runbook.rb                  a directory or a single file: steps, verify, rollback
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  library.rb                  a directory tree of runbooks: folders, entries, READMEs, rescan
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  search.rb                   full-text search over runbooks
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  diff.rb                     line diff for drift between a record and the runbook
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  expectation.rb              compares a block's output with its expect block, {{any}} wildcards
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  redactor.rb                 replaces secret values in captured output
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  execution.rb                one execution: state, pid, files, timing
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  executor.rb                 spawns, pumps output through the redactor to the file and the log, reaps, times out, stops
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  run_record.rb               run.json, run.md, blocks/; list, load, drift, closing status
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>  run.rb                      one runbook's run: inputs, executions, confirmation codes
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  session_log.rb              session.log: tagged, levelled lines, echoed to the terminal
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>  session.rb                  the session: engineer, notes, the runs, session.json, ending
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>  web.rb                      Sinatra routes and the security checks
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>  pages.rb                    pure functions that build the HTML
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  pages/chooser.rb            the library page: header, folder pane, runbook pane
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>  pages/tree.rb               the folder tree in the library page's left pane
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  pages/search.rb             the search results page
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>  assets.rb                   inline CSS and JavaScript
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>  cli.rb                      option parsing and the bin/runsheets entry point
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>  prompt.rb                   questions at the terminal for --new and --run; secrets read without echo
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>  template.rb                 a starter runbook under templates/, rendered with the --new answers
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>  wizard.rb                   runsheets --new: asks, confirms, writes a runbook from a template
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>  step_runner.rb              runsheets --run: one step at the terminal, recorded in a session
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>bin/runsheets
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>templates/                                            the --new templates, one directory runbook each
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>examples/directory_based_runbooks/hello/               a safe runbook; also the test fixture
 </span></code></pre></div>
 <div class="diagram">
 <p><img alt="Rendering and execution pipelines" src="../../assets/images/pipeline.svg" /></p>

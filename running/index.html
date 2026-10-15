@@ -1711,6 +1711,9 @@ is allowed at any time. Every run stays open, and every background process
 keeps running, until the session ends with <strong>End session</strong> or Ctrl-C. Then
 each run is closed with a status worked out from what was done. To keep two
 separate sessions, start two processes on different ports.</p>
+<p><code>runsheets --run STEP</code> starts a session too, without the web server: it
+runs one step at the terminal and ends the session when the step ends.
+See <a href="cli/#running-one-step">Running one step</a>.</p>
 <h2 id="where-the-shell-comes-from">Where the shell comes from<a class="headerlink" href="#where-the-shell-comes-from" title="Permanent link">&para;</a></h2>
 <p>Executed blocks inherit the environment of the shell that started
 <code>runsheets</code>. If a runbook needs an SSO session, a VPN, a tunnel, or a

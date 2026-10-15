@@ -2333,10 +2333,13 @@ under <strong>Previous runs</strong>. Edit
 greeting, and open that run: a <strong>Runbook changed since this run</strong> panel
 shows the diff between what ran and what the runbook says now.</p>
 <h3 id="13-start-your-own">13. Start your own<a class="headerlink" href="#13-start-your-own" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure<span class="w">       </span><span class="c1"># a directory runbook</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>runsheets<span class="w"> </span>--init<span class="w"> </span>ops/runbooks/my-procedure.md<span class="w">    </span><span class="c1"># or one file, ## headings as steps</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runsheets<span class="w"> </span>--new<span class="w"> </span>ops/runbooks<span class="w">                  </span><span class="c1"># asks: shape, template, name, title, ...</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>runsheets<span class="w"> </span>--check<span class="w"> </span>ops/runbooks/my-procedure
 </span></code></pre></div>
+<p>Leave the directory off and <code>--new</code> asks for it, offering the <code>dir:</code> in
+your config file or <code>RUNSHEETS_DIR</code>. It then asks whether you want a
+directory runbook or a single file, which template to start from, and the
+name and title. Enter accepts each default.</p>
 <p>For the shape of a real one, read <code>examples/directory_based_runbooks/staging-teardown</code> (a
 directory, every block kind, a blast radius and a rollback) and
 <code>examples/single_md_file_runbooks/db-maintenance.md</code> (a single file whose <code>sql run</code> blocks go
