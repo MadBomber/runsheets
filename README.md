@@ -40,7 +40,7 @@ the *runbook*; the record of one runbook's run is the *runsheet*.
 gem install runsheets
 ```
 
-Requires Ruby 3.4 or newer.
+Requires Ruby 4.0 or newer.
 
 ## Run
 
